@@ -1,0 +1,19 @@
+{
+  "name": "Hungry Birds Restaurant POS",
+  "short_name": "HB POS",
+  "description": "Offline-capable point of sale system for Hungry Birds restaurant.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#4f46e5",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
