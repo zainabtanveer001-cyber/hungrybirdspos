@@ -129,37 +129,32 @@
                         <input id="menuSearch" type="text" placeholder="🔍 Search menu items..." class="w-full p-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition" />
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
-                        <button data-role="OWNER" onclick="openSalesAnalyticsModal()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm">
-                            📈 Analytics
+                    <div class="relative">
+                        <button id="mainActionMenuButton" type="button" onclick="toggleMainActionMenu()" aria-expanded="false" aria-controls="mainActionMenu" class="bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white rounded-lg shadow-sm transition hover:bg-indigo-700">
+                            ☰ More
                         </button>
-                        <button onclick="openHeldOrdersModal()" class="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-700 transition flex items-center gap-1 shadow-sm">
-                            ⏸️ Held <span id="heldOrdersBadge" class="bg-white text-orange-700 font-black px-1.5 py-0.5 rounded-full text-[10px]">0</span>
-                        </button>
-                        <button onclick="openDeliveryManagementModal()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition flex items-center gap-1 shadow-sm">
-                            🛵 Deliveries
-                        </button>
-                        <button onclick="openCustomerModal()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 transition flex items-center gap-1 shadow-sm">
-                            👥 Customers
-                        </button>
-                        <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-amber-700 transition shadow-sm">
-                            📦 Stock
-                        </button>
-                        <button data-role="OWNER" onclick="authenticateOwner()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 transition shadow-sm">
-                            👑 Admin
-                        </button>
-                        <button id="connectPrinterBtn" onclick="connectPrinter()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-sm">
-                            🖨️ Printer
-                        </button>
-                        <button data-role="OWNER,MANAGER" onclick="openExpenseModal()" class="bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-700 transition flex items-center gap-1 shadow-sm">
-    💸 Expenses
-</button>
-<button data-role="OWNER" onclick="openPnlModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1 shadow-sm hidden">
-    📊 P&L Report
-</button>
-<button data-role="OWNER" onclick="openAuditLogModal()" class="bg-gray-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1 shadow-sm">
-    🕵️ Audit Log
-</button>
+                        <div id="mainActionMenu" class="hidden absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl" role="menu" aria-labelledby="mainActionMenuButton">
+                            <div class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-gray-400">Orders</div>
+                            <button type="button" onclick="closeMainActionMenu(); openHeldOrdersModal()" role="menuitem" class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-orange-50 hover:text-orange-800">
+                                <span>Held Orders</span>
+                                <span id="heldOrdersBadge" class="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">0</span>
+                            </button>
+                            <button type="button" onclick="closeMainActionMenu(); openDeliveryManagementModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-800">Deliveries</button>
+                            <button type="button" onclick="closeMainActionMenu(); openCustomerModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-800">Customers</button>
+                            <button id="connectPrinterBtn" type="button" onclick="closeMainActionMenu(); connectPrinter()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-800">Connect Printer</button>
+
+                            <div data-role="OWNER,MANAGER" class="my-1 border-t border-gray-100"></div>
+                            <div data-role="OWNER,MANAGER" class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-gray-400">Management</div>
+                            <button data-role="OWNER,MANAGER" type="button" onclick="closeMainActionMenu(); protectedOpenInventoryModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-amber-50 hover:text-amber-800">Stock</button>
+                            <button data-role="OWNER,MANAGER" type="button" onclick="closeMainActionMenu(); openExpenseModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:text-teal-800">Expenses</button>
+
+                            <div data-role="OWNER" class="my-1 border-t border-gray-100"></div>
+                            <div data-role="OWNER" class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-gray-400">Owner</div>
+                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); openSalesAnalyticsModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-800">Sales Analytics</button>
+                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); openPnlModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-800">Profit &amp; Loss Report</button>
+                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); openAuditLogModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100">Audit Log</button>
+                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); authenticateOwner()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-800">Owner Admin</button>
+                        </div>
                     </div>
                 </div>
 
@@ -348,6 +343,15 @@
                             ⬇️ Export CSV
                         </button>
                     </div>
+
+                        <div class="mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                            <div class="flex flex-col gap-2 sm:flex-row">
+                                <input id="receiptSearchInput" type="search" placeholder="Search receipt #, customer name, or phone..." oninput="searchOldReceipts(this.value)" onkeydown="if (event.key === 'Enter') searchOldReceipts(this.value, true)" class="min-w-0 flex-1 rounded-lg border border-blue-200 bg-white p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                                <button type="button" onclick="clearReceiptSearch()" title="Clear receipt search" class="bg-white px-3 py-1.5 text-xs font-bold text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition">Clear</button>
+                            </div>
+                            <div id="receiptSearchStatus" class="hidden mt-2 text-[11px] font-semibold text-blue-800"></div>
+                            <div id="receiptSearchResults" class="hidden mt-2 max-h-72 space-y-2 overflow-y-auto"></div>
+                        </div>
 
                     <!-- BULK SELECTION TOOLBAR -->
                     <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl mb-3 border text-xs">

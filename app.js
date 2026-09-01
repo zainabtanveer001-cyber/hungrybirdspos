@@ -337,6 +337,25 @@ let pendingOwnerAction = null;
 let openingCashEditAuthorized = false;
 let pendingModifierMenuId = null;
 
+function isMainActionMenuOpen() {
+    return !document.getElementById("mainActionMenu")?.classList.contains("hidden");
+}
+
+window.closeMainActionMenu = function () {
+    document.getElementById("mainActionMenu")?.classList.add("hidden");
+    document.getElementById("mainActionMenuButton")?.setAttribute("aria-expanded", "false");
+};
+
+window.toggleMainActionMenu = function () {
+    const menu = document.getElementById("mainActionMenu");
+    const button = document.getElementById("mainActionMenuButton");
+    if (!menu || !button) return;
+
+    const willOpen = menu.classList.contains("hidden");
+    menu.classList.toggle("hidden", !willOpen);
+    button.setAttribute("aria-expanded", String(willOpen));
+};
+
 // ------------------------------
 // Application Startup
 // ------------------------------
@@ -364,6 +383,21 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (e.key === "Enter") window.signUp();
         });
     }
+
+    document.addEventListener("click", event => {
+        const menu = document.getElementById("mainActionMenu");
+        const button = document.getElementById("mainActionMenuButton");
+        if (isMainActionMenuOpen() && menu && button && !menu.contains(event.target) && !button.contains(event.target)) {
+            window.closeMainActionMenu();
+        }
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape" && isMainActionMenuOpen()) {
+            window.closeMainActionMenu();
+            document.getElementById("mainActionMenuButton")?.focus();
+        }
+    });
     // --- NEW SECURE LISTENERS ---
 
     // Secure Void / Override Action Integration
@@ -3718,6 +3752,103 @@ async function restoreInventory(itemsToRestore) {
 // ====================================================
 // Post-Sales Management & Bulk Actions
 // ====================================================
+let receiptSearchTimer = null;
+let receiptSearchRequestVersion = 0;
+
+function hideReceiptSearchResults() {
+    document.getElementById("receiptSearchStatus")?.classList.add("hidden");
+    const results = document.getElementById("receiptSearchResults");
+    if (results) {
+        results.classList.add("hidden");
+        results.innerHTML = "";
+    }
+}
+
+async function renderReceiptSearchResults(query, requestVersion) {
+    const status = document.getElementById("receiptSearchStatus");
+    const results = document.getElementById("receiptSearchResults");
+    if (!status || !results) return;
+
+    const sales = await db.sales.toArray();
+    if (requestVersion !== receiptSearchRequestVersion) return;
+
+    const normalizedQuery = query.toLowerCase();
+    const matchingSales = sales.filter(sale => {
+        const customer = sale.customer || {};
+        const delivery = sale.deliveryInfo || {};
+        return [sale.id, customer.name, customer.phone, delivery.name, delivery.phone]
+            .some(value => String(value || "").toLowerCase().includes(normalizedQuery));
+    }).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+
+    status.textContent = matchingSales.length === 0
+        ? "No receipts found."
+        : `${matchingSales.length} receipt${matchingSales.length === 1 ? "" : "s"} found.`;
+    status.classList.remove("hidden");
+
+    if (matchingSales.length === 0) {
+        results.innerHTML = `<div class="rounded-lg border border-dashed border-blue-200 bg-white p-3 text-center text-xs text-gray-500">Try a receipt number, customer name, or phone number.</div>`;
+    } else {
+        results.innerHTML = matchingSales.map(sale => {
+            const customerName = sale.customer?.name || sale.deliveryInfo?.name || "Walk-in customer";
+            const customerPhone = sale.customer?.phone || sale.deliveryInfo?.phone || "No phone saved";
+            return `
+                <div class="rounded-lg border border-blue-100 bg-white p-3 text-xs shadow-sm">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="font-bold text-gray-800">Receipt #${escapeHtml(String(sale.id))}</div>
+                            <div class="mt-0.5 text-[11px] text-gray-500">${escapeHtml(new Date(sale.timestamp).toLocaleString())} | ${escapeHtml(sale.orderType || "DINE_IN")}</div>
+                        </div>
+                        <div class="shrink-0 font-bold text-emerald-700">${formatAmount(sale.total || 0)}</div>
+                    </div>
+                    <div class="mt-2 text-gray-700"><strong>${escapeHtml(customerName)}</strong> <span class="text-gray-500">${escapeHtml(customerPhone)}</span></div>
+                    <div class="mt-2 flex justify-end gap-1.5 border-t border-gray-100 pt-2">
+                        <button type="button" onclick="downloadReceiptPDF(${Number(sale.id)})" class="rounded bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">PDF</button>
+                        <button type="button" onclick="shareReceipt(${Number(sale.id)})" class="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">Share</button>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    results.classList.remove("hidden");
+}
+
+window.searchOldReceipts = function (value, searchImmediately = false) {
+    const query = String(value || "").trim();
+    clearTimeout(receiptSearchTimer);
+    const requestVersion = ++receiptSearchRequestVersion;
+
+    if (!query) {
+        hideReceiptSearchResults();
+        return;
+    }
+
+    const search = () => renderReceiptSearchResults(query, requestVersion).catch(error => {
+        console.error("Receipt search failed:", error);
+        if (requestVersion !== receiptSearchRequestVersion) return;
+        const status = document.getElementById("receiptSearchStatus");
+        if (status) {
+            status.textContent = "Could not search receipts. Please try again.";
+            status.classList.remove("hidden");
+        }
+    });
+
+    if (searchImmediately) {
+        search();
+    } else {
+        receiptSearchTimer = setTimeout(search, 250);
+    }
+};
+
+window.clearReceiptSearch = function () {
+    const input = document.getElementById("receiptSearchInput");
+    if (input) input.value = "";
+    clearTimeout(receiptSearchTimer);
+    receiptSearchRequestVersion++;
+    hideReceiptSearchResults();
+    input?.focus();
+};
+
 window.renderRecentSales = async function () {
     const container = document.getElementById("salesContainer");
     if (!container) return;
