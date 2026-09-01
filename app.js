@@ -138,7 +138,7 @@ window.exportSalesCSV = async function () {
     const sales = await db.sales.orderBy("timestamp").toArray();
     if (sales.length === 0) return alert("No sales to export.");
 
-    const headers = ["Order ID", "Date", "Server", "Order Type", "Items", "Subtotal", "Discount %", "Discount Amount", "Delivery Charge", "Total", "Refunded Amount", "Refund Status", "Payment Methods"];
+    const headers = ["Order ID", "Date", "Server", "Order Type", "Items", "Subtotal", "Discount %", "Discount Amount", "Delivery Charge", "Packing Charge", "Tax %", "Tax Amount", "Other Charges", "Total", "Refunded Amount", "Refund Status", "Payment Methods"];
     const rows = sales.map(sale => [
         sale.id,
         sale.timestamp ? new Date(sale.timestamp).toLocaleString() : "",
@@ -149,6 +149,10 @@ window.exportSalesCSV = async function () {
         sale.discountPercent || 0,
         Number(sale.discountAmount || 0).toFixed(2),
         Number(sale.deliveryCharge || 0).toFixed(2),
+        Number(sale.packingCharge || 0).toFixed(2),
+        Number(sale.taxPercent || 0).toFixed(2),
+        Number(sale.taxAmount || 0).toFixed(2),
+        Number(sale.otherCharge || 0).toFixed(2),
         Number(sale.total || 0).toFixed(2),
         Number(sale.refundedAmount || 0).toFixed(2),
         sale.refundStatus || "",
@@ -289,6 +293,9 @@ let currentCustomer = null;
 let currentWaiter = "";
 let currentDiscountPercent = 0;
 let currentDeliveryCharge = 0;
+let currentPackingCharge = 0;
+let currentTaxPercent = 0;
+let currentOtherCharge = 0;
 let currentLoyaltyRedeemPoints = 0;
 let cartCustomerLoyaltyBalance = 0;
 const LOYALTY_EARN_RATE = 100; // Rs spent per 1 point earned
@@ -935,6 +942,9 @@ window.openShiftCloseModal = async function () {
 
     const totalSales = shiftSales.reduce((sum, s) => sum + (s.total || 0), 0);
     const totalOrders = shiftSales.length;
+    const totalPackingCharges = shiftSales.reduce((sum, sale) => sum + (Number(sale.packingCharge) || 0), 0);
+    const totalTax = shiftSales.reduce((sum, sale) => sum + (Number(sale.taxAmount) || 0), 0);
+    const totalOtherCharges = shiftSales.reduce((sum, sale) => sum + (Number(sale.otherCharge) || 0), 0);
 
     const dineInSales = shiftSales.filter(s => s.orderType === 'DINE_IN').reduce((sum, s) => sum + (s.total || 0), 0);
     const takeawaySales = shiftSales.filter(s => s.orderType === 'TAKEAWAY').reduce((sum, s) => sum + (s.total || 0), 0);
@@ -1041,6 +1051,13 @@ window.openShiftCloseModal = async function () {
                         <strong class="text-blue-900">${formatAmount(deliverySales)}</strong>
                     </div>
                 </div>
+            </div>
+
+            <div class="border-t pt-3 space-y-1 text-xs text-gray-600">
+                <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Checkout Charges Collected</h4>
+                <div class="flex justify-between"><span>Packing Charges:</span><strong>${formatAmount(totalPackingCharges)}</strong></div>
+                <div class="flex justify-between"><span>Tax:</span><strong>${formatAmount(totalTax)}</strong></div>
+                <div class="flex justify-between"><span>Other Charges:</span><strong>${formatAmount(totalOtherCharges)}</strong></div>
             </div>
 
             <div class="border-t pt-3 space-y-2">
@@ -1530,11 +1547,7 @@ window.holdCurrentOrder = async function () {
         return;
     }
 
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const discountAmount = subtotal * (currentDiscountPercent / 100);
-    const deliveryCharge = currentOrderType === "DELIVERY" ? (Number(currentDeliveryCharge) || 0) : 0;
-    const loyaltyDiscount = Math.min((Number(currentLoyaltyRedeemPoints) || 0) * LOYALTY_POINT_VALUE, Math.max(0, subtotal - discountAmount));
-    const grandTotal = Math.max(0, subtotal - discountAmount + deliveryCharge - loyaltyDiscount);
+    const { subtotal, discountAmount, deliveryCharge, packingCharge, otherCharge, taxAmount, loyaltyDiscount, grandTotal } = calculateCartTotals();
 
     let deliveryDetails = null;
     if (currentOrderType === "DELIVERY") {
@@ -1551,6 +1564,10 @@ window.holdCurrentOrder = async function () {
         discountPercent: currentDiscountPercent,
         discountAmount,
         deliveryCharge,
+        packingCharge,
+        taxPercent: currentTaxPercent,
+        taxAmount,
+        otherCharge,
         loyaltyRedeemPoints: currentLoyaltyRedeemPoints,
         loyaltyDiscount,
         total: grandTotal,
@@ -1564,10 +1581,7 @@ window.holdCurrentOrder = async function () {
 
     await db.heldOrders.add(heldOrderData);
 
-    cart = [];
-    currentDiscountPercent = 0;
-    const discInput = document.getElementById("discountInput");
-    if (discInput) discInput.value = 0;
+    clearCheckoutCharges();
     clearDeliveryDetails();
     clearCartCustomer();
 
@@ -1656,6 +1670,11 @@ window.restoreHeldOrder = async function (id) {
     currentDeliveryCharge = Number(order.deliveryCharge) || 0;
     const chargeInput = document.getElementById("deliveryChargeInput");
     if (chargeInput) chargeInput.value = currentDeliveryCharge;
+
+    currentPackingCharge = Number(order.packingCharge) || 0;
+    currentTaxPercent = Number(order.taxPercent) || 0;
+    currentOtherCharge = Number(order.otherCharge) || 0;
+    syncCheckoutChargeInputs();
 
     restoreCartCustomerInput(order.customer);
     currentLoyaltyRedeemPoints = Number(order.loyaltyRedeemPoints) || 0;
@@ -2032,7 +2051,7 @@ async function printKDS(saleId, items, meta = {}) {
     }
 }
 
-async function printReceipt(saleId, cartItems, subtotal, discountPercent, total, deliveryInfo = null, payments = [], totalChange = 0, orderType = currentOrderType, deliveryCharge = 0) {
+async function printReceipt(saleId, cartItems, subtotal, discountPercent, total, deliveryInfo = null, payments = [], totalChange = 0, orderType = currentOrderType, deliveryCharge = 0, packingCharge = 0, taxPercent = 0, taxAmount = 0, otherCharge = 0) {
     if (!printerCharacteristic) {
         console.warn("No printer connected.");
         return;
@@ -2082,6 +2101,9 @@ async function printReceipt(saleId, cartItems, subtotal, discountPercent, total,
     if (deliveryCharge > 0) {
         text += `Delivery Charge: Rs ${Number(deliveryCharge).toFixed(2)}\n`;
     }
+    if (packingCharge > 0) text += `Packing Charge: Rs ${Number(packingCharge).toFixed(2)}\n`;
+    if (taxAmount > 0) text += `Tax (${Number(taxPercent).toFixed(2)}%): Rs ${Number(taxAmount).toFixed(2)}\n`;
+    if (otherCharge > 0) text += `Other Charges: Rs ${Number(otherCharge).toFixed(2)}\n`;
     text += `\x1BE\x01\x1D!\x11GRAND TOTAL: Rs ${total.toFixed(2)}\n\x1D!\x00\x1BE\x00`;
 
     if (payments && payments.length > 0) {
@@ -2981,6 +3003,64 @@ window.updateDiscount = function (value) {
     renderCart();
 };
 
+function normalizeCharge(value, maximum = Infinity) {
+    const amount = parseFloat(value);
+    if (!Number.isFinite(amount) || amount < 0) return 0;
+    return Math.min(amount, maximum);
+}
+
+function calculateCartTotals() {
+    const subtotal = cart.reduce((sum, item) => sum + (Number(item.price) * Number(item.qty)), 0);
+    const discountAmount = subtotal * (currentDiscountPercent / 100);
+    const deliveryCharge = currentOrderType === "DELIVERY" ? normalizeCharge(currentDeliveryCharge) : 0;
+    const packingCharge = normalizeCharge(currentPackingCharge);
+    const otherCharge = normalizeCharge(currentOtherCharge);
+    const taxableAmount = subtotal - discountAmount + deliveryCharge + packingCharge + otherCharge;
+    const taxAmount = taxableAmount * (currentTaxPercent / 100);
+    const loyaltyDiscount = Math.min(
+        (Number(currentLoyaltyRedeemPoints) || 0) * LOYALTY_POINT_VALUE,
+        Math.max(0, subtotal - discountAmount)
+    );
+    const grandTotal = Math.max(0, taxableAmount + taxAmount - loyaltyDiscount);
+
+    return { subtotal, discountAmount, deliveryCharge, packingCharge, otherCharge, taxAmount, loyaltyDiscount, grandTotal };
+}
+
+window.updatePackingCharge = function (value) {
+    currentPackingCharge = normalizeCharge(value);
+    renderCart();
+};
+
+window.updateTaxPercent = function (value) {
+    currentTaxPercent = normalizeCharge(value, 100);
+    renderCart();
+};
+
+window.updateOtherCharge = function (value) {
+    currentOtherCharge = normalizeCharge(value);
+    renderCart();
+};
+
+function syncCheckoutChargeInputs() {
+    const packingInput = document.getElementById("packingChargeInput");
+    const taxInput = document.getElementById("taxPercentInput");
+    const otherInput = document.getElementById("otherChargeInput");
+    if (packingInput) packingInput.value = currentPackingCharge || 0;
+    if (taxInput) taxInput.value = currentTaxPercent || 0;
+    if (otherInput) otherInput.value = currentOtherCharge || 0;
+}
+
+function clearCheckoutCharges() {
+    cart = [];
+    currentDiscountPercent = 0;
+    currentPackingCharge = 0;
+    currentTaxPercent = 0;
+    currentOtherCharge = 0;
+    const discInput = document.getElementById("discountInput");
+    if (discInput) discInput.value = 0;
+    syncCheckoutChargeInputs();
+}
+
 function renderCart() {
     const container = document.getElementById("cartItems");
     const subtotalEl = document.getElementById("cartSubtotal");
@@ -2989,6 +3069,12 @@ function renderCart() {
     const discAmountEl = document.getElementById("cartDiscountAmount");
     const chargeRow = document.getElementById("deliveryChargeRow");
     const chargeAmountEl = document.getElementById("cartDeliveryCharge");
+    const packingChargeRow = document.getElementById("packingChargeRow");
+    const packingChargeAmountEl = document.getElementById("cartPackingCharge");
+    const taxAmountRow = document.getElementById("taxAmountRow");
+    const taxAmountEl = document.getElementById("cartTaxAmount");
+    const otherChargeRow = document.getElementById("otherChargeRow");
+    const otherChargeAmountEl = document.getElementById("cartOtherCharge");
 
     if (!container) return;
 
@@ -2997,6 +3083,10 @@ function renderCart() {
         if (subtotalEl) subtotalEl.innerText = "Rs 0.00";
         if (totalEl) totalEl.innerText = "Rs 0.00";
         if (discRow) discRow.classList.add("hidden");
+        if (chargeRow) chargeRow.classList.add("hidden");
+        if (packingChargeRow) packingChargeRow.classList.add("hidden");
+        if (taxAmountRow) taxAmountRow.classList.add("hidden");
+        if (otherChargeRow) otherChargeRow.classList.add("hidden");
         return;
     }
 
@@ -3024,12 +3114,7 @@ function renderCart() {
         `;
     }).join("");
 
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const discountAmount = subtotal * (currentDiscountPercent / 100);
-    const deliveryCharge = currentOrderType === "DELIVERY" ? (Number(currentDeliveryCharge) || 0) : 0;
-    const maxLoyaltyDiscount = Math.max(0, subtotal - discountAmount);
-    const loyaltyDiscount = Math.min((Number(currentLoyaltyRedeemPoints) || 0) * LOYALTY_POINT_VALUE, maxLoyaltyDiscount);
-    const grandTotal = Math.max(0, subtotal - discountAmount + deliveryCharge - loyaltyDiscount);
+    const { subtotal, discountAmount, deliveryCharge, packingCharge, otherCharge, taxAmount, loyaltyDiscount, grandTotal } = calculateCartTotals();
 
     if (subtotalEl) subtotalEl.innerText = formatAmount(subtotal);
     if (totalEl) totalEl.innerText = formatAmount(grandTotal);
@@ -3046,6 +3131,27 @@ function renderCart() {
         if (chargeAmountEl) chargeAmountEl.innerText = formatAmount(deliveryCharge);
     } else {
         if (chargeRow) chargeRow.classList.add("hidden");
+    }
+
+    if (packingCharge > 0) {
+        if (packingChargeRow) packingChargeRow.classList.remove("hidden");
+        if (packingChargeAmountEl) packingChargeAmountEl.innerText = formatAmount(packingCharge);
+    } else {
+        if (packingChargeRow) packingChargeRow.classList.add("hidden");
+    }
+
+    if (taxAmount > 0) {
+        if (taxAmountRow) taxAmountRow.classList.remove("hidden");
+        if (taxAmountEl) taxAmountEl.innerText = `${formatAmount(taxAmount)} (${currentTaxPercent}%)`;
+    } else {
+        if (taxAmountRow) taxAmountRow.classList.add("hidden");
+    }
+
+    if (otherCharge > 0) {
+        if (otherChargeRow) otherChargeRow.classList.remove("hidden");
+        if (otherChargeAmountEl) otherChargeAmountEl.innerText = formatAmount(otherCharge);
+    } else {
+        if (otherChargeRow) otherChargeRow.classList.add("hidden");
     }
 
     const loyaltyRow = document.getElementById("loyaltyDiscountRow");
@@ -3262,11 +3368,7 @@ async function confirmPaymentAndProcess() {
 window.processSale = async function () {
     if (cart.length === 0) return alert("Cart is empty.");
 
-    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    const discountAmount = subtotal * (currentDiscountPercent / 100);
-    const deliveryCharge = currentOrderType === "DELIVERY" ? (Number(currentDeliveryCharge) || 0) : 0;
-    const loyaltyDiscount = Math.min((Number(currentLoyaltyRedeemPoints) || 0) * LOYALTY_POINT_VALUE, Math.max(0, subtotal - discountAmount));
-    const grandTotal = Math.max(0, subtotal - discountAmount + deliveryCharge - loyaltyDiscount);
+    const { subtotal, discountAmount, deliveryCharge, packingCharge, otherCharge, taxAmount, loyaltyDiscount, grandTotal } = calculateCartTotals();
 
     if (currentOrderType === "DELIVERY" && (subtotal - discountAmount) < 500) {
         alert(`Minimum order total for delivery is Rs 500.00. Current total is ${formatAmount(subtotal - discountAmount)}.`);
@@ -3297,6 +3399,10 @@ window.processSale = async function () {
         discountPercent: currentDiscountPercent,
         discountAmount,
         deliveryCharge,
+        packingCharge,
+        taxPercent: currentTaxPercent,
+        taxAmount,
+        otherCharge,
         loyaltyRedeemPoints: currentLoyaltyRedeemPoints,
         loyaltyDiscount,
         total: grandTotal,
@@ -3378,7 +3484,7 @@ async function completeSaleWithPayments(saleData) {
     try {
         if (printerCharacteristic) {
             await printKDS(savedSaleId, saleData.items, { server: saleData.serverUser, table: saleData.table, notes: saleData.notes });
-            await printReceipt(savedSaleId, saleData.items, saleData.subtotal, saleData.discountPercent, saleData.total, saleData.deliveryInfo, saleData.payments || [], saleData.totalChange || 0, saleData.orderType, saleData.deliveryCharge || 0);
+            await printReceipt(savedSaleId, saleData.items, saleData.subtotal, saleData.discountPercent, saleData.total, saleData.deliveryInfo, saleData.payments || [], saleData.totalChange || 0, saleData.orderType, saleData.deliveryCharge || 0, saleData.packingCharge || 0, saleData.taxPercent || 0, saleData.taxAmount || 0, saleData.otherCharge || 0);
         } else {
             console.warn("Printer not connected - skipping receipts.");
         }
@@ -3388,10 +3494,7 @@ async function completeSaleWithPayments(saleData) {
 
     alert(`Order Processed Successfully by ${currentUser?.username || 'Staff'}!`);
 
-    cart = [];
-    currentDiscountPercent = 0;
-    const discInput = document.getElementById("discountInput");
-    if (discInput) discInput.value = 0;
+    clearCheckoutCharges();
 
     clearDeliveryDetails();
     clearCartCustomer();
@@ -3828,6 +3931,9 @@ window.downloadReceiptPDF = async function (saleId) {
         </div>
         ${sale.discountPercent > 0 ? `<div class="flex justify-between items-baseline gap-3 text-red-600"><span>Discount (${escapeHtml(String(sale.discountPercent))}%):</span><span class="whitespace-nowrap">-${formatAmount(sale.discountAmount)}</span></div>` : ''}
         ${sale.deliveryCharge > 0 ? `<div class="flex justify-between items-baseline gap-3 text-blue-700"><span>Delivery Charge:</span><span class="whitespace-nowrap">${formatAmount(sale.deliveryCharge)}</span></div>` : ''}
+        ${Number(sale.packingCharge || 0) > 0 ? `<div class="flex justify-between items-baseline gap-3"><span>Packing Charge:</span><span class="whitespace-nowrap">${formatAmount(sale.packingCharge)}</span></div>` : ''}
+        ${Number(sale.taxAmount || 0) > 0 ? `<div class="flex justify-between items-baseline gap-3"><span>Tax (${escapeHtml(String(sale.taxPercent || 0))}%):</span><span class="whitespace-nowrap">${formatAmount(sale.taxAmount)}</span></div>` : ''}
+        ${Number(sale.otherCharge || 0) > 0 ? `<div class="flex justify-between items-baseline gap-3"><span>Other Charges:</span><span class="whitespace-nowrap">${formatAmount(sale.otherCharge)}</span></div>` : ''}
         <div class="flex min-h-[28px] justify-between items-center gap-3 border-b-2 border-black pb-1 mb-2 text-base font-black leading-tight">
             <span>GRAND TOTAL:</span><span class="whitespace-nowrap">${formatAmount(sale.total)}</span>
         </div>
@@ -3943,7 +4049,15 @@ async function proceedToEditSale(saleId) {
     const discInput = document.getElementById("discountInput");
     if (discInput) discInput.value = currentDiscountPercent;
 
+    currentPackingCharge = Number(sale.packingCharge) || 0;
+    currentTaxPercent = Number(sale.taxPercent) || 0;
+    currentOtherCharge = Number(sale.otherCharge) || 0;
+    syncCheckoutChargeInputs();
+
     setOrderType(sale.orderType || "DINE_IN");
+    currentDeliveryCharge = Number(sale.deliveryCharge) || 0;
+    const deliveryChargeInput = document.getElementById("deliveryChargeInput");
+    if (deliveryChargeInput) deliveryChargeInput.value = currentDeliveryCharge;
     if (sale.deliveryInfo) {
         const name = document.getElementById("deliveryCustomerName");
         const phone = document.getElementById("deliveryCustomerPhone");

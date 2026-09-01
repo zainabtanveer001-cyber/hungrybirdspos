@@ -252,6 +252,21 @@
                             </div>
                         </div>
 
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                            <label for="packingChargeInput" class="text-xs font-bold text-slate-700">
+                                Packing (Rs)
+                                <input id="packingChargeInput" type="number" min="0" step="0.01" placeholder="0.00" value="0" oninput="updatePackingCharge(this.value)" class="mt-1 w-full p-1.5 text-right font-bold text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                            </label>
+                            <label for="taxPercentInput" class="text-xs font-bold text-slate-700">
+                                Tax (%)
+                                <input id="taxPercentInput" type="number" min="0" max="100" step="0.01" placeholder="0" value="0" oninput="updateTaxPercent(this.value)" class="mt-1 w-full p-1.5 text-right font-bold text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                            </label>
+                            <label for="otherChargeInput" class="text-xs font-bold text-slate-700">
+                                Other (Rs)
+                                <input id="otherChargeInput" type="number" min="0" step="0.01" placeholder="0.00" value="0" oninput="updateOtherCharge(this.value)" class="mt-1 w-full p-1.5 text-right font-bold text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                            </label>
+                        </div>
+
                         <div id="discountAmountRow" class="hidden flex justify-between items-center text-xs text-red-600 font-medium">
                             <span>Discount Amount:</span>
                             <span id="cartDiscountAmount">-Rs 0.00</span>
@@ -260,6 +275,21 @@
                         <div id="deliveryChargeRow" class="hidden flex justify-between items-center text-xs text-blue-700 font-medium">
                             <span>Delivery Charge:</span>
                             <span id="cartDeliveryCharge">Rs 0.00</span>
+                        </div>
+
+                        <div id="packingChargeRow" class="hidden flex justify-between items-center text-xs text-slate-700 font-medium">
+                            <span>Packing Charge:</span>
+                            <span id="cartPackingCharge">Rs 0.00</span>
+                        </div>
+
+                        <div id="taxAmountRow" class="hidden flex justify-between items-center text-xs text-slate-700 font-medium">
+                            <span>Tax:</span>
+                            <span id="cartTaxAmount">Rs 0.00</span>
+                        </div>
+
+                        <div id="otherChargeRow" class="hidden flex justify-between items-center text-xs text-slate-700 font-medium">
+                            <span>Other Charges:</span>
+                            <span id="cartOtherCharge">Rs 0.00</span>
                         </div>
 
                         <div id="loyaltyDiscountRow" class="hidden flex justify-between items-center text-xs text-purple-700 font-medium">
