@@ -59,6 +59,7 @@ async function purgeSessionAndLogout() {
     } catch (error) {
         console.error('Sign-out failed:', error);
     } finally {
+        teardownMenuCategoryCloudSync();
         // This clears your shiftStartTime and shiftOpeningCash
         localStorage.clear();
         sessionStorage.clear();
@@ -1408,6 +1409,7 @@ firebase.auth().onAuthStateChanged(async (user) => {
             const profile = userDoc.data();
             startSession({ ...user, username: profile.username, role: profile.role, displayName: profile.displayName });
             await renderEmployeeList();
+            setupMenuCategoryCloudSync();
         } else {
             alert("Unauthorized account. Access denied.");
             await firebase.auth().signOut();
@@ -1527,11 +1529,21 @@ function applyRoleViews() {
     mainPos?.classList.remove("hidden");
 }
 
-window.logout = function () {
+window.logout = async function () {
     if (!confirm("Are you sure you want to log out?")) return;
     currentUser = null;
     currentRole = null;
     sessionStorage.removeItem("loggedUser");
+    teardownMenuCategoryCloudSync();
+
+    // Must sign out of Firebase too, otherwise onAuthStateChanged auto-logs back in on refresh
+    try {
+        if (typeof firebase !== "undefined" && firebase.auth()) {
+            await firebase.auth().signOut();
+        }
+    } catch (error) {
+        console.error("Firebase sign-out failed:", error);
+    }
 
     const u = document.getElementById("loginUsername");
     const p = document.getElementById("loginPassword");
@@ -1745,6 +1757,96 @@ async function syncSaleToCloud(saleData) {
     } catch (err) {
         console.error("Cloud sales sync error:", err);
     }
+}
+
+// ====================================================
+// Menu / Category Cloud Sync (so items added on one browser show up on others)
+// ====================================================
+let unsubscribeMenuSync = null;
+let unsubscribeCategorySync = null;
+
+async function pushMenuItemToCloud(menuItem, recipeRows) {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    try {
+        await cloudDb.collection("menu").doc(menuItem.id).set({ ...menuItem, recipes: recipeRows });
+    } catch (err) {
+        console.error("Cloud menu sync error:", err);
+    }
+}
+
+async function deleteMenuItemFromCloud(id) {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    try {
+        await cloudDb.collection("menu").doc(id).delete();
+    } catch (err) {
+        console.error("Cloud menu delete sync error:", err);
+    }
+}
+
+async function pushCategoryToCloud(category) {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    try {
+        await cloudDb.collection("categories").doc(category.id).set(category);
+    } catch (err) {
+        console.error("Cloud category sync error:", err);
+    }
+}
+
+async function deleteCategoryFromCloud(id) {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    try {
+        await cloudDb.collection("categories").doc(id).delete();
+    } catch (err) {
+        console.error("Cloud category delete sync error:", err);
+    }
+}
+
+// Mirrors Firestore menu/category changes (from any browser) into local Dexie, then re-renders.
+function setupMenuCategoryCloudSync() {
+    if (!cloudSyncEnabled || !cloudDb) return;
+
+    unsubscribeMenuSync = cloudDb.collection("menu").onSnapshot(async snapshot => {
+        for (const change of snapshot.docChanges()) {
+            const data = change.doc.data();
+            if (change.type === "removed") {
+                await db.menu.delete(change.doc.id);
+                await db.recipes.where("menuItemId").equals(change.doc.id).delete();
+            } else {
+                const { recipes, ...menuItem } = data;
+                await db.menu.put({ ...menuItem, id: change.doc.id });
+                await db.recipes.where("menuItemId").equals(change.doc.id).delete();
+                for (const r of (recipes || [])) {
+                    await db.recipes.add({ menuItemId: change.doc.id, inventoryId: r.inventoryId, qtyRequired: r.qtyRequired });
+                }
+            }
+        }
+        if (snapshot.docChanges().length > 0) {
+            await renderMenu();
+            await renderOwnerFoodList();
+        }
+    }, err => console.error("Menu cloud sync listener error:", err));
+
+    unsubscribeCategorySync = cloudDb.collection("categories").onSnapshot(async snapshot => {
+        for (const change of snapshot.docChanges()) {
+            if (change.type === "removed") {
+                await db.categories.delete(change.doc.id);
+            } else {
+                await db.categories.put({ ...change.doc.data(), id: change.doc.id });
+            }
+        }
+        if (snapshot.docChanges().length > 0) {
+            await renderCategoryBar();
+            await renderOwnerAdminCategories();
+            await populateCategorySelect();
+        }
+    }, err => console.error("Category cloud sync listener error:", err));
+}
+
+function teardownMenuCategoryCloudSync() {
+    unsubscribeMenuSync?.();
+    unsubscribeCategorySync?.();
+    unsubscribeMenuSync = null;
+    unsubscribeCategorySync = null;
 }
 
 // ====================================================
@@ -2395,7 +2497,9 @@ window.addCategory = async function () {
     if (!input || !input.value.trim()) return;
 
     const catId = "CAT_" + Date.now();
-    await db.categories.put({ id: catId, name: input.value.trim() });
+    const category = { id: catId, name: input.value.trim() };
+    await db.categories.put(category);
+    pushCategoryToCloud(category).catch(e => console.warn("Cloud category sync failed (non-blocking):", e));
     input.value = "";
 
     await renderOwnerAdminCategories();
@@ -2419,6 +2523,7 @@ async function renderOwnerAdminCategories() {
 window.deleteCategory = async function (id) {
     if (!confirm("Delete category?")) return;
     await db.categories.delete(id);
+    deleteCategoryFromCloud(id).catch(e => console.warn("Cloud category delete sync failed (non-blocking):", e));
     await renderOwnerAdminCategories();
     await renderCategoryBar();
     await populateCategorySelect();
@@ -2558,40 +2663,50 @@ window.handleFoodImageUpload = async function (event) {
     reader.readAsDataURL(file);
 };
 
+let isSavingFoodItem = false; // guards against double-click causing duplicate recipe rows
 window.saveFoodItem = async function () {
-    const idEl = document.getElementById("editFoodId");
-    const nameEl = document.getElementById("foodName");
-    const priceEl = document.getElementById("foodPrice");
-    const catEl = document.getElementById("foodCategorySelect");
-    const preview = document.getElementById("foodImagePreview");
+    if (isSavingFoodItem) return;
+    isSavingFoodItem = true;
+    try {
+        const idEl = document.getElementById("editFoodId");
+        const nameEl = document.getElementById("foodName");
+        const priceEl = document.getElementById("foodPrice");
+        const catEl = document.getElementById("foodCategorySelect");
+        const preview = document.getElementById("foodImagePreview");
 
-    if (!nameEl?.value || !priceEl?.value || !catEl?.value) return alert("Fill in dish details.");
+        if (!nameEl?.value || !priceEl?.value || !catEl?.value) return alert("Fill in dish details.");
 
-    const foodId = idEl.value || "MENU_" + Date.now();
-    const imageUrl = preview?.dataset.imageUrl || preview?.src || "";
+        const foodId = idEl.value || "MENU_" + Date.now();
+        const imageUrl = preview?.dataset.imageUrl || preview?.src || "";
+        const recipeRows = Array.from(document.querySelectorAll("#recipeIngredientRows > div"))
+            .map(row => ({
+                inventoryId: row.querySelector(".recipe-inv-id")?.value,
+                qtyRequired: parseFloat(row.querySelector(".recipe-qty")?.value || 0)
+            }))
+            .filter(r => r.inventoryId && r.qtyRequired > 0);
 
-    await db.menu.put({
-        id: foodId,
-        name: nameEl.value.trim(),
-        price: parseFloat(priceEl.value),
-        categoryId: catEl.value,
-        imageUrl: imageUrl,
-        modifierGroups: collectModifierGroupsFromForm()
-    });
+        await db.menu.put({
+            id: foodId,
+            name: nameEl.value.trim(),
+            price: parseFloat(priceEl.value),
+            categoryId: catEl.value,
+            imageUrl: imageUrl,
+            modifierGroups: collectModifierGroupsFromForm()
+        });
 
-    await db.recipes.where("menuItemId").equals(foodId).delete();
-    const rows = document.querySelectorAll("#recipeIngredientRows > div");
-    for (const row of rows) {
-        const invId = row.querySelector(".recipe-inv-id")?.value;
-        const qty = parseFloat(row.querySelector(".recipe-qty")?.value || 0);
-        if (invId && qty > 0) {
-            await db.recipes.add({ menuItemId: foodId, inventoryId: invId, qtyRequired: qty });
+        await db.recipes.where("menuItemId").equals(foodId).delete();
+        for (const r of recipeRows) {
+            await db.recipes.add({ menuItemId: foodId, inventoryId: r.inventoryId, qtyRequired: r.qtyRequired });
         }
-    }
+        pushMenuItemToCloud({ id: foodId, name: nameEl.value.trim(), price: parseFloat(priceEl.value), categoryId: catEl.value, imageUrl, modifierGroups: collectModifierGroupsFromForm() }, recipeRows)
+            .catch(e => console.warn("Cloud menu sync failed (non-blocking):", e));
 
-    resetFoodForm();
-    await renderMenu();
-    await renderOwnerFoodList();
+        resetFoodForm();
+        await renderMenu();
+        await renderOwnerFoodList();
+    } finally {
+        isSavingFoodItem = false;
+    }
 };
 
 window.resetFoodForm = function () {
@@ -2732,6 +2847,7 @@ window.deleteFoodItem = async function (id) {
     if (!confirm("Delete food item?")) return;
     await db.menu.delete(id);
     await db.recipes.where("menuItemId").equals(id).delete();
+    deleteMenuItemFromCloud(id).catch(e => console.warn("Cloud menu delete sync failed (non-blocking):", e));
     await renderMenu();
     await renderOwnerFoodList();
 };
