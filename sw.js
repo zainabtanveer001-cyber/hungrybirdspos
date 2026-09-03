@@ -1,5 +1,6 @@
 // Service worker for Hungry Birds POS — offline-first app shell caching.
-const CACHE_NAME = "hb-pos-cache-v1";
+// Bump this on every release so old cached app shells get purged automatically.
+const CACHE_NAME = "hb-pos-cache-v2";
 
 const APP_SHELL = [
   "./",
@@ -37,16 +38,13 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin) {
-    // App shell: cache-first, fall back to network and update cache.
+    // App shell: network-first so new deploys show immediately; fall back to cache when offline.
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          return response;
-        }).catch(() => cached);
-      })
+      fetch(request).then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        return response;
+      }).catch(() => caches.match(request))
     );
     return;
   }
