@@ -365,6 +365,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("./sw.js").catch(err => console.warn("Service worker registration failed:", err));
+
+        // Auto-reload once when a newly deployed service worker takes control, so updates appear without manual cache clearing
+        let refreshingAfterSwUpdate = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (refreshingAfterSwUpdate) return;
+            refreshingAfterSwUpdate = true;
+            window.location.reload();
+        });
     }
 
     await db.open().catch(err => console.error("Dexie Open Error:", err));
@@ -1767,10 +1775,18 @@ let unsubscribeCategorySync = null;
 
 async function pushMenuItemToCloud(menuItem, recipeRows) {
     if (!cloudSyncEnabled || !cloudDb) return;
+    // Drop oversized images instead of letting the whole doc write fail (which cloud sync would then read back as a delete).
+    let payload = menuItem;
+    if (menuItem.imageUrl && menuItem.imageUrl.length > MAX_SYNCED_IMAGE_BYTES) {
+        console.warn(`Menu item "${menuItem.name}" image too large to sync (${menuItem.imageUrl.length} bytes); syncing without image.`);
+        const { imageUrl, ...rest } = menuItem;
+        payload = rest;
+    }
     try {
-        await cloudDb.collection("menu").doc(menuItem.id).set({ ...menuItem, recipes: recipeRows });
+        await cloudDb.collection("menu").doc(menuItem.id).set({ ...payload, recipes: recipeRows });
     } catch (err) {
         console.error("Cloud menu sync error:", err);
+        throw err;
     }
 }
 
@@ -1809,6 +1825,10 @@ function setupMenuCategoryCloudSync() {
         for (const change of snapshot.docChanges()) {
             const data = change.doc.data();
             if (change.type === "removed") {
+                // A rejected/rolled-back local write (e.g. oversized image) can also surface as "removed";
+                // confirm against the server before wiping local data so we don't act on a rollback.
+                const serverDoc = await cloudDb.collection("menu").doc(change.doc.id).get({ source: "server" }).catch(() => null);
+                if (serverDoc && serverDoc.exists) continue;
                 await db.menu.delete(change.doc.id);
                 await db.recipes.where("menuItemId").equals(change.doc.id).delete();
             } else {
@@ -2642,6 +2662,38 @@ function collectModifierGroupsFromForm() {
     return groups;
 }
 
+// Firestore rejects docs with a field over ~1MB; keep synced images well under that.
+const MAX_IMAGE_DIMENSION = 800;
+const IMAGE_JPEG_QUALITY = 0.7;
+const MAX_SYNCED_IMAGE_BYTES = 700 * 1024;
+
+function compressImageFile(file, maxDimension = MAX_IMAGE_DIMENSION, quality = IMAGE_JPEG_QUALITY) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(reader.error || new Error("Failed to read image file."));
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("Failed to decode image file."));
+            img.onload = () => {
+                let { width, height } = img;
+                if (width > maxDimension || height > maxDimension) {
+                    const scale = maxDimension / Math.max(width, height);
+                    width = Math.round(width * scale);
+                    height = Math.round(height * scale);
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL("image/jpeg", quality));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
 window.handleFoodImageUpload = async function (event) {
     const file = event?.target?.files?.[0];
     const preview = document.getElementById("foodImagePreview");
@@ -2653,14 +2705,16 @@ window.handleFoodImageUpload = async function (event) {
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-        const imageUrl = reader.result;
+    try {
+        const imageUrl = await compressImageFile(file);
         preview.src = imageUrl;
         preview.dataset.imageUrl = imageUrl;
         preview.classList.remove("hidden");
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+        console.error("Image compression failed:", err);
+        alert("Could not process that image. Please try a different file.");
+        event.target.value = "";
+    }
 };
 
 let isSavingFoodItem = false; // guards against double-click causing duplicate recipe rows
@@ -2699,7 +2753,10 @@ window.saveFoodItem = async function () {
             await db.recipes.add({ menuItemId: foodId, inventoryId: r.inventoryId, qtyRequired: r.qtyRequired });
         }
         pushMenuItemToCloud({ id: foodId, name: nameEl.value.trim(), price: parseFloat(priceEl.value), categoryId: catEl.value, imageUrl, modifierGroups: collectModifierGroupsFromForm() }, recipeRows)
-            .catch(e => console.warn("Cloud menu sync failed (non-blocking):", e));
+            .catch(e => {
+                console.warn("Cloud menu sync failed (non-blocking):", e);
+                alert(`"${nameEl.value.trim()}" saved locally, but could not sync to the cloud (${e.message || "unknown error"}). Other devices may not see this change.`);
+            });
 
         resetFoodForm();
         await renderMenu();
