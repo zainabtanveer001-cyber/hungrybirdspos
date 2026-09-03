@@ -2939,12 +2939,21 @@ async function renderMenu(searchText) {
         return;
     }
 
-    const allCats = await db.categories.toArray();
-    const firstCat = allCats[0];
-    if (firstCat) {
-        menu = menu.filter(item => item.categoryId === firstCat.id);
-        renderMenuGroups([{ category: firstCat, items: menu }], "");
+    // "ALL" selected: show every item, grouped by category (plus any uncategorized items)
+    const categoryIdLookup = new Map(categories.map(cat => [cat.id, cat.name]));
+    const uncategorizedItems = menu.filter(item => !item.categoryId || !categoryIdLookup.has(item.categoryId));
+    const grouped = categories
+        .map(cat => ({
+            category: cat,
+            items: menu.filter(item => item.categoryId === cat.id)
+        }))
+        .filter(g => g.items.length > 0);
+
+    if (uncategorizedItems.length) {
+        grouped.push({ category: { id: "UNCATEGORIZED", name: "Uncategorized" }, items: uncategorizedItems });
     }
+
+    renderMenuGroups(grouped, "");
 }
 
 function renderMenuGroups(grouped, searchText = "") {
