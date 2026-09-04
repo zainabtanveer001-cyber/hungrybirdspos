@@ -1395,12 +1395,94 @@ async function renderEmployeeList() {
     const snapshot = await cloudDb.collection("users").orderBy("usernameLower").get();
     container.innerHTML = snapshot.docs.map(doc => {
         const employee = doc.data();
-        return `<div class="flex justify-between items-center border rounded-lg p-2 text-xs">
-            <span><strong>${escapeHtml(employee.displayName || employee.username)}</strong> (${escapeHtml(employee.username || "")}) - ${escapeHtml(employee.role || "")}</span>
-            <span class="font-bold ${employee.active ? "text-emerald-700" : "text-red-600"}">${employee.active ? "Active" : "Disabled"}</span>
+        const uid = doc.id;
+        const username = escapeHtml(employee.username || "");
+        const isSelf = uid === currentUser?.uid;
+
+        let actions = "";
+        if (isSelf) {
+            actions = `<span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">You</span>`;
+        } else if (employee.active) {
+            actions = `<button onclick="setEmployeeActive('${uid}', '${username}', false)" class="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded hover:bg-red-200 transition">Disable</button>`;
+        } else {
+            actions = `
+                <button onclick="setEmployeeActive('${uid}', '${username}', true)" class="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded hover:bg-emerald-200 transition">Enable</button>
+                <button onclick="deleteEmployee('${uid}', '${username}')" class="bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-red-700 transition">Delete</button>`;
+        }
+
+        return `<div class="flex justify-between items-center border rounded-lg p-2 text-xs gap-2">
+            <span><strong>${escapeHtml(employee.displayName || employee.username)}</strong> (${username}) - ${escapeHtml(employee.role || "")}</span>
+            <span class="flex items-center gap-2 shrink-0">
+                <span class="font-bold ${employee.active ? "text-emerald-700" : "text-red-600"}">${employee.active ? "Active" : "Disabled"}</span>
+                ${actions}
+            </span>
         </div>`;
     }).join("");
 }
+
+window.setEmployeeActive = async function (uid, username, active) {
+    if (currentRole !== "OWNER") {
+        alert("Only the Owner can manage employee accounts.");
+        return;
+    }
+    if (uid === currentUser?.uid) {
+        alert("You cannot disable your own account.");
+        return;
+    }
+
+    const verb = active ? "Enable" : "Disable";
+    const note = active
+        ? `Enable '${username}'? They will be able to log in again.`
+        : `Disable '${username}'? They will not be able to log in. This takes effect on their next login or page refresh.`;
+    if (!confirm(note)) return;
+
+    try {
+        await cloudDb.collection("users").doc(uid).update({ active });
+        await logAudit(active ? "EMPLOYEE_ENABLE" : "EMPLOYEE_DISABLE", `${verb}d employee account '${username}'`);
+        await renderEmployeeList();
+    } catch (error) {
+        console.error("Employee status update failed:", error);
+        alert(`Could not ${verb.toLowerCase()} employee: ${error.message}`);
+    }
+};
+
+window.deleteEmployee = async function (uid, username) {
+    if (currentRole !== "OWNER") {
+        alert("Only the Owner can manage employee accounts.");
+        return;
+    }
+    if (uid === currentUser?.uid) {
+        alert("You cannot delete your own account.");
+        return;
+    }
+
+    if (!confirm(`PERMANENTLY delete the profile of '${username}'? This removes their access record and cannot be undone.`)) return;
+    if (!confirm(`Are you absolutely sure? '${username}' will no longer be able to log in.`)) return;
+
+    const result = document.getElementById("employeeManagementResult");
+    try {
+        // Best-effort: delete the Firebase Auth credential too. Only possible when the
+        // provisioning app is still signed in as that user (e.g. right after creation).
+        const provisioningApp = firebase.apps.find(app => app.name === "employeeProvisioning");
+        if (provisioningApp && provisioningApp.auth().currentUser?.uid === uid) {
+            await provisioningApp.auth().currentUser.delete();
+        } else {
+            console.info(`Auth credential for '${username}' left in place (cannot delete other users' credentials from the browser). The deleted profile fully blocks login.`);
+        }
+
+        await cloudDb.collection("users").doc(uid).delete();
+        await logAudit("EMPLOYEE_DELETE", `Permanently deleted employee profile '${username}'`);
+
+        if (result) {
+            result.textContent = `Employee '${username}' deleted.`;
+            result.className = "text-xs text-emerald-700";
+        }
+        await renderEmployeeList();
+    } catch (error) {
+        console.error("Employee deletion failed:", error);
+        alert(`Could not delete employee: ${error.message}`);
+    }
+};
 
 firebase.auth().onAuthStateChanged(async (user) => {
     if (user) {
