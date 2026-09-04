@@ -1,6 +1,6 @@
 // Service worker for Hungry Birds POS — offline-first app shell caching.
 // Bump this on every release so old cached app shells get purged automatically.
-const CACHE_NAME = "hb-pos-cache-v2";
+const CACHE_NAME = "hb-pos-cache-v3";
 
 const APP_SHELL = [
   "./",

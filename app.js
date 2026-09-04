@@ -463,6 +463,7 @@ async function initializeApplication() {
     await renderMenu();
     renderCart();
     initializeSearch();
+    initializeStockSearch();
     await renderRecentSales();
     await updateHeldOrdersBadge();
 }
@@ -1418,6 +1419,7 @@ firebase.auth().onAuthStateChanged(async (user) => {
             startSession({ ...user, username: profile.username, role: profile.role, displayName: profile.displayName });
             await renderEmployeeList();
             setupMenuCategoryCloudSync();
+            setupInventoryCloudSync();
         } else {
             alert("Unauthorized account. Access denied.");
             await firebase.auth().signOut();
@@ -1499,6 +1501,7 @@ window.login = async () => {
             return;
         }
 
+        await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.SESSION);
         await firebase.auth().signInWithEmailAndPassword(profile.authEmail || usernameAuthEmail(username), password);
     } catch (error) {
         console.error("Firebase Login Error:", error.code, error.message);
@@ -1867,6 +1870,109 @@ function teardownMenuCategoryCloudSync() {
     unsubscribeCategorySync?.();
     unsubscribeMenuSync = null;
     unsubscribeCategorySync = null;
+    unsubscribeInventorySync?.();
+    unsubscribeInventorySync = null;
+    inventoryReadyToPush = false;
+}
+
+// ====================================================
+// Inventory Cloud Sync (stocks sync across browsers)
+// ====================================================
+let unsubscribeInventorySync = null;
+let inventoryReadyToPush = false; // echo guard: only push after initial server snapshot applied
+
+async function pushInventoryItemToCloud(item) {
+    if (!cloudSyncEnabled || !cloudDb || !inventoryReadyToPush || !item?.id) return;
+    try {
+        const { updatedAt, ...rest } = item;
+        await cloudDb.collection("inventory").doc(item.id).set({
+            ...rest,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    } catch (err) {
+        console.error("Cloud inventory sync error:", err);
+        throw err;
+    }
+}
+
+async function deleteInventoryItemFromCloud(id) {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    try {
+        await cloudDb.collection("inventory").doc(id).delete();
+    } catch (err) {
+        console.error("Cloud inventory delete sync error:", err);
+    }
+}
+
+// One-time per login: upload local-only items so pre-existing stock converges (last writer wins).
+async function pushLocalInventoryToCloud() {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    const localItems = await db.inventory.toArray();
+    if (localItems.length === 0) return;
+    const snapshot = await cloudDb.collection("inventory").get();
+    const cloudIds = new Set(snapshot.docs.map(d => d.id));
+    const missing = localItems.filter(item => !cloudIds.has(item.id));
+    // Firestore batch limit is 500; inventory is small, but chunk anyway for safety.
+    for (let i = 0; i < missing.length; i += 400) {
+        const batch = cloudDb.batch();
+        for (const item of missing.slice(i, i + 400)) {
+            const { updatedAt, ...rest } = item;
+            batch.set(cloudDb.collection("inventory").doc(item.id), {
+                ...rest,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        }
+        await batch.commit();
+    }
+    if (missing.length > 0) console.log(`Uploaded ${missing.length} local inventory item(s) to cloud.`);
+}
+
+function setupInventoryCloudSync() {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    let firstSnapshot = true;
+
+    unsubscribeInventorySync = cloudDb.collection("inventory").onSnapshot(async snapshot => {
+        let changed = false;
+        for (const change of snapshot.docChanges()) {
+            const data = change.doc.data();
+            if (change.type === "removed") {
+                // Rejected/rolled-back writes can also surface as "removed" — verify against server first.
+                const serverDoc = await cloudDb.collection("inventory").doc(change.doc.id).get({ source: "server" }).catch(() => null);
+                if (serverDoc && serverDoc.exists) continue;
+                await db.inventory.delete(change.doc.id);
+                changed = true;
+            } else {
+                // Skip stale echoes of our own writes: remote must be newer than local.
+                const local = await db.inventory.get(change.doc.id);
+                const remoteTs = data.updatedAt?.toMillis?.() || 0;
+                const localTs = local?.updatedAt?.toMillis?.() || 0;
+                if (local && remoteTs <= localTs) continue;
+                await db.inventory.put({
+                    id: change.doc.id,
+                    name: data.name,
+                    stock: data.stock,
+                    unit: data.unit,
+                    cost: data.cost,
+                    updatedAt: data.updatedAt || null
+                });
+                changed = true;
+            }
+        }
+        if (changed) {
+            if (document.getElementById("stockUnlockedState") && !document.getElementById("stockUnlockedState").classList.contains("hidden")) {
+                await renderInventoryList();
+            }
+            if (!document.getElementById("inventoryModal")?.classList.contains("hidden")) {
+                await renderModalInventoryList();
+            }
+            await renderLowStockAlert();
+        }
+        if (firstSnapshot) {
+            firstSnapshot = false;
+            inventoryReadyToPush = true;
+            await pushLocalInventoryToCloud();
+        }
+    }, err => console.error("Inventory cloud sync listener error:", err));
 }
 
 // ====================================================
@@ -2359,13 +2465,15 @@ window.addNewInventoryItem = async function () {
     if (!nameEl?.value || !stockEl?.value) return alert("Enter item name and stock quantity.");
 
     const id = "INV_" + Date.now();
-    await db.inventory.put({
+    const newItem = {
         id,
         name: nameEl.value.trim(),
         stock: parseFloat(stockEl.value),
         unit: unitEl?.value.trim() || "pcs",
         cost: parseFloat(costEl?.value || 0) || 0
-    });
+    };
+    await db.inventory.put(newItem);
+    await pushInventoryItemToCloud(newItem).catch(() => alert("Saved locally, but cloud sync failed. Other browsers will update once the connection is back."));
 
     nameEl.value = "";
     stockEl.value = "";
@@ -2377,7 +2485,7 @@ window.addNewInventoryItem = async function () {
     await renderLowStockAlert();
 };
 
-async function renderInventoryList() {
+async function renderInventoryList(searchText) {
     const container = document.getElementById("inventoryContainer");
     if (!container) return;
 
@@ -2385,9 +2493,19 @@ async function renderInventoryList() {
     const thresholdInput = document.getElementById("lowStockThresholdInput");
     if (thresholdInput && document.activeElement !== thresholdInput) thresholdInput.value = threshold;
 
-    const items = await db.inventory.toArray();
+    let items = await db.inventory.toArray();
+    if (searchText === undefined) {
+        searchText = document.getElementById("stockSearch")?.value || "";
+    }
+    const normalizedText = (searchText || "").trim().toLowerCase();
+    if (normalizedText) {
+        items = items.filter(item => (item.name || "").toLowerCase().includes(normalizedText));
+    }
     if (items.length === 0) {
-        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-2">No raw inventory found.</div>`;
+        const emptyMessage = normalizedText
+            ? `No items match "${escapeHtml(normalizedText)}".`
+            : "No raw inventory found.";
+        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-2">${emptyMessage}</div>`;
         return;
     }
 
@@ -2418,6 +2536,7 @@ window.saveQuickStock = async function (id) {
     if (isNaN(newStock) || newStock < 0) return alert("Enter a valid non-negative number.");
 
     await db.inventory.update(id, { stock: newStock });
+    pushInventoryItemToCloud(await db.inventory.get(id)).catch(e => console.warn("Stock sync failed:", e));
     await renderInventoryList();
     await renderLowStockAlert();
     if (!document.getElementById("inventoryModal")?.classList.contains("hidden")) {
@@ -2431,6 +2550,7 @@ window.quickAdjustStock = async function (id, delta) {
 
     const updatedStock = Math.max(0, (Number(item.stock) || 0) + delta);
     await db.inventory.update(id, { stock: updatedStock });
+    pushInventoryItemToCloud(await db.inventory.get(id)).catch(e => console.warn("Stock sync failed:", e));
     await renderInventoryList();
     await renderLowStockAlert();
     if (!document.getElementById("inventoryModal")?.classList.contains("hidden")) {
@@ -2438,11 +2558,25 @@ window.quickAdjustStock = async function (id, delta) {
     }
 };
 
-async function renderModalInventoryList() {
+async function renderModalInventoryList(searchText) {
     const container = document.getElementById("modalInventoryList");
     if (!container) return;
 
-    const items = await db.inventory.toArray();
+    let items = await db.inventory.toArray();
+    if (searchText === undefined) {
+        searchText = document.getElementById("modalStockSearch")?.value || "";
+    }
+    const normalizedText = (searchText || "").trim().toLowerCase();
+    if (normalizedText) {
+        items = items.filter(item => (item.name || "").toLowerCase().includes(normalizedText));
+    }
+    if (items.length === 0) {
+        const emptyMessage = normalizedText
+            ? `No ingredients match "${escapeHtml(normalizedText)}".`
+            : "No raw inventory found.";
+        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-3">${emptyMessage}</div>`;
+        return;
+    }
     container.innerHTML = items.map(item => `
         <div class="p-3 bg-white rounded-xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items:center gap-2">
             <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 w-full">
@@ -2480,6 +2614,7 @@ window.saveFullModalIngredient = async function (id) {
         unit: unitInput?.value.trim() || "pcs",
         cost: updatedCost
     });
+    await pushInventoryItemToCloud(await db.inventory.get(id)).catch(() => alert("Saved locally, but cloud sync failed. Other browsers will update once the connection is back."));
 
     await renderModalInventoryList();
     await renderInventoryList();
@@ -2489,6 +2624,7 @@ window.saveFullModalIngredient = async function (id) {
 window.deleteInventoryItem = async function (id) {
     if (!confirm("Delete this inventory item?")) return;
     await db.inventory.delete(id);
+    await deleteInventoryItemFromCloud(id);
     await renderModalInventoryList();
     await renderInventoryList();
     await renderLowStockAlert();
@@ -3067,6 +3203,22 @@ function initializeSearch() {
     search.addEventListener("input", onInput);
 }
 
+function initializeStockSearch() {
+    const stockSearch = document.getElementById("stockSearch");
+    if (stockSearch) {
+        stockSearch.addEventListener("input", debounce(async () => {
+            await renderInventoryList(stockSearch.value);
+        }, 250));
+    }
+
+    const modalStockSearch = document.getElementById("modalStockSearch");
+    if (modalStockSearch) {
+        modalStockSearch.addEventListener("input", debounce(async () => {
+            await renderModalInventoryList(modalStockSearch.value);
+        }, 250));
+    }
+}
+
 // ====================================================
 // Cart & Discount Calculations
 // ====================================================
@@ -3636,6 +3788,7 @@ window.processSale = async function () {
 
 async function completeSaleWithPayments(saleData) {
     let savedSaleId = null;
+    const changedInventoryIds = new Set();
     try {
         await db.transaction('rw', db.sales, db.inventory, db.recipes, async () => {
             const saleRecord = { ...saleData };
@@ -3662,6 +3815,7 @@ async function completeSaleWithPayments(saleData) {
                     if (!ingredient) continue;
                     const newStock = (Number(ingredient.stock) || 0) - (recipe.qtyRequired * cartItem.qty);
                     await db.inventory.update(recipe.inventoryId, { stock: Math.max(0, newStock) });
+                    changedInventoryIds.add(recipe.inventoryId);
                 }
             }
         });
@@ -3669,6 +3823,11 @@ async function completeSaleWithPayments(saleData) {
         console.error("Transaction failed:", err);
         alert("Failed to process sale. Please try again.");
         return;
+    }
+
+    // Push sale-driven stock deductions to cloud (fire-and-forget, after local commit).
+    for (const invId of changedInventoryIds) {
+        db.inventory.get(invId).then(item => pushInventoryItemToCloud(item)).catch(e => console.warn("Sale stock sync failed:", e));
     }
 
     syncSaleToCloud({ ...saleData, localId: savedSaleId }).catch(e => console.warn("Cloud sync failed (non-blocking):", e));
@@ -3912,6 +4071,7 @@ async function deductInventory(itemsToDeduct) {
             await db.inventory.update(recipe.inventoryId, {
                 stock: (Number(ingredient.stock) || 0) - (recipe.qtyRequired * cartItem.qty)
             });
+            pushInventoryItemToCloud(await db.inventory.get(recipe.inventoryId)).catch(e => console.warn("Stock sync failed:", e));
         }
     }
     await renderLowStockAlert();
@@ -3926,6 +4086,7 @@ async function restoreInventory(itemsToRestore) {
             await db.inventory.update(recipe.inventoryId, {
                 stock: (Number(ingredient.stock) || 0) + (recipe.qtyRequired * cartItem.qty)
             });
+            pushInventoryItemToCloud(await db.inventory.get(recipe.inventoryId)).catch(e => console.warn("Stock sync failed:", e));
         }
     }
     await renderLowStockAlert();

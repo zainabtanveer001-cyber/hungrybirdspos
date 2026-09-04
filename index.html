@@ -331,6 +331,7 @@
                     </div>
 
                     <div id="stockUnlockedState" class="hidden">
+                        <input id="stockSearch" type="text" placeholder="🔍 Search stock items..." class="w-full p-2 mb-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition" />
                         <div id="inventoryContainer" class="space-y-2 text-xs max-h-60 overflow-y-auto pr-1"></div>
                     </div>
                 </div>
@@ -740,6 +741,10 @@
                         <input id="newItemCost" type="number" step="0.01" min="0" placeholder="Cost per Unit" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
                         <button onclick="addNewInventoryItem()" class="bg-amber-600 text-white text-xs font-bold rounded-lg p-2 hover:bg-amber-700 transition shadow-sm">+ Add</button>
                     </div>
+                </div>
+
+                <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
+                    <input id="modalStockSearch" type="text" placeholder="🔍 Search ingredients..." class="w-full p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
                 </div>
 
                 <div id="modalInventoryList" class="space-y-2"></div>
