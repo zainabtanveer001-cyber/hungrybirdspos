@@ -1931,6 +1931,7 @@ function setupMenuCategoryCloudSync() {
         }
     }, err => console.error("Menu cloud sync listener error:", err));
 
+    let firstCategorySnapshot = true;
     unsubscribeCategorySync = cloudDb.collection("categories").onSnapshot(async snapshot => {
         for (const change of snapshot.docChanges()) {
             if (change.type === "removed") {
@@ -1944,7 +1945,25 @@ function setupMenuCategoryCloudSync() {
             await renderOwnerAdminCategories();
             await populateCategorySelect();
         }
+        if (firstCategorySnapshot) {
+            firstCategorySnapshot = false;
+            await pushLocalCategoriesToCloud();
+        }
     }, err => console.error("Category cloud sync listener error:", err));
+}
+
+// One-time per login: upload local-only categories (e.g. default seeds) so all browsers converge.
+async function pushLocalCategoriesToCloud() {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    const localCats = await db.categories.toArray();
+    if (localCats.length === 0) return;
+    const snapshot = await cloudDb.collection("categories").get();
+    const cloudIds = new Set(snapshot.docs.map(d => d.id));
+    const missing = localCats.filter(cat => !cloudIds.has(cat.id));
+    for (const cat of missing) {
+        await pushCategoryToCloud(cat);
+    }
+    if (missing.length > 0) console.log(`Uploaded ${missing.length} local categor${missing.length === 1 ? "y" : "ies"} to cloud.`);
 }
 
 function teardownMenuCategoryCloudSync() {
