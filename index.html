@@ -139,6 +139,10 @@
                                 <span>Held Orders</span>
                                 <span id="heldOrdersBadge" class="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">0</span>
                             </button>
+                            <button type="button" onclick="closeMainActionMenu(); openOnlineOrdersModal()" role="menuitem" class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-800">
+                                <span>Website Orders</span>
+                                <span id="onlineOrdersBadge" class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-black text-blue-700">0</span>
+                            </button>
                             <button type="button" onclick="closeMainActionMenu(); openDeliveryManagementModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-800">Deliveries</button>
                             <button type="button" onclick="closeMainActionMenu(); openCustomerModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-800">Customers</button>
                             <button id="connectPrinterBtn" type="button" onclick="closeMainActionMenu(); connectPrinter()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-800">Connect Printer</button>
@@ -572,6 +576,30 @@
 
             <div class="p-3 bg-gray-50 border-t text-right">
                 <button onclick="closeHeldOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WEBSITE (ONLINE) ORDERS MODAL -->
+    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b bg-blue-700 text-white flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🌐</span>
+                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Website Orders</h3>
+                </div>
+                <button onclick="closeOnlineOrdersModal()" class="text-blue-200 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+
+            <div class="p-4 space-y-3 overflow-y-auto flex-1">
+                <p class="text-xs text-gray-500">Accept loads the order into your cart for review/checkout; reject notifies no one automatically but records your reason.</p>
+                <div id="onlineOrdersList" class="space-y-3"></div>
+            </div>
+
+            <div class="p-3 bg-gray-50 border-t text-right">
+                <button onclick="closeOnlineOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
                     Close
                 </button>
             </div>

@@ -338,6 +338,11 @@ let pendingOwnerAction = null;
 let openingCashEditAuthorized = false;
 let pendingModifierMenuId = null;
 
+// Orders placed on the customer-facing website, synced via the "onlineOrders" Firestore collection
+let unsubscribeOnlineOrdersSync = null;
+let onlineOrdersCache = [];
+let pendingOnlineOrderId = null;
+
 function isMainActionMenuOpen() {
     return !document.getElementById("mainActionMenu")?.classList.contains("hidden");
 }
@@ -1502,6 +1507,7 @@ firebase.auth().onAuthStateChanged(async (user) => {
             await renderEmployeeList();
             setupMenuCategoryCloudSync();
             setupInventoryCloudSync();
+            setupOnlineOrdersSync();
         } else {
             alert("Unauthorized account. Access denied.");
             await firebase.auth().signOut();
@@ -1974,6 +1980,9 @@ function teardownMenuCategoryCloudSync() {
     unsubscribeInventorySync?.();
     unsubscribeInventorySync = null;
     inventoryReadyToPush = false;
+    unsubscribeOnlineOrdersSync?.();
+    unsubscribeOnlineOrdersSync = null;
+    onlineOrdersCache = [];
 }
 
 // ====================================================
@@ -2075,6 +2084,128 @@ function setupInventoryCloudSync() {
         }
     }, err => console.error("Inventory cloud sync listener error:", err));
 }
+
+// ====================================================
+// Website Orders (customer-facing site writes to "onlineOrders"; staff accept/reject here)
+// ====================================================
+function setupOnlineOrdersSync() {
+    if (!cloudSyncEnabled || !cloudDb) return;
+    unsubscribeOnlineOrdersSync = cloudDb.collection("onlineOrders").where("status", "==", "PENDING")
+        .onSnapshot(snapshot => {
+            onlineOrdersCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setText("onlineOrdersBadge", onlineOrdersCache.length);
+            if (!document.getElementById("onlineOrdersModal")?.classList.contains("hidden")) {
+                renderOnlineOrdersList();
+            }
+        }, err => console.error("Online orders sync listener error:", err));
+}
+
+window.openOnlineOrdersModal = function () {
+    document.getElementById("onlineOrdersModal")?.classList.remove("hidden");
+    renderOnlineOrdersList();
+};
+
+window.closeOnlineOrdersModal = function () {
+    document.getElementById("onlineOrdersModal")?.classList.add("hidden");
+};
+
+function renderOnlineOrdersList() {
+    const container = document.getElementById("onlineOrdersList");
+    if (!container) return;
+
+    if (onlineOrdersCache.length === 0) {
+        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-6">No pending website orders.</div>`;
+        return;
+    }
+
+    container.innerHTML = onlineOrdersCache.map(order => {
+        const placedAt = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleTimeString() : "Just now";
+        return `
+        <div class="p-3 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
+            <div class="flex justify-between items-start">
+                <div>
+                    <div class="font-bold text-xs text-gray-800">
+                        ${escapeHtml(order.customer?.name || "Website Customer")}
+                        <span class="ml-1 text-[10px] text-blue-700 font-bold bg-blue-100 px-1.5 py-0.5 rounded">(${escapeHtml(order.orderType || "DELIVERY")})</span>
+                    </div>
+                    <div class="text-[10px] text-gray-500">${escapeHtml(order.customer?.phone || "")} • ${placedAt}</div>
+                </div>
+                <div class="font-bold text-blue-800 text-xs">${formatAmount(order.total || 0)}</div>
+            </div>
+
+            <div class="text-xs text-gray-600 bg-white p-2 rounded border border-blue-100">
+                ${escapeHtml((order.items || []).map(i => `${i.name} x${i.qty}`).join(", "))}
+            </div>
+
+            ${order.customer?.address ? `<div class="text-[11px] text-gray-500">📍 ${escapeHtml(order.customer.address)}</div>` : ""}
+
+            <div class="flex items-center justify-end gap-2 pt-1">
+                <button onclick="acceptOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">
+                    ✅ Accept to Cart
+                </button>
+                <button onclick="rejectOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 font-bold px-3 py-1.5 rounded-lg transition">
+                    ✖️ Reject
+                </button>
+            </div>
+        </div>
+    `;
+    }).join("");
+}
+
+window.acceptOnlineOrder = async function (id) {
+    const order = onlineOrdersCache.find(o => o.id === id);
+    if (!order) return alert("Order not found (it may have already been handled by another device).");
+
+    if (cart.length > 0 && !confirm("Accepting this order will replace items currently in your cart. Proceed?")) {
+        return;
+    }
+
+    cart = (order.items || []).map(i => ({
+        id: i.id || `WEB_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        menuItemId: i.id,
+        name: i.name,
+        price: Number(i.price) || 0,
+        qty: Number(i.qty) || 1
+    }));
+
+    window.setOrderType(order.orderType === "TAKEAWAY" ? "TAKEAWAY" : "DELIVERY");
+
+    if (currentOrderType === "DELIVERY") {
+        const nameEl = document.getElementById("deliveryCustomerName");
+        const phoneEl = document.getElementById("deliveryCustomerPhone");
+        const addrEl = document.getElementById("deliveryAddress");
+        if (nameEl) nameEl.value = order.customer?.name || "";
+        if (phoneEl) phoneEl.value = order.customer?.phone || "";
+        if (addrEl) addrEl.value = order.customer?.address || "";
+    } else {
+        restoreCartCustomerInput(order.customer);
+    }
+
+    pendingOnlineOrderId = id;
+
+    try {
+        await cloudDb.collection("onlineOrders").doc(id).update({ status: "ACCEPTED" });
+    } catch (e) {
+        console.warn("Failed to mark online order accepted:", e);
+    }
+
+    renderCart();
+    closeOnlineOrdersModal();
+    alert("Order loaded into cart. Review items, then checkout as normal to complete it.");
+};
+
+window.rejectOnlineOrder = async function (id) {
+    if (!confirm("Reject this online order?")) return;
+    const reason = prompt("Optional reason (kept for your own records):") || "";
+
+    try {
+        await cloudDb.collection("onlineOrders").doc(id).update({ status: "REJECTED", rejectionReason: reason });
+        await logAudit("ONLINE_ORDER_REJECT", `Rejected website order #${id}${reason ? `: ${reason}` : ""}`);
+    } catch (e) {
+        console.error("Failed to reject online order:", e);
+        alert("Could not reject order: " + e.message);
+    }
+};
 
 // ====================================================
 // Order Type Management
@@ -3881,9 +4012,11 @@ window.processSale = async function () {
         customer: getCartCustomerInput(),
         table: null,
         serverUser: currentUser?.username || "Staff",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        onlineOrderId: pendingOnlineOrderId
     };
 
+    pendingOnlineOrderId = null;
     openPaymentModal();
 };
 
@@ -3932,6 +4065,14 @@ async function completeSaleWithPayments(saleData) {
     }
 
     syncSaleToCloud({ ...saleData, localId: savedSaleId }).catch(e => console.warn("Cloud sync failed (non-blocking):", e));
+
+    // Close the loop on the source website order, if this sale came from one.
+    if (saleData.onlineOrderId && cloudSyncEnabled && cloudDb) {
+        cloudDb.collection("onlineOrders").doc(saleData.onlineOrderId).update({
+            status: "COMPLETED",
+            saleId: savedSaleId
+        }).catch(e => console.warn("Failed to update online order status:", e));
+    }
 
     // If delivery, create delivery record
     if (saleData.orderType === 'DELIVERY') {
