@@ -469,6 +469,7 @@ async function initializeApplication() {
     renderCart();
     initializeSearch();
     initializeStockSearch();
+    await syncCustomersFromSales();
     await renderRecentSales();
     await updateHeldOrdersBadge();
 }
@@ -2368,12 +2369,14 @@ function restoreCartCustomerInput(customer) {
 
 async function upsertCustomerRecord(customer, saleTotal, redeemedPoints = 0) {
     if (!customer || !customer.phone) return;
-    const existing = await db.customers.get(customer.phone);
+    const phone = normalizePhone(customer.phone);
+    if (!phone) return;
+    const existing = await db.customers.get(phone);
     const earnedPoints = Math.floor((Number(saleTotal) || 0) / LOYALTY_EARN_RATE);
     const newBalance = Math.max(0, (Number(existing?.loyaltyPoints) || 0) - (Number(redeemedPoints) || 0) + earnedPoints);
     await db.customers.put({
-        id: customer.phone,
-        phone: customer.phone,
+        id: phone,
+        phone: phone,
         name: customer.name || existing?.name || "",
         totalOrders: (existing?.totalOrders || 0) + 1,
         totalSpent: (existing?.totalSpent || 0) + (Number(saleTotal) || 0),
@@ -2383,9 +2386,60 @@ async function upsertCustomerRecord(customer, saleTotal, redeemedPoints = 0) {
     });
 }
 
+window.lookupDeliveryCustomer = async function (phone) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) return;
+    const existing = await db.customers.get(normalized);
+    if (existing) {
+        const nameEl = document.getElementById("deliveryCustomerName");
+        if (nameEl && !nameEl.value.trim() && existing.name) {
+            nameEl.value = existing.name;
+        }
+    }
+    const sales = await db.sales.toArray();
+    const pastDelivery = sales.find(s => normalizePhone(s.deliveryInfo?.phone || s.customer?.phone) === normalized && s.deliveryInfo?.address);
+    if (pastDelivery && pastDelivery.deliveryInfo?.address) {
+        const addrEl = document.getElementById("deliveryAddress");
+        if (addrEl && !addrEl.value.trim()) {
+            addrEl.value = pastDelivery.deliveryInfo.address;
+        }
+    }
+};
+
+async function syncCustomersFromSales() {
+    try {
+        const sales = await db.sales.toArray();
+        for (const sale of sales) {
+            const cust = sale.customer || (sale.orderType === 'DELIVERY' && sale.deliveryInfo?.phone ? sale.deliveryInfo : null);
+            if (cust && cust.phone) {
+                const phone = normalizePhone(cust.phone);
+                if (!phone) continue;
+                const existing = await db.customers.get(phone);
+                if (!existing) {
+                    await db.customers.put({
+                        id: phone,
+                        phone: phone,
+                        name: cust.name || (cust.phone ? `Customer ${cust.phone}` : "Customer"),
+                        totalOrders: 1,
+                        totalSpent: Number(sale.total) || 0,
+                        loyaltyPoints: Math.floor((Number(sale.total) || 0) / LOYALTY_EARN_RATE),
+                        lastVisit: sale.timestamp || new Date().toISOString(),
+                        createdAt: sale.timestamp || new Date().toISOString()
+                    });
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Customer sync from sales error:", e);
+    }
+}
+
 window.openCustomerModal = async function () {
+    await syncCustomersFromSales();
     document.getElementById("customerModal")?.classList.remove("hidden");
     showCustomerListView();
+    const searchInput = document.getElementById("customerSearchInput");
+    if (searchInput) searchInput.value = "";
     await renderCustomerList();
 };
 
@@ -2414,7 +2468,7 @@ window.renderCustomerList = async function (searchText = "") {
     }
 
     if (customers.length === 0) {
-        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-6">No customers found.</div>`;
+        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-6">No customers found. Enter customer phone during checkout to save them here.</div>`;
         return;
     }
 
@@ -2426,7 +2480,7 @@ window.renderCustomerList = async function (searchText = "") {
             </div>
             <div class="text-right">
                 <div class="font-bold text-purple-700 text-xs">${formatAmount(c.totalSpent || 0)}</div>
-                <div class="text-[10px] text-gray-500">${c.totalOrders || 0} orders</div>
+                <div class="text-[10px] text-gray-500">${c.totalOrders || 0} orders • ⭐ ${c.loyaltyPoints || 0} pts</div>
             </div>
         </div>
     `).join("");
@@ -2469,7 +2523,10 @@ window.viewCustomerHistory = async function (phone) {
                         <div class="font-bold text-gray-800">Order #${s.id}</div>
                         <div class="text-[10px] text-gray-500">${new Date(s.timestamp).toLocaleString()}</div>
                     </div>
-                    <div class="font-bold text-emerald-700">${formatAmount(s.total || 0)}</div>
+                    <div class="flex items-center gap-2">
+                        <div class="font-bold text-emerald-700">${formatAmount(s.total || 0)}</div>
+                        <button type="button" onclick="downloadReceiptPDF(${Number(s.id)})" class="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-100">PDF</button>
+                    </div>
                 </div>
             `).join("");
     }
@@ -4380,12 +4437,20 @@ async function renderReceiptSearchResults(query, requestVersion) {
     const sales = await db.sales.toArray();
     if (requestVersion !== receiptSearchRequestVersion) return;
 
-    const normalizedQuery = query.toLowerCase();
+    const rawQuery = query.toLowerCase().trim();
+    const normalizedQuery = rawQuery.replace(/^order\s*#?|^#/, "").trim();
+
     const matchingSales = sales.filter(sale => {
         const customer = sale.customer || {};
         const delivery = sale.deliveryInfo || {};
-        return [sale.id, customer.name, customer.phone, delivery.name, delivery.phone]
-            .some(value => String(value || "").toLowerCase().includes(normalizedQuery));
+        const saleIdStr = String(sale.id || "");
+        const formattedSaleId = `#${saleIdStr}`;
+        const itemNames = (sale.items || []).map(i => i.name).join(" ");
+        return [saleIdStr, formattedSaleId, customer.name, customer.phone, delivery.name, delivery.phone, sale.onlineOrderId, itemNames]
+            .some(value => {
+                const str = String(value || "").toLowerCase();
+                return str.includes(rawQuery) || (normalizedQuery && str.includes(normalizedQuery));
+            });
     }).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
 
     status.textContent = matchingSales.length === 0
@@ -4394,24 +4459,32 @@ async function renderReceiptSearchResults(query, requestVersion) {
     status.classList.remove("hidden");
 
     if (matchingSales.length === 0) {
-        results.innerHTML = `<div class="rounded-lg border border-dashed border-blue-200 bg-white p-3 text-center text-xs text-gray-500">Try a receipt number, customer name, or phone number.</div>`;
+        results.innerHTML = `<div class="rounded-lg border border-dashed border-blue-200 bg-white p-3 text-center text-xs text-gray-500">Try an order number (e.g. 101), customer name, or phone number.</div>`;
     } else {
         results.innerHTML = matchingSales.map(sale => {
             const customerName = sale.customer?.name || sale.deliveryInfo?.name || "Walk-in customer";
             const customerPhone = sale.customer?.phone || sale.deliveryInfo?.phone || "No phone saved";
             return `
-                <div class="rounded-lg border border-blue-100 bg-white p-3 text-xs shadow-sm">
+                <div class="rounded-lg border border-blue-100 bg-white p-3 text-xs shadow-sm space-y-2">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0">
-                            <div class="font-bold text-gray-800">Receipt #${escapeHtml(String(sale.id))}</div>
-                            <div class="mt-0.5 text-[11px] text-gray-500">${escapeHtml(new Date(sale.timestamp).toLocaleString())} | ${escapeHtml(sale.orderType || "DINE_IN")}</div>
+                            <div class="font-bold text-gray-800">
+                                Order #${escapeHtml(String(sale.id))}
+                                <span class="ml-1 text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">(${escapeHtml(sale.orderType || "DINE_IN")})</span>
+                                ${sale.refundStatus ? `<span class="ml-1 text-[10px] text-red-700 font-bold bg-red-50 px-1.5 py-0.5 rounded">${sale.refundStatus === 'FULL' ? 'REFUNDED' : 'PARTIAL REFUND'}</span>` : ''}
+                            </div>
+                            <div class="mt-0.5 text-[11px] text-gray-500">${escapeHtml(new Date(sale.timestamp).toLocaleString())} • By ${escapeHtml(sale.serverUser || "Staff")}</div>
                         </div>
                         <div class="shrink-0 font-bold text-emerald-700">${formatAmount(sale.total || 0)}</div>
                     </div>
-                    <div class="mt-2 text-gray-700"><strong>${escapeHtml(customerName)}</strong> <span class="text-gray-500">${escapeHtml(customerPhone)}</span></div>
-                    <div class="mt-2 flex justify-end gap-1.5 border-t border-gray-100 pt-2">
-                        <button type="button" onclick="downloadReceiptPDF(${Number(sale.id)})" class="rounded bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">PDF</button>
-                        <button type="button" onclick="shareReceipt(${Number(sale.id)})" class="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">Share</button>
+                    <div class="text-gray-700 text-[11px]">👤 <strong>${escapeHtml(customerName)}</strong> <span class="text-gray-500">(${escapeHtml(customerPhone)})</span></div>
+                    <div class="flex flex-wrap items-center justify-end gap-1.5 border-t border-gray-100 pt-1.5">
+                        <button type="button" onclick="downloadReceiptPDF(${Number(sale.id)})" class="rounded bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">📄 PDF</button>
+                        <button type="button" onclick="shareReceipt(${Number(sale.id)})" class="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">📲 Share</button>
+                        <button type="button" onclick="editSale(${Number(sale.id)})" class="rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-100">✏️ Edit</button>
+                        ${(currentRole === 'OWNER' || currentRole === 'MANAGER') && sale.refundStatus !== 'FULL' ? `
+                        <button type="button" onclick="openRefundModal(${Number(sale.id)})" class="rounded bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-700 hover:bg-orange-100">💵 Refund</button>` : ''}
+                        <button type="button" onclick="deleteSale(${Number(sale.id)})" class="rounded bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100">🗑️ Delete</button>
                     </div>
                 </div>
             `;

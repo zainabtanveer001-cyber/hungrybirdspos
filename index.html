@@ -113,6 +113,12 @@
                     </div>
 
                     <div class="flex flex-wrap gap-2">
+                        <button onclick="openOnlineOrdersModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1 shadow-sm">
+                            🌐 Website Orders <span id="onlineOrdersBadge" class="bg-red-500 text-white font-black px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button onclick="openCustomerModal()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 transition flex items-center gap-1 shadow-sm">
+                            👥 Customers
+                        </button>
                         <button data-role="OWNER" onclick="openSalesAnalyticsModal()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm">
                             📈 Analytics
                         </button>
@@ -183,10 +189,27 @@
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <input id="deliveryCustomerName" type="text" placeholder="Customer Name" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
-                            <input id="deliveryCustomerPhone" type="text" placeholder="Phone Number" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
+                            <input id="deliveryCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupDeliveryCustomer(this.value)" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
                         </div>
                         <input id="deliveryAddress" type="text" placeholder="Delivery Address / Landmark" class="w-full p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
                         <input id="deliveryChargeInput" type="number" min="0" step="0.01" placeholder="Delivery Charge (Rs)" value="0" oninput="updateDeliveryCharge(this.value)" class="w-full p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
+                    </div>
+
+                    <!-- Customer CRM Lookup for Dine-In / Takeaway -->
+                    <div id="cartCustomerBox" class="mb-3 p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 text-xs">
+                        <div class="flex justify-between items-center font-bold text-purple-900">
+                            <span class="flex items-center gap-1">👤 Customer CRM / Loyalty</span>
+                            <button type="button" onclick="clearCartCustomer()" class="text-gray-400 hover:text-red-500 text-[10px] font-semibold">Clear</button>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input id="cartCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupCartCustomer(this.value)" class="p-1.5 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-purple-500" />
+                            <input id="cartCustomerName" type="text" placeholder="Customer Name" class="p-1.5 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-purple-500" />
+                        </div>
+                        <div id="cartCustomerInfo" class="hidden text-[11px] text-purple-800 font-medium bg-purple-100/60 p-1.5 rounded"></div>
+                        <div id="cartLoyaltyRedeemBox" class="hidden flex items-center justify-between gap-2 pt-1 border-t border-purple-200">
+                            <span class="text-[11px] font-bold text-amber-800">⭐ Redeem Points:</span>
+                            <input id="cartLoyaltyRedeemInput" type="number" min="0" placeholder="0" oninput="applyLoyaltyRedemption(this.value)" class="w-16 p-1 border rounded text-xs text-right bg-white focus:ring-1 focus:ring-amber-500" />
+                        </div>
                     </div>
 
                     <div id="cartItems" class="space-y-2 mb-4 min-h-[60px]"></div>
@@ -267,6 +290,18 @@
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="text-sm font-bold text-gray-700">Recent Sales History</h3>
                         <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Secure Sync</span>
+                    </div>
+
+                    <!-- ORDER / RECEIPT SEARCH -->
+                    <div class="mb-3 space-y-2">
+                        <div class="relative">
+                            <input id="receiptSearchInput" type="text" placeholder="🔍 Search by Order #, Customer Name, or Phone..."
+                                   oninput="searchOldReceipts(this.value)"
+                                   class="w-full p-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition pr-8" />
+                            <button onclick="clearReceiptSearch()" class="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs font-bold" title="Clear search">✕</button>
+                        </div>
+                        <div id="receiptSearchStatus" class="hidden text-[11px] font-bold text-indigo-700"></div>
+                        <div id="receiptSearchResults" class="hidden space-y-2 max-h-60 overflow-y-auto pr-1"></div>
                     </div>
 
                     <!-- BULK SELECTION TOOLBAR -->
@@ -859,6 +894,57 @@
             </div>
             <div class="p-3 bg-gray-100 border-t text-right">
                 <button onclick="closeAuditLogModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- WEBSITE ONLINE ORDERS MODAL -->
+    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b bg-indigo-900 text-white flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🌐</span>
+                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Incoming Website Orders</h3>
+                </div>
+                <button onclick="closeOnlineOrdersModal()" class="text-indigo-200 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-4 space-y-3 overflow-y-auto flex-1 bg-gray-50">
+                <div id="onlineOrdersList" class="space-y-3"></div>
+            </div>
+            <div class="p-3 bg-gray-100 border-t text-right">
+                <button onclick="closeOnlineOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CUSTOMER CRM MODAL -->
+    <div id="customerModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b bg-purple-700 text-white flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">👥</span>
+                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Customer CRM & History</h3>
+                </div>
+                <button onclick="closeCustomerModal()" class="text-purple-200 hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-gray-50">
+                <!-- List View -->
+                <div id="customerListView" class="space-y-3">
+                    <input id="customerSearchInput" type="text" placeholder="🔍 Search customer by name or phone..."
+                           oninput="renderCustomerList(this.value)"
+                           class="w-full p-2.5 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-sm" />
+                    <div id="customerListContainer" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1"></div>
+                </div>
+                <!-- History View -->
+                <div id="customerHistoryView" class="hidden space-y-3">
+                    <button onclick="showCustomerListView()" class="text-xs text-purple-700 font-bold hover:underline flex items-center gap-1">← Back to Customer List</button>
+                    <div id="customerHistoryDetails"></div>
+                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide pt-2 border-t">Past Orders</h4>
+                    <div id="customerHistoryOrders" class="space-y-2 max-h-[45vh] overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+            <div class="p-3 bg-gray-100 border-t text-right">
+                <button onclick="closeCustomerModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
             </div>
         </div>
     </div>
