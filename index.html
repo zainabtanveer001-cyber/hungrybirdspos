@@ -6,23 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hungry Birds Restaurant POS v4.0</title>
 
-    <link rel="manifest" href="manifest.json" />
-    <link rel="icon" href="icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="icon.svg" />
-    <meta name="theme-color" content="#4f46e5" />
-
-    <!-- Mobile-only touch/zoom fixes; desktop (Chrome/Windows) is unaffected -->
-    <style>
-        @media (max-width: 640px) {
-            input, select, textarea { font-size: 16px; }
-            button[class*="py-1 "],
-            button[class*="py-1.5"] {
-                padding-top: 0.625rem;
-                padding-bottom: 0.625rem;
-            }
-        }
-    </style>
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
 
@@ -92,14 +75,14 @@
     <div id="posScreen" class="hidden min-h-screen flex flex-col">
 
         <!-- TOP BAR / EMPLOYEE HEADER -->
-        <header class="bg-indigo-900 text-white p-3 shadow-md flex flex-wrap justify-between items-center gap-y-2 sticky top-0 z-40">
+        <header class="bg-indigo-900 text-white p-3 shadow-md flex justify-between items-center sticky top-0 z-40">
             <div class="flex items-center gap-3">
                 <h1 class="text-lg font-black tracking-tight flex items-center gap-2">
                     🦅 <span>Hungry Birds</span>
                 </h1>
                 <span id="roleBadge" class="text-xs px-2.5 py-1 rounded-full bg-indigo-800 border border-indigo-700 font-mono font-bold tracking-wide"></span>
             </div>
-            <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-sm">
+            <div class="flex items-center gap-2 sm:gap-3 text-sm">
                 <button data-role="OWNER" onclick="openShiftOpeningModal()" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-1 shadow-sm">
                     💵 Opening Cash
                 </button>
@@ -129,43 +112,35 @@
                         <input id="menuSearch" type="text" placeholder="🔍 Search menu items..." class="w-full p-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition" />
                     </div>
 
-                    <div class="relative">
-                        <button id="mainActionMenuButton" type="button" onclick="toggleMainActionMenu()" aria-expanded="false" aria-controls="mainActionMenu" class="bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white rounded-lg shadow-sm transition hover:bg-indigo-700">
-                            ☰ More
+                    <div class="flex flex-wrap gap-2">
+                        <button data-role="OWNER" onclick="openSalesAnalyticsModal()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm">
+                            📈 Analytics
                         </button>
-                        <div id="mainActionMenu" class="hidden absolute right-0 z-40 mt-2 w-64 overflow-hidden rounded-lg border border-gray-200 bg-white py-1 shadow-xl" role="menu" aria-labelledby="mainActionMenuButton">
-                            <div class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-gray-400">Orders</div>
-                            <button type="button" onclick="closeMainActionMenu(); openHeldOrdersModal()" role="menuitem" class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-orange-50 hover:text-orange-800">
-                                <span>Held Orders</span>
-                                <span id="heldOrdersBadge" class="rounded-full bg-orange-100 px-1.5 py-0.5 text-[10px] font-black text-orange-700">0</span>
-                            </button>
-                            <button type="button" onclick="closeMainActionMenu(); openOnlineOrdersModal()" role="menuitem" class="flex w-full items-center justify-between px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-800">
-                                <span>Website Orders</span>
-                                <span id="onlineOrdersBadge" class="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-black text-blue-700">0</span>
-                            </button>
-                            <button type="button" onclick="closeMainActionMenu(); openDeliveryManagementModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-800">Deliveries</button>
-                            <button type="button" onclick="closeMainActionMenu(); openCustomerModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-800">Customers</button>
-                            <button id="connectPrinterBtn" type="button" onclick="closeMainActionMenu(); connectPrinter()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-800">Connect Printer</button>
-
-                            <div data-role="OWNER,MANAGER" class="my-1 border-t border-gray-100"></div>
-                            <div data-role="OWNER,MANAGER" class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-gray-400">Management</div>
-                            <button data-role="OWNER,MANAGER" type="button" onclick="closeMainActionMenu(); protectedOpenInventoryModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-amber-50 hover:text-amber-800">Stock</button>
-                            <button data-role="OWNER,MANAGER" type="button" onclick="closeMainActionMenu(); openExpenseModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-teal-50 hover:text-teal-800">Expenses</button>
-
-                            <div data-role="OWNER" class="my-1 border-t border-gray-100"></div>
-                            <div data-role="OWNER" class="px-3 pb-1 pt-2 text-[10px] font-bold uppercase text-gray-400">Owner</div>
-                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); openSalesAnalyticsModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-emerald-50 hover:text-emerald-800">Sales Analytics</button>
-                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); openPnlModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-indigo-50 hover:text-indigo-800">Profit &amp; Loss Report</button>
-                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); openAuditLogModal()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-gray-100">Audit Log</button>
-                            <button data-role="OWNER" type="button" onclick="closeMainActionMenu(); authenticateOwner()" role="menuitem" class="w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-purple-50 hover:text-purple-800">Owner Admin</button>
-                        </div>
+                        <button onclick="openHeldOrdersModal()" class="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-700 transition flex items-center gap-1 shadow-sm">
+                            ⏸️ Held <span id="heldOrdersBadge" class="bg-white text-orange-700 font-black px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                        </button>
+                        <button onclick="openDeliveryManagementModal()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition flex items-center gap-1 shadow-sm">
+                            🛵 Deliveries
+                        </button>
+                        <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-amber-700 transition shadow-sm">
+                            📦 Stock
+                        </button>
+                        <button data-role="OWNER" onclick="authenticateOwner()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 transition shadow-sm">
+                            👑 Admin
+                        </button>
+                        <button id="connectPrinterBtn" onclick="connectPrinter()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-sm">
+                            🖨️ Printer
+                        </button>
+                        <button data-role="OWNER,MANAGER" onclick="openExpenseModal()" class="bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-700 transition flex items-center gap-1 shadow-sm">
+    💸 Expenses
+</button>
+<button data-role="OWNER" onclick="openPnlModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1 shadow-sm hidden">
+    📊 P&L Report
+</button>
+<button data-role="OWNER" onclick="openAuditLogModal()" class="bg-gray-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1 shadow-sm">
+    🕵️ Audit Log
+</button>
                     </div>
-                </div>
-
-                <!-- Low Stock Alert Banner -->
-                <div id="lowStockBanner" onclick="protectedOpenInventoryModal()" class="hidden bg-red-50 border border-red-300 text-red-700 px-4 py-2.5 rounded-2xl text-xs font-bold flex justify-between items-center gap-2 cursor-pointer hover:bg-red-100 transition shadow-sm">
-                    <span id="lowStockBannerText">⚠️ 0 items low on stock</span>
-                    <span class="text-red-500 whitespace-nowrap">View Stock →</span>
                 </div>
 
                 <!-- Food Categories Toggle -->
@@ -197,23 +172,6 @@
                             <button id="btnDelivery" onclick="setOrderType('DELIVERY')" class="px-3 py-1.5 rounded-lg text-gray-600 hover:text-indigo-600 transition">
                                 🛵 Delivery
                             </button>
-                        </div>
-                    </div>
-
-                    <!-- Customer Lookup Panel -->
-                    <div class="mb-4 p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 text-xs">
-                        <div class="font-bold text-purple-900 flex justify-between items-center">
-                            <span>👤 Customer (Optional)</span>
-                            <button onclick="clearCartCustomer()" class="text-gray-400 hover:text-red-500 font-bold">Clear</button>
-                        </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <input id="cartCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupCartCustomer(this.value)" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-purple-500" />
-                            <input id="cartCustomerName" type="text" placeholder="Customer Name" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-purple-500" />
-                        </div>
-                        <div id="cartCustomerInfo" class="hidden text-[10px] text-purple-700 font-semibold"></div>
-                        <div id="cartLoyaltyRedeemBox" class="hidden flex items-center gap-1.5">
-                            <input id="cartLoyaltyRedeemInput" type="number" min="0" step="1" placeholder="Redeem points" class="flex-1 p-1.5 border rounded-lg bg-white text-[11px] focus:ring-1 focus:ring-purple-500" />
-                            <button onclick="applyLoyaltyRedemption(document.getElementById('cartLoyaltyRedeemInput').value)" class="bg-purple-600 text-white text-[10px] font-bold px-2 py-1.5 rounded-lg hover:bg-purple-700 transition">Redeem</button>
                         </div>
                     </div>
 
@@ -251,21 +209,6 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                            <label for="packingChargeInput" class="text-xs font-bold text-slate-700">
-                                Packing (Rs)
-                                <input id="packingChargeInput" type="number" min="0" step="0.01" placeholder="0.00" value="0" oninput="updatePackingCharge(this.value)" class="mt-1 w-full p-1.5 text-right font-bold text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                            </label>
-                            <label for="taxPercentInput" class="text-xs font-bold text-slate-700">
-                                Tax (%)
-                                <input id="taxPercentInput" type="number" min="0" max="100" step="0.01" placeholder="0" value="0" oninput="updateTaxPercent(this.value)" class="mt-1 w-full p-1.5 text-right font-bold text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                            </label>
-                            <label for="otherChargeInput" class="text-xs font-bold text-slate-700">
-                                Other (Rs)
-                                <input id="otherChargeInput" type="number" min="0" step="0.01" placeholder="0.00" value="0" oninput="updateOtherCharge(this.value)" class="mt-1 w-full p-1.5 text-right font-bold text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
-                            </label>
-                        </div>
-
                         <div id="discountAmountRow" class="hidden flex justify-between items-center text-xs text-red-600 font-medium">
                             <span>Discount Amount:</span>
                             <span id="cartDiscountAmount">-Rs 0.00</span>
@@ -274,26 +217,6 @@
                         <div id="deliveryChargeRow" class="hidden flex justify-between items-center text-xs text-blue-700 font-medium">
                             <span>Delivery Charge:</span>
                             <span id="cartDeliveryCharge">Rs 0.00</span>
-                        </div>
-
-                        <div id="packingChargeRow" class="hidden flex justify-between items-center text-xs text-slate-700 font-medium">
-                            <span>Packing Charge:</span>
-                            <span id="cartPackingCharge">Rs 0.00</span>
-                        </div>
-
-                        <div id="taxAmountRow" class="hidden flex justify-between items-center text-xs text-slate-700 font-medium">
-                            <span>Tax:</span>
-                            <span id="cartTaxAmount">Rs 0.00</span>
-                        </div>
-
-                        <div id="otherChargeRow" class="hidden flex justify-between items-center text-xs text-slate-700 font-medium">
-                            <span>Other Charges:</span>
-                            <span id="cartOtherCharge">Rs 0.00</span>
-                        </div>
-
-                        <div id="loyaltyDiscountRow" class="hidden flex justify-between items-center text-xs text-purple-700 font-medium">
-                            <span>Loyalty Redemption:</span>
-                            <span id="cartLoyaltyDiscount">-Rs 0.00</span>
                         </div>
 
                         <div class="flex justify-between items-center font-black text-xl text-gray-900 border-t pt-2">
@@ -335,7 +258,6 @@
                     </div>
 
                     <div id="stockUnlockedState" class="hidden">
-                        <input id="stockSearch" type="text" placeholder="🔍 Search stock items..." class="w-full p-2 mb-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition" />
                         <div id="inventoryContainer" class="space-y-2 text-xs max-h-60 overflow-y-auto pr-1"></div>
                     </div>
                 </div>
@@ -344,19 +266,8 @@
                 <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="text-sm font-bold text-gray-700">Recent Sales History</h3>
-                        <button onclick="exportSalesCSV()" title="Export all sales to CSV" class="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-2 py-1 rounded transition">
-                            ⬇️ Export CSV
-                        </button>
+                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Secure Sync</span>
                     </div>
-
-                        <div class="mb-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
-                            <div class="flex flex-col gap-2 sm:flex-row">
-                                <input id="receiptSearchInput" type="search" placeholder="Search receipt #, customer name, or phone..." oninput="searchOldReceipts(this.value)" onkeydown="if (event.key === 'Enter') searchOldReceipts(this.value, true)" class="min-w-0 flex-1 rounded-lg border border-blue-200 bg-white p-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                                <button type="button" onclick="clearReceiptSearch()" title="Clear receipt search" class="bg-white px-3 py-1.5 text-xs font-bold text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition">Clear</button>
-                            </div>
-                            <div id="receiptSearchStatus" class="hidden mt-2 text-[11px] font-semibold text-blue-800"></div>
-                            <div id="receiptSearchResults" class="hidden mt-2 max-h-72 space-y-2 overflow-y-auto"></div>
-                        </div>
 
                     <!-- BULK SELECTION TOOLBAR -->
                     <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl mb-3 border text-xs">
@@ -502,13 +413,10 @@
                     </select>
 
                     <!-- NEW: Supplier Dropdown -->
-                    <div class="flex gap-1">
-                        <select id="expenseSupplier" class="flex-1 p-2 border rounded-lg text-xs bg-white focus:ring-1 focus:ring-teal-500">
-                            <option value="">-- No Supplier --</option>
-                            <!-- Populated by JS -->
-                        </select>
-                        <button type="button" onclick="openSupplierModal()" title="Manage Suppliers" class="bg-teal-100 text-teal-700 text-xs font-bold px-2 rounded-lg hover:bg-teal-200 transition">🏭</button>
-                    </div>
+                    <select id="expenseSupplier" class="p-2 border rounded-lg text-xs bg-white focus:ring-1 focus:ring-teal-500">
+                        <option value="">-- No Supplier --</option>
+                        <!-- Populated by JS -->
+                    </select>
                 </div>
 
                 <div class="flex gap-2 pt-2">
@@ -521,12 +429,7 @@
             <div id="ownerExpenseSection" class="hidden bg-white p-4 rounded-xl border border-gray-200 space-y-3">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
                     <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Expense History</h4>
-                    <div class="flex items-center gap-2">
-                        <span id="totalExpenseAmount" class="text-sm font-extrabold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">Total: Rs 0.00</span>
-                        <button onclick="exportExpensesCSV()" title="Export filtered expenses to CSV" class="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-2 py-1 rounded transition">
-                            ⬇️ Export CSV
-                        </button>
-                    </div>
+                    <span id="totalExpenseAmount" class="text-sm font-extrabold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">Total: Rs 0.00</span>
                 </div>
 
                 <!-- NEW: Date Range Filters -->
@@ -576,30 +479,6 @@
 
             <div class="p-3 bg-gray-50 border-t text-right">
                 <button onclick="closeHeldOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
-                    Close
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- WEBSITE (ONLINE) ORDERS MODAL -->
-    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-blue-700 text-white flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">🌐</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Website Orders</h3>
-                </div>
-                <button onclick="closeOnlineOrdersModal()" class="text-blue-200 hover:text-white font-bold text-xl">&times;</button>
-            </div>
-
-            <div class="p-4 space-y-3 overflow-y-auto flex-1">
-                <p class="text-xs text-gray-500">Accept loads the order into your cart for review/checkout; reject notifies no one automatically but records your reason.</p>
-                <div id="onlineOrdersList" class="space-y-3"></div>
-            </div>
-
-            <div class="p-3 bg-gray-50 border-t text-right">
-                <button onclick="closeOnlineOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
                     Close
                 </button>
             </div>
@@ -745,21 +624,10 @@
         <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div class="p-4 border-b bg-amber-600 text-white flex justify-between items-center">
                 <h3 class="text-sm font-extrabold tracking-wide uppercase">📦 Raw Ingredients & Inventory Management</h3>
-                <div class="flex items-center gap-2">
-                    <button onclick="exportInventoryCSV()" title="Export inventory to CSV" class="text-[10px] bg-amber-500 text-white hover:bg-amber-400 font-bold px-2 py-1 rounded transition">
-                        ⬇️ Export CSV
-                    </button>
-                    <button onclick="closeInventoryModal()" class="text-amber-200 hover:text-white font-bold text-xl">&times;</button>
-                </div>
+                <button onclick="closeInventoryModal()" class="text-amber-200 hover:text-white font-bold text-xl">&times;</button>
             </div>
 
             <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-gray-50">
-                <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-2">
-                    <label class="text-xs font-bold text-gray-700 uppercase tracking-wide">⚠️ Low Stock Alert Threshold</label>
-                    <input id="lowStockThresholdInput" type="number" step="0.01" min="0" class="p-1.5 border rounded-lg text-xs w-24 focus:ring-1 focus:ring-amber-500" />
-                    <button onclick="saveLowStockThreshold()" class="bg-amber-600 text-white text-xs font-bold rounded-lg px-3 py-1.5 hover:bg-amber-700 transition">Save</button>
-                </div>
-
                 <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-2">
                     <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Add New Ingredient</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
@@ -769,10 +637,6 @@
                         <input id="newItemCost" type="number" step="0.01" min="0" placeholder="Cost per Unit" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
                         <button onclick="addNewInventoryItem()" class="bg-amber-600 text-white text-xs font-bold rounded-lg p-2 hover:bg-amber-700 transition shadow-sm">+ Add</button>
                     </div>
-                </div>
-
-                <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
-                    <input id="modalStockSearch" type="text" placeholder="🔍 Search ingredients..." class="w-full p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
                 </div>
 
                 <div id="modalInventoryList" class="space-y-2"></div>
@@ -999,60 +863,6 @@
         </div>
     </div>
 
-    <!-- CUSTOMER MANAGEMENT MODAL -->
-    <div id="customerModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-purple-700 text-white flex justify-between items-center">
-                <h3 class="text-sm font-extrabold tracking-wide uppercase">👥 Customer Management</h3>
-                <button onclick="closeCustomerModal()" class="text-purple-200 hover:text-white font-bold text-xl">&times;</button>
-            </div>
-            <div class="p-4 space-y-3 overflow-y-auto flex-1 bg-gray-50">
-                <div id="customerListView" class="space-y-3">
-                    <input id="customerSearchInput" type="text" placeholder="Search by name or phone..." oninput="renderCustomerList(this.value)" class="w-full p-2 border rounded-lg text-xs focus:ring-1 focus:ring-purple-500" />
-                    <div id="customerListContainer" class="space-y-2"></div>
-                </div>
-                <div id="customerHistoryView" class="hidden space-y-3">
-                    <button onclick="showCustomerListView()" class="text-xs font-bold text-purple-700 hover:text-purple-900">&larr; Back to all customers</button>
-                    <div id="customerHistoryDetails"></div>
-                    <div id="customerHistoryOrders" class="space-y-2"></div>
-                </div>
-            </div>
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeCustomerModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- SUPPLIER MANAGEMENT MODAL -->
-    <div id="supplierModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-teal-700 text-white flex justify-between items-center">
-                <h3 class="text-sm font-extrabold tracking-wide uppercase">🏭 Supplier Management</h3>
-                <button onclick="closeSupplierModal()" class="text-teal-200 hover:text-white font-bold text-xl">&times;</button>
-            </div>
-            <div class="p-4 space-y-3 overflow-y-auto flex-1 bg-gray-50">
-                <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-2">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Add / Update Supplier</h4>
-                    <input id="editSupplierId" type="hidden" />
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input id="supplierName" type="text" placeholder="Supplier Name" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-teal-500" />
-                        <input id="supplierPhone" type="text" placeholder="Phone Number" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-teal-500" />
-                        <input id="supplierAddress" type="text" placeholder="Address" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-teal-500 sm:col-span-2" />
-                        <input id="supplierNotes" type="text" placeholder="Notes (optional)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-teal-500 sm:col-span-2" />
-                    </div>
-                    <div class="flex gap-2 pt-1">
-                        <button onclick="saveSupplier()" class="flex-1 bg-teal-600 text-white text-xs font-bold py-2 rounded-lg hover:bg-teal-700 transition shadow-sm">Save Supplier</button>
-                        <button onclick="resetSupplierForm()" class="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-300">Reset</button>
-                    </div>
-                </div>
-                <div id="supplierList" class="space-y-2"></div>
-            </div>
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeSupplierModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
-            </div>
-        </div>
-    </div>
-
     <!-- HIDDEN PDF RECEIPT RENDER TEMPLATE -->
     <div id="receiptPdfWrapper" class="hidden fixed -top-[9999px] -left-[9999px] box-border w-[320px] bg-white px-4 py-4 font-mono text-black overflow-hidden">
         <div class="text-center border-b-2 border-black pb-2 mb-2 leading-tight">
@@ -1065,7 +875,6 @@
         <div id="pdfReceiptTotals" class="text-[12px] font-bold mb-2"></div>
         <div id="pdfReceiptFooter" class="text-center text-[11px] font-bold border-t-2 border-black pt-2"></div>
     </div>
-
 
     <script src="app.js"></script>
 </body>

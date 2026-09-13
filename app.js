@@ -1358,8 +1358,8 @@ window.createEmployee = async function () {
     }
 
     try {
-        const existing = await cloudDb.collection("users").where("usernameLower", "==", username).limit(1).get();
-        if (!existing.empty) {
+        const existingDirectoryEntry = await cloudDb.collection("usernameDirectory").doc(username).get();
+        if (existingDirectoryEntry.exists) {
             alert("That username is already in use.");
             return;
         }
@@ -1376,6 +1376,11 @@ window.createEmployee = async function () {
             active: true,
             authEmail: usernameAuthEmail(username),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        // Publicly-readable so the login screen can resolve username -> email before signing in.
+        await cloudDb.collection("usernameDirectory").doc(username).set({
+            authEmail: usernameAuthEmail(username),
+            active: true
         });
 
         ["employeeName", "employeeUsername", "employeePassword"].forEach(id => {
@@ -1443,6 +1448,7 @@ window.setEmployeeActive = async function (uid, username, active) {
 
     try {
         await cloudDb.collection("users").doc(uid).update({ active });
+        await cloudDb.collection("usernameDirectory").doc(username).update({ active });
         await logAudit(active ? "EMPLOYEE_ENABLE" : "EMPLOYEE_DISABLE", `${verb}d employee account '${username}'`);
         await renderEmployeeList();
     } catch (error) {
@@ -1476,6 +1482,7 @@ window.deleteEmployee = async function (uid, username) {
         }
 
         await cloudDb.collection("users").doc(uid).delete();
+        await cloudDb.collection("usernameDirectory").doc(username).delete();
         await logAudit("EMPLOYEE_DELETE", `Permanently deleted employee profile '${username}'`);
 
         if (result) {
@@ -1577,13 +1584,13 @@ window.login = async () => {
     }
 
     try {
-        const profileSnapshot = await cloudDb.collection("users").where("usernameLower", "==", username).limit(1).get();
-        if (profileSnapshot.empty) {
+        const directoryEntry = await cloudDb.collection("usernameDirectory").doc(username).get();
+        if (!directoryEntry.exists) {
             alert("Username not found or account is not configured.");
             return;
         }
 
-        const profile = profileSnapshot.docs[0].data();
+        const profile = directoryEntry.data();
         if (profile.active !== true) {
             alert("This account is disabled. Contact the Owner.");
             return;
@@ -2160,13 +2167,23 @@ window.acceptOnlineOrder = async function (id) {
         return;
     }
 
-    cart = (order.items || []).map(i => ({
-        id: i.id || `WEB_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        menuItemId: i.id,
-        name: i.name,
-        price: Number(i.price) || 0,
-        qty: Number(i.qty) || 1
-    }));
+    // Resolve each website item against the local menu table so recipes.menuItemId lookups (stock deduction) work
+    const resolvedItems = [];
+    for (const i of (order.items || [])) {
+        const canonicalId = i.menuItemId || i.id;
+        const menuItem = canonicalId ? await db.menu.get(canonicalId) : null;
+        if (!menuItem) {
+            console.warn(`Online order item "${i.name}" (id ${canonicalId}) not found in local menu; adding without recipe/stock deduction.`);
+        }
+        resolvedItems.push({
+            id: menuItem ? menuItem.id : `CUSTOM_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            menuItemId: menuItem ? menuItem.id : null,
+            name: menuItem ? menuItem.name : (i.name || "Item"),
+            price: Number(i.price) || (menuItem ? Number(menuItem.price) : 0) || 0,
+            qty: Number(i.qty) || 1
+        });
+    }
+    cart = resolvedItems;
 
     window.setOrderType(order.orderType === "TAKEAWAY" ? "TAKEAWAY" : "DELIVERY");
 
@@ -4044,6 +4061,9 @@ async function completeSaleWithPayments(saleData) {
 
             for (const cartItem of saleRecord.items) {
                 const recipes = await db.recipes.where("menuItemId").equals(cartItem.menuItemId || cartItem.id).toArray();
+                if (recipes.length === 0 && cartItem.menuItemId) {
+                    console.warn(`No recipe configured for menu item "${cartItem.name}" (${cartItem.menuItemId}); stock will not be deducted for it.`);
+                }
                 for (const recipe of recipes) {
                     const ingredient = await db.inventory.get(recipe.inventoryId);
                     if (!ingredient) continue;
@@ -4292,6 +4312,9 @@ async function viewDelivery(id) {
 async function verifyStock() {
     for (const cartItem of cart) {
         const recipes = await db.recipes.where("menuItemId").equals(cartItem.menuItemId || cartItem.id).toArray();
+        if (recipes.length === 0 && cartItem.menuItemId) {
+            console.warn(`No recipe configured for menu item "${cartItem.name}" (${cartItem.menuItemId}); stock will not be deducted for it.`);
+        }
         for (const recipe of recipes) {
             const ingredient = await db.inventory.get(recipe.inventoryId);
             if (!ingredient) continue;
