@@ -2138,7 +2138,7 @@ function setupOnlineOrdersSync() {
     if (!notificationAudio) {
         notificationAudio = new Audio();
         notificationAudio.id = "notificationSound";
-        notificationAudio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZRA0OVqzn77BgGAg+lunxwmohBSuAzvLVezEGG2i77+WSQw0OVq/m8LNjHAgziMzx1n8yBRxru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQU=';
+        notificationAudio.src = 'mixkit-software-interface-start-2574.wav';
         notificationAudio.volume = 1.0;
         notificationAudio.preload = 'auto';
         document.body.appendChild(notificationAudio);
