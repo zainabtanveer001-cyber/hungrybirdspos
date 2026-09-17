@@ -2099,27 +2099,42 @@ function setupInventoryCloudSync() {
 
 // Notification Sound Setup
 let notificationAudio = null;
-let previousOrderCount = 0;
+let previousOrderCount = -1;
+let isFirstSnapshot = true;
 
 function initNotificationSound() {
-    // Create audio element for notification sound
-    notificationAudio = new Audio();
-    // Using a data URL for a simple beep sound (you can replace with your own sound file)
-    notificationAudio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZRA0OVqzn77BgGAg+lunxwmohBSuAzvLVezEGG2i77+WSQw0OVq/m8LNjHAgziMzx1n8yBRxru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQU=';
-    notificationAudio.volume = 0.8;
+    if (!notificationAudio) {
+        notificationAudio = document.getElementById("notificationSound");
+        if (!notificationAudio) {
+            notificationAudio = new Audio();
+            notificationAudio.id = "notificationSound";
+            notificationAudio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZRA0OVqzn77BgGAg+lunxwmohBSuAzvLVezEGG2i77+WSQw0OVq/m8LNjHAgziMzx1n8yBRxru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQU=';
+            notificationAudio.volume = 0.8;
+            document.body.appendChild(notificationAudio);
+        }
+    }
+    console.log("Notification sound initialized");
 }
 
 function playNotificationSound() {
-    if (notificationAudio) {
-        notificationAudio.currentTime = 0;
-        notificationAudio.play().catch(err => {
-            console.warn("Could not play notification sound:", err);
-        });
+    try {
+        if (notificationAudio) {
+            notificationAudio.currentTime = 0;
+            notificationAudio.play().catch(err => {
+                console.warn("Could not play notification sound:", err);
+            });
+            console.log("Playing notification sound");
+        } else {
+            console.warn("Notification audio not initialized");
+        }
+    } catch (err) {
+        console.error("Error in playNotificationSound:", err);
     }
 }
 
 function showVisualNotification(orderCount) {
-    // Animate the badge
+    console.log(`Showing visual notification for ${orderCount} new order(s)`);
+
     const badge = document.getElementById("onlineOrdersBadge");
     if (badge) {
         badge.classList.add("animate-bounce");
@@ -2128,10 +2143,8 @@ function showVisualNotification(orderCount) {
         }, 2000);
     }
 
-    // Show toast notification
     showToast(`🔔 ${orderCount} new order${orderCount > 1 ? 's' : ''} received!`, "success");
 
-    // Flash the button
     const button = document.querySelector('[onclick="openOnlineOrdersModal()"]');
     if (button) {
         button.classList.add("animate-pulse");
@@ -2142,30 +2155,44 @@ function showVisualNotification(orderCount) {
 }
 
 function setupOnlineOrdersSync() {
-    if (!cloudSyncEnabled || !cloudDb) return;
+    if (!cloudSyncEnabled || !cloudDb) {
+        console.warn("Online orders sync: cloudSyncEnabled=" + cloudSyncEnabled + ", cloudDb=" + (cloudDb ? "exists" : "null"));
+        return;
+    }
 
-    // Initialize notification sound
+    console.log("Setting up online orders sync listener");
     initNotificationSound();
 
     unsubscribeOnlineOrdersSync = cloudDb.collection("onlineOrders").where("status", "==", "PENDING")
         .onSnapshot(snapshot => {
             const newOrderCount = snapshot.docs.length;
+            console.log("Online orders snapshot received. Count:", newOrderCount, "Previous:", previousOrderCount, "IsFirst:", isFirstSnapshot);
+
             onlineOrdersCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            // Check if new orders arrived (count increased)
-            if (previousOrderCount > 0 && newOrderCount > previousOrderCount) {
+            if (isFirstSnapshot) {
+                console.log("First snapshot - skipping notification, caching", newOrderCount, "existing orders");
+                previousOrderCount = newOrderCount;
+                isFirstSnapshot = false;
+            } else if (newOrderCount > previousOrderCount) {
                 const newOrders = newOrderCount - previousOrderCount;
+                console.log("New orders detected! Count increased from", previousOrderCount, "to", newOrderCount);
                 playNotificationSound();
                 showVisualNotification(newOrders);
+                previousOrderCount = newOrderCount;
+            } else if (newOrderCount < previousOrderCount) {
+                console.log("Orders reduced from", previousOrderCount, "to", newOrderCount);
+                previousOrderCount = newOrderCount;
             }
 
-            previousOrderCount = newOrderCount;
             setText("onlineOrdersBadge", onlineOrdersCache.length);
 
             if (!document.getElementById("onlineOrdersModal")?.classList.contains("hidden")) {
                 renderOnlineOrdersList();
             }
-        }, err => console.error("Online orders sync listener error:", err));
+        }, err => {
+            console.error("Online orders sync listener error:", err);
+        });
 }
 
 window.openOnlineOrdersModal = function () {
