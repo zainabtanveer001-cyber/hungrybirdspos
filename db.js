@@ -708,9 +708,14 @@ window.renderKitchenSummary = async function () {
 window.playKitchenAlert = function () {
     try {
         const audio = new Audio("notification.mp3");
-        audio.play();
+        audio.volume = 1.0;
+        audio.play().catch(err => {
+            console.warn("Could not play kitchen alert sound:", err);
+            // Fallback to system beep if mp3 fails
+            console.log('\x07');
+        });
     } catch (e) {
-        console.log(e);
+        console.error("Kitchen alert sound error:", e);
     }
 };
 

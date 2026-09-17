@@ -2097,15 +2097,97 @@ function setupInventoryCloudSync() {
 // Website Orders (customer-facing site writes to "onlineOrders"; staff accept/reject here)
 // ====================================================
 function setupOnlineOrdersSync() {
-    if (!cloudSyncEnabled || !cloudDb) return;
+    if (!cloudSyncEnabled || !cloudDb) {
+        console.warn("Online orders sync: cloudSyncEnabled=" + cloudSyncEnabled + ", cloudDb=" + (cloudDb ? "exists" : "null"));
+        return;
+    }
+
+    console.log("Setting up online orders sync listener");
+
+    let notificationAudio = document.getElementById("notificationSound");
+    if (!notificationAudio) {
+        notificationAudio = new Audio();
+        notificationAudio.id = "notificationSound";
+        notificationAudio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZRA0OVqzn77BgGAg+lunxwmohBSuAzvLVezEGG2i77+WSQw0OVq/m8LNjHAgziMzx1n8yBRxru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQUba7vt5p5FDg1VrOXwsWQcCDWIzfHWfzEFG2u77eaeRQ4NVazl8LFkHAg1iM3x1n8xBRtru+3mnkUODVWs5fCxZBwINYjN8dZ/MQU=';
+        notificationAudio.volume = 1.0;
+        notificationAudio.preload = 'auto';
+        document.body.appendChild(notificationAudio);
+        console.log("Notification sound created with volume 1.0");
+    }
+
+    // Enable audio context on user interaction (required for autoplay policy)
+    const enableAudio = () => {
+        notificationAudio.play().then(() => {
+            notificationAudio.pause();
+            notificationAudio.currentTime = 0;
+            console.log("Audio unlocked for autoplay");
+        }).catch(() => {});
+        document.removeEventListener('click', enableAudio);
+        document.removeEventListener('touchstart', enableAudio);
+    };
+    document.addEventListener('click', enableAudio, { once: true });
+    document.addEventListener('touchstart', enableAudio, { once: true });
+
+    let previousOrderCount = -1;
+    let isFirstSnapshot = true;
+
     unsubscribeOnlineOrdersSync = cloudDb.collection("onlineOrders").where("status", "==", "PENDING")
         .onSnapshot(snapshot => {
+            const newOrderCount = snapshot.docs.length;
+            console.log("Online orders snapshot received. Count:", newOrderCount, "Previous:", previousOrderCount, "IsFirst:", isFirstSnapshot);
+
             onlineOrdersCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            if (isFirstSnapshot) {
+                console.log("First snapshot - skipping notification, caching", newOrderCount, "existing orders");
+                previousOrderCount = newOrderCount;
+                isFirstSnapshot = false;
+            } else if (newOrderCount > previousOrderCount) {
+                const newOrders = newOrderCount - previousOrderCount;
+                console.log("New orders detected! Count increased from", previousOrderCount, "to", newOrderCount);
+
+                // Play sound
+                try {
+                    notificationAudio.currentTime = 0;
+                    notificationAudio.play().catch(err => {
+                        console.warn("Could not play notification sound:", err);
+                    });
+                    console.log("Playing notification sound");
+                } catch (err) {
+                    console.error("Error playing sound:", err);
+                }
+
+                // Visual feedback
+                const badge = document.getElementById("onlineOrdersBadge");
+                if (badge) {
+                    badge.classList.add("animate-bounce");
+                    setTimeout(() => {
+                        badge.classList.remove("animate-bounce");
+                    }, 2000);
+                }
+
+                const button = document.querySelector('[onclick="openOnlineOrdersModal()"]');
+                if (button) {
+                    button.classList.add("animate-pulse");
+                    setTimeout(() => {
+                        button.classList.remove("animate-pulse");
+                    }, 3000);
+                }
+
+                previousOrderCount = newOrderCount;
+            } else if (newOrderCount < previousOrderCount) {
+                console.log("Orders reduced from", previousOrderCount, "to", newOrderCount);
+                previousOrderCount = newOrderCount;
+            }
+
             setText("onlineOrdersBadge", onlineOrdersCache.length);
+
             if (!document.getElementById("onlineOrdersModal")?.classList.contains("hidden")) {
                 renderOnlineOrdersList();
             }
-        }, err => console.error("Online orders sync listener error:", err));
+        }, err => {
+            console.error("Online orders sync listener error:", err);
+        });
 }
 
 window.openOnlineOrdersModal = function () {
