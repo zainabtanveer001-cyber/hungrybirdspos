@@ -4316,11 +4316,18 @@ async function completeSaleWithPayments(saleData) {
     syncSaleToCloud({ ...saleData, localId: savedSaleId }).catch(e => console.warn("Cloud sync failed (non-blocking):", e));
 
     // Close the loop on the source website order, if this sale came from one.
+    // Delivery orders advance to PREPARING at checkout — staff must still mark
+    // OUT_FOR_DELIVERY and COMPLETED (delivered) from the Website Orders panel.
+    // Takeaway/dine-in orders are done at checkout so they go straight to COMPLETED.
     if (saleData.onlineOrderId && cloudSyncEnabled && cloudDb) {
-        cloudDb.collection("onlineOrders").doc(saleData.onlineOrderId).update({
-            status: "COMPLETED",
-            saleId: savedSaleId
-        }).catch(e => console.warn("Failed to update online order status:", e));
+        const isDelivery = saleData.orderType === "DELIVERY";
+        const newStatus = isDelivery ? "PREPARING" : "COMPLETED";
+        const updateData = { status: newStatus, saleId: savedSaleId };
+        if (!isDelivery) updateData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+        else updateData.preparingAt = firebase.firestore.FieldValue.serverTimestamp();
+
+        cloudDb.collection("onlineOrders").doc(saleData.onlineOrderId).update(updateData)
+            .catch(e => console.warn("Failed to update online order status:", e));
     }
 
     // If delivery, create delivery record
