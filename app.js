@@ -2096,6 +2096,36 @@ function setupInventoryCloudSync() {
 // ====================================================
 // Website Orders (customer-facing site writes to "onlineOrders"; staff accept/reject here)
 // ====================================================
+
+// Helper: Calculate estimated preparation time
+function calculateEstimatedTime(items) {
+    const baseTime = 15; // Base 15 minutes
+    const itemTime = items.length * 3; // 3 min per unique item
+    const qtyTime = Math.floor(items.reduce((sum, i) => sum + i.qty, 0) / 3) * 5;
+    return baseTime + itemTime + qtyTime;
+}
+
+// Helper: Sync order status to Firestore with timestamps
+async function syncOrderStatusToFirestore(orderId, status, metadata = {}) {
+    if (!cloudSyncEnabled || !cloudDb) {
+        console.warn("Cannot sync to Firestore: cloud sync disabled");
+        return;
+    }
+
+    try {
+        const updateData = {
+            status: status,
+            [`${status.toLowerCase()}At`]: firebase.firestore.FieldValue.serverTimestamp(),
+            ...metadata
+        };
+
+        await cloudDb.collection("onlineOrders").doc(orderId).update(updateData);
+        console.log(`Order ${orderId} status synced to Firestore: ${status}`);
+    } catch (error) {
+        console.error("Failed to sync order status:", error);
+    }
+}
+
 function setupOnlineOrdersSync() {
     if (!cloudSyncEnabled || !cloudDb) {
         console.warn("Online orders sync: cloudSyncEnabled=" + cloudSyncEnabled + ", cloudDb=" + (cloudDb ? "exists" : "null"));
@@ -2283,8 +2313,14 @@ window.acceptOnlineOrder = async function (id) {
 
     pendingOnlineOrderId = id;
 
+    // Calculate estimated ready time
+    const estimatedMinutes = calculateEstimatedTime(order.items || []);
+    const estimatedTime = new Date(Date.now() + estimatedMinutes * 60000);
+
     try {
-        await cloudDb.collection("onlineOrders").doc(id).update({ status: "ACCEPTED" });
+        await syncOrderStatusToFirestore(id, "ACCEPTED", {
+            estimatedReadyTime: firebase.firestore.Timestamp.fromDate(estimatedTime)
+        });
     } catch (e) {
         console.warn("Failed to mark online order accepted:", e);
     }
@@ -2299,7 +2335,7 @@ window.rejectOnlineOrder = async function (id) {
     const reason = prompt("Optional reason (kept for your own records):") || "";
 
     try {
-        await cloudDb.collection("onlineOrders").doc(id).update({ status: "REJECTED", rejectionReason: reason });
+        await syncOrderStatusToFirestore(id, "REJECTED", { rejectionReason: reason });
         await logAudit("ONLINE_ORDER_REJECT", `Rejected website order #${id}${reason ? `: ${reason}` : ""}`);
     } catch (e) {
         console.error("Failed to reject online order:", e);
