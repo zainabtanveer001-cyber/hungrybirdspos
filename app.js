@@ -2161,12 +2161,15 @@ function setupOnlineOrdersSync() {
     let previousOrderCount = -1;
     let isFirstSnapshot = true;
 
-    unsubscribeOnlineOrdersSync = cloudDb.collection("onlineOrders").where("status", "==", "PENDING")
+    // Watch PENDING + in-progress orders so staff can advance delivery status
+    unsubscribeOnlineOrdersSync = cloudDb.collection("onlineOrders")
+        .where("status", "in", ["PENDING", "ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY"])
         .onSnapshot(snapshot => {
-            const newOrderCount = snapshot.docs.length;
+            const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const newOrderCount = allOrders.filter(o => o.status === "PENDING").length;
             console.log("Online orders snapshot received. Count:", newOrderCount, "Previous:", previousOrderCount, "IsFirst:", isFirstSnapshot);
 
-            onlineOrdersCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            onlineOrdersCache = allOrders;
 
             if (isFirstSnapshot) {
                 console.log("First snapshot - skipping notification, caching", newOrderCount, "existing orders");
@@ -2210,7 +2213,7 @@ function setupOnlineOrdersSync() {
                 previousOrderCount = newOrderCount;
             }
 
-            setText("onlineOrdersBadge", onlineOrdersCache.length);
+            setText("onlineOrdersBadge", onlineOrdersCache.filter(o => o.status === "PENDING").length);
 
             if (!document.getElementById("onlineOrdersModal")?.classList.contains("hidden")) {
                 renderOnlineOrdersList();
@@ -2233,20 +2236,48 @@ function renderOnlineOrdersList() {
     const container = document.getElementById("onlineOrdersList");
     if (!container) return;
 
-    if (onlineOrdersCache.length === 0) {
-        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-6">No pending website orders.</div>`;
+    const pendingOrders = onlineOrdersCache.filter(o => o.status === "PENDING");
+    const inProgressOrders = onlineOrdersCache.filter(o => ["ACCEPTED", "PREPARING", "OUT_FOR_DELIVERY"].includes(o.status));
+
+    if (pendingOrders.length === 0 && inProgressOrders.length === 0) {
+        container.innerHTML = `<div class="text-gray-400 text-xs text-center py-6">No active website orders.</div>`;
         return;
     }
 
-    container.innerHTML = onlineOrdersCache.map(order => {
+    function orderCard(order, isPending) {
         const placedAt = order.createdAt?.toDate ? order.createdAt.toDate().toLocaleTimeString() : "Just now";
+        const status = order.status || "PENDING";
+
+        const statusLabel = {
+            PENDING:          "⏳ Awaiting Acceptance",
+            ACCEPTED:         "✅ Accepted",
+            PREPARING:        "👨‍🍳 Preparing",
+            OUT_FOR_DELIVERY: "🛵 Out for Delivery"
+        }[status] || status;
+
+        // Delivery-only progression buttons (shown after acceptance)
+        const isDelivery = (order.orderType || "DELIVERY") === "DELIVERY";
+        let progressionBtn = "";
+        if (isDelivery) {
+            if (status === "ACCEPTED") {
+                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'PREPARING')" class="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg transition">👨‍🍳 Mark as Preparing</button>`;
+            } else if (status === "PREPARING") {
+                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'OUT_FOR_DELIVERY')" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg transition">🛵 Assign to Rider</button>`;
+            } else if (status === "OUT_FOR_DELIVERY") {
+                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'COMPLETED')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">✅ Mark as Delivered</button>`;
+            }
+        }
+
+        const bgClass = isPending ? "bg-blue-50/60 border-blue-200" : "bg-amber-50/60 border-amber-200";
+
         return `
-        <div class="p-3 bg-blue-50/60 border border-blue-200 rounded-xl space-y-2">
+        <div class="p-3 border ${bgClass} rounded-xl space-y-2">
             <div class="flex justify-between items-start">
                 <div>
                     <div class="font-bold text-xs text-gray-800">
                         ${escapeHtml(order.customer?.name || "Website Customer")}
-                        <span class="ml-1 text-[10px] text-blue-700 font-bold bg-blue-100 px-1.5 py-0.5 rounded">(${escapeHtml(order.orderType || "DELIVERY")})</span>
+                        <span class="ml-1 text-[10px] text-blue-700 font-bold bg-blue-100 px-1.5 py-0.5 rounded">${escapeHtml(order.orderType || "DELIVERY")}</span>
+                        <span class="ml-1 text-[10px] text-gray-500 font-semibold">${statusLabel}</span>
                     </div>
                     <div class="text-[10px] text-gray-500">${escapeHtml(order.customer?.phone || "")} • ${placedAt}</div>
                 </div>
@@ -2259,18 +2290,41 @@ function renderOnlineOrdersList() {
 
             ${order.customer?.address ? `<div class="text-[11px] text-gray-500">📍 ${escapeHtml(order.customer.address)}</div>` : ""}
 
-            <div class="flex items-center justify-end gap-2 pt-1">
-                <button onclick="acceptOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">
-                    ✅ Accept to Cart
-                </button>
-                <button onclick="rejectOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 font-bold px-3 py-1.5 rounded-lg transition">
-                    ✖️ Reject
-                </button>
+            <div class="flex items-center justify-end gap-2 pt-1 flex-wrap">
+                ${isPending ? `
+                    <button onclick="acceptOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">✅ Accept to Cart</button>
+                    <button onclick="rejectOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 font-bold px-3 py-1.5 rounded-lg transition">✖️ Reject</button>
+                ` : progressionBtn}
             </div>
         </div>
-    `;
-    }).join("");
+        `;
+    }
+
+    let html = "";
+
+    if (pendingOrders.length > 0) {
+        html += `<div class="text-[10px] font-bold uppercase tracking-widest text-blue-700 mb-1">🔔 New Orders (${pendingOrders.length})</div>`;
+        html += pendingOrders.map(o => orderCard(o, true)).join("");
+    }
+
+    if (inProgressOrders.length > 0) {
+        if (pendingOrders.length > 0) html += `<div class="my-2 border-t border-gray-200"></div>`;
+        html += `<div class="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">🚀 In Progress (${inProgressOrders.length})</div>`;
+        html += inProgressOrders.map(o => orderCard(o, false)).join("");
+    }
+
+    container.innerHTML = html;
 }
+
+window.advanceOnlineOrderStatus = async function (id, newStatus) {
+    try {
+        await syncOrderStatusToFirestore(id, newStatus);
+        console.log(`Order ${id} advanced to ${newStatus}`);
+    } catch (e) {
+        console.error("Failed to advance order status:", e);
+        alert("Could not update order status: " + e.message);
+    }
+};
 
 window.acceptOnlineOrder = async function (id) {
     const order = onlineOrdersCache.find(o => o.id === id);
