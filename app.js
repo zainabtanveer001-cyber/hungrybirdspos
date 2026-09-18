@@ -2138,12 +2138,11 @@ function setupOnlineOrdersSync() {
     if (!notificationAudio) {
         notificationAudio = new Audio();
         notificationAudio.id = "notificationSound";
-        notificationAudio.src = 'mixkit-software-interface-start-2574.wav';
-        notificationAudio.volume = 1.0;
-        notificationAudio.preload = 'auto';
         document.body.appendChild(notificationAudio);
-        console.log("Notification sound created with volume 1.0");
     }
+    notificationAudio.src = 'mixkit-software-interface-start-2574.wav';
+    notificationAudio.volume = 1.0;
+    notificationAudio.preload = 'auto';
 
     // Enable audio context on user interaction (required for autoplay policy)
     const enableAudio = () => {
