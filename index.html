@@ -8,6 +8,10 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
 
     <!-- PDF Generation Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -30,29 +34,32 @@
     <audio id="notificationSound" preload="auto" src="mixkit-software-interface-start-2574.wav"></audio>
 
     <!-- SECURE LOGIN SCREEN -->
-    <div id="loginScreen" class="fixed inset-0 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl relative">
-            <h2 class="text-2xl font-black mb-1 text-center text-gray-900 tracking-tight">🦅 Hungry Birds POS</h2>
-            <p class="text-xs text-center text-gray-500 mb-6">Secure employee login</p>
+    <div id="loginScreen" class="fixed inset-0 bg-gradient-to-br from-indigo-900 via-gray-900 to-black backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white/95 backdrop-blur-sm rounded-3xl p-10 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative transform transition-all duration-300">
+            <div class="flex justify-center mb-4">
+                <span class="text-5xl drop-shadow-md">🦅</span>
+            </div>
+            <h2 class="text-3xl font-black mb-1 text-center text-gray-900 tracking-tight">Hungry Birds</h2>
+            <p class="text-sm text-center text-indigo-600 font-medium mb-8 uppercase tracking-widest">Point of Sale</p>
 
-            <form id="loginForm" onsubmit="event.preventDefault(); login();" class="space-y-4">
+            <form id="loginForm" onsubmit="event.preventDefault(); login();" class="space-y-5">
                 <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Email</label>
-                          <input id="loginUsername" type="text" required autocomplete="username"
-                           class="border p-3 rounded-xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white transition"
-                              placeholder="Enter username" />
+                    <label class="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Email</label>
+                    <input id="loginUsername" type="text" required autocomplete="username"
+                           class="border border-gray-200 p-3.5 rounded-2xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 focus:bg-white transition-all duration-200 shadow-inner"
+                           placeholder="Enter username" />
                 </div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-700 mb-1">Password</label>
+                    <label class="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">Password</label>
                     <input id="loginPassword" type="password" required autocomplete="current-password"
-                           class="border p-3 rounded-xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 focus:bg-white transition"
+                           class="border border-gray-200 p-3.5 rounded-2xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 focus:bg-white transition-all duration-200 shadow-inner"
                            placeholder="••••••••" />
                 </div>
-                <button type="submit" class="bg-indigo-600 text-white w-full p-3.5 rounded-xl font-bold hover:bg-indigo-700 transition shadow-md">
-                    Login to System
+                <button type="submit" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white w-full p-4 rounded-2xl font-bold hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 shadow-md">
+                    Secure Login
                 </button>
-                <p class="text-[11px] text-center text-gray-500">
-                    Employee accounts are created by the Owner. No public signup is available.
+                <p class="text-[11px] text-center text-gray-400 mt-6">
+                    Authorized Personnel Only.<br>Accounts are created by the System Administrator.
                 </p>
             </form>
         </div>
@@ -78,22 +85,25 @@
     <div id="posScreen" class="hidden min-h-screen flex flex-col">
 
         <!-- TOP BAR / EMPLOYEE HEADER -->
-        <header class="bg-indigo-900 text-white p-3 shadow-md flex justify-between items-center sticky top-0 z-40">
-            <div class="flex items-center gap-3">
-                <h1 class="text-lg font-black tracking-tight flex items-center gap-2">
-                    🦅 <span>Hungry Birds</span>
+        <header class="bg-gradient-to-r from-indigo-900 to-purple-900 text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-40 border-b border-white/10">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-black tracking-tight flex items-center gap-2 drop-shadow-sm">
+                    <span class="text-2xl">🦅</span> <span class="bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300">Hungry Birds</span>
                 </h1>
-                <span id="roleBadge" class="text-xs px-2.5 py-1 rounded-full bg-indigo-800 border border-indigo-700 font-mono font-bold tracking-wide"></span>
+                <span id="roleBadge" class="text-[10px] px-3 py-1.5 rounded-full bg-white/10 border border-white/20 font-bold uppercase tracking-widest text-indigo-100 backdrop-blur-md shadow-inner"></span>
             </div>
-            <div class="flex items-center gap-2 sm:gap-3 text-sm">
-                <button data-role="OWNER" onclick="openShiftOpeningModal()" class="bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-lg text-xs font-bold text-white transition flex items-center gap-1 shadow-sm">
+            <div class="flex items-center gap-3 sm:gap-4 text-sm">
+                <button data-role="OWNER" onclick="openShiftOpeningModal()" class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 shadow-sm hover:shadow-md">
                     💵 Opening Cash
                 </button>
-                <button data-role="OWNER,MANAGER" onclick="openShiftCloseModal()" class="bg-amber-500 hover:bg-amber-600 px-3 py-1.5 rounded-lg text-xs font-bold text-gray-900 transition flex items-center gap-1 shadow-sm">
+                <button data-role="OWNER,MANAGER" onclick="openShiftCloseModal()" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 flex items-center gap-1.5 shadow-sm hover:shadow-md">
                     📊 Shift Summary
                 </button>
-                <span class="hidden md:inline text-indigo-200 text-xs">Logged in: <strong id="loggedUserName" class="text-white font-bold"></strong></span>
-                <button onclick="logout()" class="bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-sm">
+                <div class="hidden md:flex items-center gap-2 bg-black/20 px-4 py-2 rounded-xl border border-white/5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-indigo-200 text-xs">Welcome, <strong id="loggedUserName" class="text-white font-bold ml-1"></strong></span>
+                </div>
+                <button onclick="logout()" class="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 px-4 py-2 rounded-xl text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-md">
                     Logout
                 </button>
             </div>
@@ -105,337 +115,383 @@
             <!-- LEFT PANEL: Menu & Order Cart -->
             <div class="lg:col-span-2 space-y-4">
                 <!-- Navigation & Quick Tools -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap justify-between items-center gap-3">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 flex flex-wrap justify-between items-center gap-4 transition-all hover:shadow-md">
                     <div class="flex items-center gap-3">
-                        <h2 class="text-base font-extrabold text-gray-800 uppercase tracking-wide">COUNTER</h2>
-                        <span id="activeTableIndicator" class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2.5 py-1 rounded-full hidden"></span>
+                        <div class="bg-indigo-50 p-2 rounded-xl">
+                            <h2 class="text-sm font-extrabold text-indigo-900 uppercase tracking-widest">Counter</h2>
+                        </div>
+                        <span id="activeTableIndicator" class="text-xs bg-indigo-100 text-indigo-800 font-bold px-3 py-1.5 rounded-xl hidden shadow-inner"></span>
                     </div>
 
-                    <div class="flex-1 min-w-[200px]">
-                        <input id="menuSearch" type="text" placeholder="🔍 Search menu items..." class="w-full p-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition" />
+                    <div class="flex-1 min-w-[250px] relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-400">🔍</span>
+                        </div>
+                        <input id="menuSearch" type="text" placeholder="Search menu items..." class="w-full pl-10 pr-4 py-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white transition-all duration-300 shadow-inner" />
                     </div>
 
-                    <div class="flex flex-wrap gap-2">
-                        <button onclick="openOnlineOrdersModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1 shadow-sm relative">
-                            🌐 Website Orders <span id="onlineOrdersBadge" class="bg-red-500 text-white font-black px-1.5 py-0.5 rounded-full text-[10px] transition-all duration-300">0</span>
+                    <div class="flex flex-wrap gap-2.5">
+                        <button onclick="openOnlineOrdersModal()" class="bg-indigo-600/10 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-2 shadow-sm font-medium">
+                            🌐 Web Orders
+                            <span id="onlineOrdersBadge" class="bg-red-500 text-white font-black px-2 py-0.5 rounded-full text-[10px] transition-all duration-300 shadow-sm">0</span>
                             <span id="newOrderIndicator" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
                         </button>
-                        <button onclick="openCustomerModal()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 transition flex items-center gap-1 shadow-sm">
+                        <button onclick="openCustomerModal()" class="bg-purple-600/10 text-purple-700 hover:bg-purple-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm">
                             👥 Customers
                         </button>
-                        <button data-role="OWNER" onclick="openSalesAnalyticsModal()" class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition flex items-center gap-1 shadow-sm">
+                        <button data-role="OWNER" onclick="openSalesAnalyticsModal()" class="bg-emerald-600/10 text-emerald-700 hover:bg-emerald-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm">
                             📈 Analytics
                         </button>
-                        <button onclick="openHeldOrdersModal()" class="bg-orange-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-orange-700 transition flex items-center gap-1 shadow-sm">
-                            ⏸️ Held <span id="heldOrdersBadge" class="bg-white text-orange-700 font-black px-1.5 py-0.5 rounded-full text-[10px]">0</span>
+                        <button onclick="openHeldOrdersModal()" class="bg-orange-600/10 text-orange-700 hover:bg-orange-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm">
+                            ⏸️ Held <span id="heldOrdersBadge" class="bg-orange-500 text-white font-black px-2 py-0.5 rounded-full text-[10px] shadow-sm">0</span>
                         </button>
-                        <button onclick="openDeliveryManagementModal()" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition flex items-center gap-1 shadow-sm">
+                        <button onclick="openDeliveryManagementModal()" class="bg-blue-600/10 text-blue-700 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm">
                             🛵 Deliveries
                         </button>
-                        <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-amber-700 transition shadow-sm">
+                        <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="bg-amber-600/10 text-amber-700 hover:bg-amber-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 shadow-sm">
                             📦 Stock
                         </button>
-                        <button data-role="OWNER" onclick="authenticateOwner()" class="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-purple-700 transition shadow-sm">
+                        <button data-role="OWNER" onclick="authenticateOwner()" class="bg-pink-600/10 text-pink-700 hover:bg-pink-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 shadow-sm">
                             👑 Admin
                         </button>
-                        <button id="connectPrinterBtn" onclick="connectPrinter()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition shadow-sm">
+                        <button id="connectPrinterBtn" onclick="connectPrinter()" class="bg-gray-600/10 text-gray-700 hover:bg-gray-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 shadow-sm">
                             🖨️ Printer
                         </button>
-                        <button data-role="OWNER,MANAGER" onclick="openExpenseModal()" class="bg-teal-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-teal-700 transition flex items-center gap-1 shadow-sm">
-    💸 Expenses
-</button>
-<button data-role="OWNER" onclick="openPnlModal()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition flex items-center gap-1 shadow-sm hidden">
-    📊 P&L Report
-</button>
-<button data-role="OWNER" onclick="openAuditLogModal()" class="bg-gray-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-800 transition flex items-center gap-1 shadow-sm">
-    🕵️ Audit Log
-</button>
+                        <button data-role="OWNER,MANAGER" onclick="openExpenseModal()" class="bg-teal-600/10 text-teal-700 hover:bg-teal-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm">
+                            💸 Expenses
+                        </button>
+                        <button data-role="OWNER" onclick="openPnlModal()" class="bg-indigo-600/10 text-indigo-700 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm hidden">
+                            📊 P&L
+                        </button>
+                        <button data-role="OWNER" onclick="openAuditLogModal()" class="bg-gray-800/10 text-gray-800 hover:bg-gray-800 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-all duration-300 flex items-center gap-1.5 shadow-sm">
+                            🕵️ Log
+                        </button>
                     </div>
                 </div>
 
                 <!-- Food Categories Toggle -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div class="flex items-center justify-between gap-2 mb-2">
-                        <h3 class="text-xs font-extrabold uppercase tracking-wide text-gray-500">Categories</h3>
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                    <div class="flex items-center justify-between gap-2 mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg drop-shadow-sm">🍽️</span>
+                            <h3 class="text-sm font-black uppercase tracking-widest text-gray-800">Menu Categories</h3>
+                        </div>
                     </div>
-                    <div class="flex gap-2 overflow-x-auto pb-1 scrollbar-none" id="categoryFilterBar"></div>
+                    <div class="flex gap-2.5 overflow-x-auto pb-2 scrollbar-none" id="categoryFilterBar"></div>
                 </div>
 
                 <!-- Menu Grid -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <h3 class="text-sm font-bold mb-3 text-gray-700">Select Items</h3>
-                    <div id="menuContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
+                    <div class="flex items-center justify-between gap-2 mb-4">
+                        <h3 class="text-sm font-bold text-gray-800 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-indigo-500 inline-block animate-pulse"></span> Select Items
+                        </h3>
+                    </div>
+                    <div id="menuContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3.5"></div>
                 </div>
 
                 <!-- Order Cart -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div class="flex flex-wrap justify-between items-center mb-3 gap-2">
-                        <h3 class="text-sm font-bold text-gray-700">Current Order Cart</h3>
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden flex flex-col">
+                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
-                        <div class="flex bg-gray-100 p-1 rounded-xl border text-xs font-bold gap-1">
-                            <button id="btnDineIn" onclick="setOrderType('DINE_IN')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white transition">
+                    <div class="flex flex-wrap justify-between items-center mb-5 gap-3 relative z-10">
+                        <h3 class="text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
+                            🛒 Current Order
+                        </h3>
+
+                        <div class="flex bg-gray-50/80 p-1.5 rounded-2xl border border-gray-200 text-xs font-bold gap-1 shadow-inner backdrop-blur-sm">
+                            <button id="btnDineIn" onclick="setOrderType('DINE_IN')" class="px-4 py-2 rounded-xl bg-indigo-600 text-white shadow-sm transition-all duration-300">
                                 🍽️ Dine In
                             </button>
-                            <button id="btnTakeaway" onclick="setOrderType('TAKEAWAY')" class="px-3 py-1.5 rounded-lg text-gray-600 hover:text-indigo-600 transition">
+                            <button id="btnTakeaway" onclick="setOrderType('TAKEAWAY')" class="px-4 py-2 rounded-xl text-gray-600 hover:bg-white hover:shadow-sm hover:text-indigo-600 transition-all duration-300">
                                 🛍️ Takeaway
                             </button>
-                            <button id="btnDelivery" onclick="setOrderType('DELIVERY')" class="px-3 py-1.5 rounded-lg text-gray-600 hover:text-indigo-600 transition">
+                            <button id="btnDelivery" onclick="setOrderType('DELIVERY')" class="px-4 py-2 rounded-xl text-gray-600 hover:bg-white hover:shadow-sm hover:text-indigo-600 transition-all duration-300">
                                 🛵 Delivery
                             </button>
                         </div>
                     </div>
 
                     <!-- Delivery Details Panel -->
-                    <div id="deliveryInfoBox" class="hidden mb-4 p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-2 text-xs">
-                        <div class="font-bold text-blue-900 flex justify-between items-center">
-                            <span>🛵 Delivery Information <span class="text-[10px] text-red-600 font-semibold">(Min Order: Rs 500)</span></span>
-                            <button onclick="clearDeliveryDetails()" class="text-gray-400 hover:text-red-500 font-bold">Clear</button>
+                    <div id="deliveryInfoBox" class="hidden mb-5 p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/60 rounded-2xl space-y-3 text-sm relative z-10 shadow-inner">
+                        <div class="font-bold text-blue-900 flex justify-between items-center border-b border-blue-200/50 pb-2">
+                            <span class="flex items-center gap-1.5">🛵 Delivery Information <span class="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full uppercase tracking-wider ml-2">Min Order: Rs 500</span></span>
+                            <button onclick="clearDeliveryDetails()" class="text-blue-400 hover:text-red-500 transition-colors text-xs uppercase tracking-wider bg-white/50 px-2.5 py-1 rounded-lg border border-transparent hover:border-red-200">Clear</button>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <input id="deliveryCustomerName" type="text" placeholder="Customer Name" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
-                            <input id="deliveryCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupDeliveryCustomer(this.value)" class="p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <input id="deliveryCustomerName" type="text" placeholder="Customer Name" class="w-full p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm" />
+                            <input id="deliveryCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupDeliveryCustomer(this.value)" class="w-full p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm" />
                         </div>
-                        <input id="deliveryAddress" type="text" placeholder="Delivery Address / Landmark" class="w-full p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
-                        <input id="deliveryChargeInput" type="number" min="0" step="0.01" placeholder="Delivery Charge (Rs)" value="0" oninput="updateDeliveryCharge(this.value)" class="w-full p-2 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-blue-500" />
+                        <input id="deliveryAddress" type="text" placeholder="Delivery Address / Landmark" class="w-full p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm" />
+                        <input id="deliveryChargeInput" type="number" min="0" step="0.01" placeholder="Delivery Charge (Rs)" value="0" oninput="updateDeliveryCharge(this.value)" class="w-full p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm text-blue-900 font-bold" />
                     </div>
 
                     <!-- Customer CRM Lookup for Dine-In / Takeaway -->
-                    <div id="cartCustomerBox" class="mb-3 p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2 text-xs">
-                        <div class="flex justify-between items-center font-bold text-purple-900">
-                            <span class="flex items-center gap-1">👤 Customer CRM / Loyalty</span>
-                            <button type="button" onclick="clearCartCustomer()" class="text-gray-400 hover:text-red-500 text-[10px] font-semibold">Clear</button>
+                    <div id="cartCustomerBox" class="mb-5 p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200/60 rounded-2xl space-y-3 text-sm relative z-10 shadow-inner">
+                        <div class="flex justify-between items-center font-bold text-purple-900 border-b border-purple-200/50 pb-2">
+                            <span class="flex items-center gap-1.5">👤 Customer / Loyalty Program</span>
+                            <button type="button" onclick="clearCartCustomer()" class="text-purple-400 hover:text-red-500 transition-colors text-xs uppercase tracking-wider bg-white/50 px-2.5 py-1 rounded-lg border border-transparent hover:border-red-200">Clear</button>
                         </div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            <input id="cartCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupCartCustomer(this.value)" class="p-1.5 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-purple-500" />
-                            <input id="cartCustomerName" type="text" placeholder="Customer Name" class="p-1.5 border rounded-lg bg-white text-xs focus:ring-1 focus:ring-purple-500" />
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <input id="cartCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupCartCustomer(this.value)" class="w-full p-2.5 border-0 ring-1 ring-purple-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow shadow-sm" />
+                            <input id="cartCustomerName" type="text" placeholder="Customer Name" class="w-full p-2.5 border-0 ring-1 ring-purple-200 rounded-xl bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow shadow-sm" />
                         </div>
-                        <div id="cartCustomerInfo" class="hidden text-[11px] text-purple-800 font-medium bg-purple-100/60 p-1.5 rounded"></div>
-                        <div id="cartLoyaltyRedeemBox" class="hidden flex items-center justify-between gap-2 pt-1 border-t border-purple-200">
-                            <span class="text-[11px] font-bold text-amber-800">⭐ Redeem Points:</span>
-                            <input id="cartLoyaltyRedeemInput" type="number" min="0" placeholder="0" oninput="applyLoyaltyRedemption(this.value)" class="w-16 p-1 border rounded text-xs text-right bg-white focus:ring-1 focus:ring-amber-500" />
+                        <div id="cartCustomerInfo" class="hidden text-xs text-purple-800 font-bold bg-white/60 border border-purple-100 p-2.5 rounded-xl shadow-sm"></div>
+                        <div id="cartLoyaltyRedeemBox" class="hidden flex items-center justify-between gap-3 pt-2 bg-gradient-to-r from-amber-50 to-yellow-50 p-3 rounded-xl border border-amber-200/50 mt-1 shadow-sm">
+                            <span class="text-xs font-black text-amber-800 flex items-center gap-1">⭐ Redeem Points:</span>
+                            <input id="cartLoyaltyRedeemInput" type="number" min="0" placeholder="0" oninput="applyLoyaltyRedemption(this.value)" class="w-24 p-2 border-0 ring-1 ring-amber-300 rounded-lg text-sm font-bold text-right bg-white focus:ring-2 focus:ring-amber-500 shadow-inner text-amber-900" />
                         </div>
                     </div>
 
-                    <div id="cartItems" class="space-y-2 mb-4 min-h-[60px]"></div>
+                    <div id="cartItems" class="space-y-2.5 mb-5 min-h-[100px] flex-1 overflow-y-auto pr-1"></div>
 
-                    <div class="border-t pt-3 space-y-2">
-                        <div class="flex justify-between items-center text-xs text-gray-600">
+                    <div class="border-t border-gray-100 pt-5 space-y-3">
+                        <div class="flex justify-between items-center text-sm text-gray-500 font-medium">
                             <span>Subtotal:</span>
-                            <span id="cartSubtotal" class="font-bold text-gray-800">Rs 0.00</span>
+                            <span id="cartSubtotal" class="font-extrabold text-gray-800">Rs 0.00</span>
                         </div>
 
-                        <div class="flex justify-between items-center gap-2 bg-amber-50/70 p-2.5 rounded-xl border border-amber-200">
-                            <label for="discountInput" class="text-xs font-bold text-amber-900 flex items-center gap-1">
-                                🏷️ Discount (%):
+                        <div class="flex justify-between items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50/30 p-3 rounded-2xl border border-amber-200/60 shadow-sm">
+                            <label for="discountInput" class="text-sm font-bold text-amber-900 flex items-center gap-1.5">
+                                🏷️ Discount applied:
                             </label>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-2 bg-white rounded-xl ring-1 ring-amber-300 p-1 shadow-inner">
                                 <input id="discountInput" type="number" min="0" max="100" placeholder="0" value="0"
                                        oninput="updateDiscount(this.value)"
-                                       class="w-16 p-1.5 text-right font-bold text-xs border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
-                                <span class="text-xs font-bold text-amber-900">%</span>
+                                       class="w-16 p-1.5 text-right font-black text-sm border-0 rounded-lg focus:outline-none text-amber-900 bg-transparent">
+                                <span class="text-sm font-black text-amber-900 pr-2">%</span>
                             </div>
                         </div>
 
-                        <div id="discountAmountRow" class="hidden flex justify-between items-center text-xs text-red-600 font-medium">
-                            <span>Discount Amount:</span>
+                        <div id="discountAmountRow" class="hidden flex justify-between items-center text-sm text-red-500 font-bold bg-red-50/50 p-2 rounded-xl">
+                            <span class="flex items-center gap-1">📉 Saved Amount:</span>
                             <span id="cartDiscountAmount">-Rs 0.00</span>
                         </div>
 
-                        <div id="deliveryChargeRow" class="hidden flex justify-between items-center text-xs text-blue-700 font-medium">
-                            <span>Delivery Charge:</span>
+                        <div id="deliveryChargeRow" class="hidden flex justify-between items-center text-sm text-blue-700 font-bold bg-blue-50/50 p-2 rounded-xl">
+                            <span class="flex items-center gap-1">🛵 Delivery Charge:</span>
                             <span id="cartDeliveryCharge">Rs 0.00</span>
                         </div>
 
-                        <div class="flex justify-between items-center font-black text-xl text-gray-900 border-t pt-2">
-                            <span>Grand Total:</span>
-                            <span id="cartTotal" class="text-emerald-700">Rs 0.00</span>
+                        <div class="flex justify-between items-end font-black text-2xl text-gray-900 border-t border-gray-200 pt-4 pb-1">
+                            <span class="text-base text-gray-500 uppercase tracking-widest mb-1">Total Due</span>
+                            <span id="cartTotal" class="text-emerald-600 drop-shadow-sm">Rs 0.00</span>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mt-4">
-                        <button onclick="holdCurrentOrder()" class="sm:col-span-1 bg-amber-500 text-gray-900 py-3 rounded-xl font-bold hover:bg-amber-600 transition flex items-center justify-center gap-1 shadow-sm">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-5">
+                        <button onclick="holdCurrentOrder()" class="sm:col-span-1 bg-gradient-to-b from-amber-400 to-amber-500 text-amber-950 py-3.5 rounded-2xl font-bold hover:from-amber-500 hover:to-amber-600 transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-2">
                             <span>⏸️ Hold</span>
                         </button>
-                        <button id="checkoutBtn" onclick="processSale()" class="sm:col-span-3 bg-emerald-600 text-white py-3 rounded-xl font-black hover:bg-emerald-700 transition flex items-center justify-center gap-2 shadow-md active:scale-[0.99]">
-                            <span>Complete Sale & Print Receipt</span>
+                        <button id="checkoutBtn" onclick="processSale()" class="sm:col-span-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-3.5 rounded-2xl font-black text-lg hover:from-emerald-600 hover:to-teal-700 transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 border border-emerald-400/30">
+                            <span>Checkout & Print 🧾</span>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- RIGHT PANEL: Tables Control & Live Stock -->
-            <div class="space-y-4">
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-sm font-bold text-gray-700">Live Raw Stock</h3>
+            <div class="space-y-5 flex flex-col">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden">
+                    <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-amber-50 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="flex justify-between items-center mb-4 relative z-10">
+                        <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest flex items-center gap-1.5">
+                            <span class="text-lg">📦</span> Live Stock
+                        </h3>
                         <div class="flex items-center gap-2">
-                            <button id="lockStockBtn" onclick="lockStockView()" class="hidden text-xs bg-red-100 text-red-600 px-2 py-1 rounded-lg font-bold hover:bg-red-200 transition">
+                            <button id="lockStockBtn" onclick="lockStockView()" class="hidden text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition ring-1 ring-red-200">
                                 🔒 Lock
                             </button>
-                            <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="text-xs text-amber-600 font-bold underline">Manage All</button>
+                            <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="text-xs text-amber-700 bg-amber-100/50 hover:bg-amber-100 px-3 py-1.5 rounded-lg font-bold transition ring-1 ring-amber-200/50">Manage</button>
                         </div>
                     </div>
 
-                    <div id="stockLockedState" class="text-center py-6 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 space-y-3">
-                        <div class="text-3xl">🔒</div>
-                        <p class="text-xs font-semibold text-gray-500">Stock Access Protected</p>
-                        <button onclick="promptStockPin()" class="bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-amber-700 transition shadow-sm">
-                            Re-authenticate
+                    <div id="stockLockedState" class="text-center py-8 border border-dashed border-gray-300 rounded-2xl bg-gray-50/50 space-y-3 relative z-10">
+                        <div class="text-4xl drop-shadow-sm">🔒</div>
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-widest">Stock Protected</p>
+                        <button onclick="promptStockPin()" class="bg-gray-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-900 transition shadow-sm mt-2">
+                            Authenticate to View
                         </button>
                     </div>
 
-                    <div id="stockUnlockedState" class="hidden">
-                        <div id="inventoryContainer" class="space-y-2 text-xs max-h-60 overflow-y-auto pr-1"></div>
+                    <div id="stockUnlockedState" class="hidden relative z-10">
+                        <div id="inventoryContainer" class="space-y-2 text-xs max-h-60 overflow-y-auto pr-2 custom-scrollbar"></div>
                     </div>
                 </div>
 
                 <!-- Recent Sales & Receipt Management -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-                    <div class="flex justify-between items-center mb-3">
-                        <h3 class="text-sm font-bold text-gray-700">Recent Sales History</h3>
-                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Secure Sync</span>
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex-1 flex flex-col relative overflow-hidden">
+                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-purple-50 rounded-full blur-3xl pointer-events-none opacity-60"></div>
+
+                    <div class="flex justify-between items-center mb-4 relative z-10">
+                        <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest flex items-center gap-1.5">
+                            <span class="text-lg">🧾</span> Recent Sales
+                        </h3>
+                        <span class="text-[9px] text-emerald-500 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-full ring-1 ring-emerald-200">Sync Active</span>
                     </div>
 
                     <!-- ORDER / RECEIPT SEARCH -->
-                    <div class="mb-3 space-y-2">
+                    <div class="mb-4 space-y-2 relative z-10">
                         <div class="relative">
-                            <input id="receiptSearchInput" type="text" placeholder="🔍 Search by Order #, Customer Name, or Phone..."
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-gray-400">🔍</span>
+                            </div>
+                            <input id="receiptSearchInput" type="text" placeholder="Search Order # or Name..."
                                    oninput="searchOldReceipts(this.value)"
-                                   class="w-full p-2 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50 transition pr-8" />
-                            <button onclick="clearReceiptSearch()" class="absolute right-2.5 top-2 text-gray-400 hover:text-gray-600 text-xs font-bold" title="Clear search">✕</button>
+                                   class="w-full pl-10 pr-8 py-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50/50 focus:bg-white transition-all duration-300 shadow-inner" />
+                            <button onclick="clearReceiptSearch()" class="absolute right-3 top-2.5 text-gray-400 hover:text-red-500 text-xs font-bold transition" title="Clear search">✕</button>
                         </div>
-                        <div id="receiptSearchStatus" class="hidden text-[11px] font-bold text-indigo-700"></div>
+                        <div id="receiptSearchStatus" class="hidden text-[11px] font-bold text-purple-700 bg-purple-50 p-2 rounded-lg"></div>
                         <div id="receiptSearchResults" class="hidden space-y-2 max-h-60 overflow-y-auto pr-1"></div>
                     </div>
 
                     <!-- BULK SELECTION TOOLBAR -->
-                    <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl mb-3 border text-xs">
-                        <label class="flex items-center gap-2 font-bold text-gray-700 cursor-pointer">
-                            <input type="checkbox" id="selectAllSalesCheckbox" onchange="toggleSelectAllSales(this.checked)" class="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                    <div class="flex justify-between items-center bg-gray-50/80 p-3 rounded-2xl mb-4 border border-gray-200 text-sm relative z-10 shadow-inner">
+                        <label class="flex items-center gap-2.5 font-bold text-gray-700 cursor-pointer select-none">
+                            <input type="checkbox" id="selectAllSalesCheckbox" onchange="toggleSelectAllSales(this.checked)" class="rounded text-purple-600 focus:ring-purple-500 w-4 h-4 border-gray-300">
                             <span>Select All</span>
                         </label>
-                        <button id="bulkDeleteBtn" onclick="deleteSelectedSales()" data-role="OWNER,MANAGER" class="hidden text-xs bg-red-600 text-white font-bold px-2.5 py-1 rounded-lg hover:bg-red-700 transition flex items-center gap-1 shadow-sm">
-                            ↩️ Void Selected (<span id="selectedSalesCount">0</span>)
+                        <button id="bulkDeleteBtn" onclick="deleteSelectedSales()" data-role="OWNER,MANAGER" class="hidden text-xs bg-red-600/10 text-red-700 font-bold px-3 py-1.5 rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center gap-1">
+                            🗑️ Void (<span id="selectedSalesCount">0</span>)
                         </button>
                     </div>
 
-                    <div id="salesContainer" class="space-y-3 text-xs max-h-72 overflow-y-auto"></div>
+                    <div id="salesContainer" class="space-y-3 text-xs max-h-[350px] overflow-y-auto pr-2 relative z-10 custom-scrollbar flex-1"></div>
                 </div>
             </div>
         </div>
     </div>
     <!-- P&L DASHBOARD MODAL -->
-<div id="pnlModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-    <div class="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
-        <div class="p-4 border-b bg-indigo-700 text-white flex justify-between items-center">
-            <h3 class="text-sm font-extrabold tracking-wide uppercase">Hungry Birds Profit & Loss</h3>
-            <button onclick="closePnlModal()" class="text-indigo-200 hover:text-white font-bold text-xl">&times;</button>
+<div id="pnlModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+    <div class="bg-white rounded-3xl w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col transform transition-transform scale-100">
+        <div class="p-5 bg-gradient-to-r from-indigo-700 to-purple-800 text-white flex justify-between items-center shadow-inner relative overflow-hidden">
+            <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+            <div class="flex items-center gap-2 relative z-10">
+                <span class="text-xl">📊</span>
+                <h3 class="text-sm font-black tracking-widest uppercase text-indigo-50">Profit & Loss</h3>
+            </div>
+            <button onclick="closePnlModal()" class="text-white/60 hover:text-white font-bold text-2xl transition relative z-10 leading-none">&times;</button>
         </div>
 
-        <div class="p-5 space-y-5 bg-gray-50 flex-1">
+        <div class="p-6 space-y-5 bg-gray-50/50 flex-1">
             <!-- Date Filters -->
-            <div class="flex gap-2 bg-white p-3 rounded-xl border">
-                <input type="date" id="pnlStartDate" class="p-2 border rounded-lg text-xs flex-1 bg-gray-50" onchange="generatePnlReport()">
-                <input type="date" id="pnlEndDate" class="p-2 border rounded-lg text-xs flex-1 bg-gray-50" onchange="generatePnlReport()">
+            <div class="flex gap-3 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm">
+                <input type="date" id="pnlStartDate" class="p-2 border-0 ring-1 ring-gray-200 rounded-xl text-xs flex-1 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none" onchange="generatePnlReport()">
+                <input type="date" id="pnlEndDate" class="p-2 border-0 ring-1 ring-gray-200 rounded-xl text-xs flex-1 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all outline-none" onchange="generatePnlReport()">
             </div>
-            
-            <div class="flex gap-2 mb-2">
-                <button onclick="setPnlDate('today')" class="flex-1 py-1.5 bg-white border rounded text-[10px] font-bold hover:bg-gray-100">Today</button>
-                <button onclick="setPnlDate('month')" class="flex-1 py-1.5 bg-white border rounded text-[10px] font-bold hover:bg-gray-100">This Month</button>
+
+            <div class="flex gap-2 mb-2 p-1 bg-gray-100 rounded-xl">
+                <button onclick="setPnlDate('today')" class="flex-1 py-2 bg-white shadow-sm rounded-lg text-[11px] font-bold text-gray-700 hover:text-indigo-600 transition">Today</button>
+                <button onclick="setPnlDate('month')" class="flex-1 py-2 bg-transparent rounded-lg text-[11px] font-bold text-gray-500 hover:bg-white hover:text-indigo-600 hover:shadow-sm transition">This Month</button>
             </div>
 
             <!-- Dashboard Cards -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="bg-white p-4 rounded-xl border border-green-200 shadow-sm">
-                    <p class="text-[10px] text-green-600 font-bold uppercase mb-1">Total Sales</p>
-                    <h4 id="pnlTotalSales" class="text-xl font-extrabold text-green-700">Rs 0.00</h4>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl border border-green-200/50 shadow-sm relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-5xl opacity-10">💵</div>
+                    <p class="text-[10px] text-green-700 font-extrabold uppercase tracking-widest mb-1 relative z-10">Total Sales</p>
+                    <h4 id="pnlTotalSales" class="text-2xl font-black text-green-800 relative z-10">Rs 0.00</h4>
                 </div>
-                <div class="bg-white p-4 rounded-xl border border-red-200 shadow-sm">
-                    <p class="text-[10px] text-red-600 font-bold uppercase mb-1">Total Expenses</p>
-                    <h4 id="pnlTotalExpenses" class="text-xl font-extrabold text-red-700">Rs 0.00</h4>
+                <div class="bg-gradient-to-br from-red-50 to-rose-50 p-5 rounded-2xl border border-red-200/50 shadow-sm relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-5xl opacity-10">📉</div>
+                    <p class="text-[10px] text-red-700 font-extrabold uppercase tracking-widest mb-1 relative z-10">Total Expenses</p>
+                    <h4 id="pnlTotalExpenses" class="text-2xl font-black text-red-800 relative z-10">Rs 0.00</h4>
                 </div>
             </div>
 
-            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-200 shadow-sm flex justify-between items-center mt-4">
-                <p class="text-xs text-indigo-800 font-bold uppercase">Net Profit</p>
-                <h2 id="pnlNetProfit" class="text-2xl font-extrabold text-indigo-700">Rs 0.00</h2>
+            <div class="bg-gradient-to-r from-indigo-50 to-indigo-100/50 p-5 rounded-2xl border border-indigo-200 shadow-sm flex flex-col items-center justify-center mt-5 py-8">
+                <p class="text-[11px] text-indigo-800 font-black uppercase tracking-widest mb-1 shadow-sm">Net Profit</p>
+                <h2 id="pnlNetProfit" class="text-4xl font-black text-indigo-700 drop-shadow-sm">Rs 0.00</h2>
             </div>
         </div>
     </div>
 </div>
 
     <!-- OWNER SALES ANALYTICS MODAL -->
-    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-emerald-700 text-white flex justify-between items-center">
+    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center shadow-inner">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">📈</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Owner Sales Analytics</h3>
+                    <h3 class="text-sm font-black tracking-widest uppercase">Owner Sales Analytics</h3>
                 </div>
-                <button onclick="closeSalesAnalyticsModal()" class="text-emerald-200 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeSalesAnalyticsModal()" class="text-emerald-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
             </div>
 
-            <div class="p-5 space-y-4 overflow-y-auto flex-1 bg-gray-50">
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="bg-white p-4 rounded-xl border border-emerald-100 shadow-sm space-y-1">
-                        <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Today's Sales</div>
-                        <div id="analyticsTodaySales" class="text-2xl font-black text-emerald-700">Rs 0.00</div>
-                        <div id="analyticsTodayCount" class="text-[11px] text-gray-400">0 orders today</div>
-                        <div id="analyticsTodayDiscounts" class="text-[11px] text-red-600 font-semibold">Discounts: Rs 0.00</div>
+                    <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-50 rounded-full blur-xl group-hover:bg-emerald-100 transition"></div>
+                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">Today's Sales</div>
+                        <div id="analyticsTodaySales" class="text-3xl font-black text-emerald-700 relative z-10 tracking-tight">Rs 0.00</div>
+                        <div class="flex justify-between items-center relative z-10">
+                            <div id="analyticsTodayCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 orders today</div>
+                            <div id="analyticsTodayDiscounts" class="text-[11px] text-red-500 font-bold">Discounts: Rs 0.00</div>
+                        </div>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl border border-indigo-100 shadow-sm space-y-1">
-                        <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">This Week's Sales</div>
-                        <div id="analyticsWeekSales" class="text-2xl font-black text-indigo-700">Rs 0.00</div>
-                        <div id="analyticsWeekCount" class="text-[11px] text-gray-400">0 orders this week</div>
-                        <div id="analyticsWeekDiscounts" class="text-[11px] text-red-600 font-semibold">Discounts: Rs 0.00</div>
+                    <div class="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-indigo-50 rounded-full blur-xl group-hover:bg-indigo-100 transition"></div>
+                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">This Week's Sales</div>
+                        <div id="analyticsWeekSales" class="text-3xl font-black text-indigo-700 relative z-10 tracking-tight">Rs 0.00</div>
+                        <div class="flex justify-between items-center relative z-10">
+                            <div id="analyticsWeekCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 orders this week</div>
+                            <div id="analyticsWeekDiscounts" class="text-[11px] text-red-500 font-bold">Discounts: Rs 0.00</div>
+                        </div>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl border border-purple-100 shadow-sm space-y-1">
-                        <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">This Month's Sales</div>
-                        <div id="analyticsMonthSales" class="text-2xl font-black text-purple-700">Rs 0.00</div>
-                        <div id="analyticsMonthCount" class="text-[11px] text-gray-400">0 orders this month</div>
-                        <div id="analyticsMonthDiscounts" class="text-[11px] text-red-600 font-semibold">Discounts: Rs 0.00</div>
+                    <div class="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-purple-50 rounded-full blur-xl group-hover:bg-purple-100 transition"></div>
+                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">This Month's Sales</div>
+                        <div id="analyticsMonthSales" class="text-3xl font-black text-purple-700 relative z-10 tracking-tight">Rs 0.00</div>
+                        <div class="flex justify-between items-center relative z-10">
+                            <div id="analyticsMonthCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 orders this month</div>
+                            <div id="analyticsMonthDiscounts" class="text-[11px] text-red-500 font-bold">Discounts: Rs 0.00</div>
+                        </div>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl border border-amber-100 shadow-sm space-y-1">
-                        <div class="text-[11px] font-bold text-gray-500 uppercase tracking-wide">Total Overall Revenue</div>
-                        <div id="analyticsOverallSales" class="text-2xl font-black text-amber-700">Rs 0.00</div>
-                        <div id="analyticsOverallCount" class="text-[11px] text-gray-400">0 overall orders</div>
-                        <div id="analyticsOverallDiscounts" class="text-[11px] text-red-600 font-semibold">Total discounts: Rs 0.00</div>
+                    <div class="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
+                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-amber-50 rounded-full blur-xl group-hover:bg-amber-100 transition"></div>
+                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">Total Overall Revenue</div>
+                        <div id="analyticsOverallSales" class="text-3xl font-black text-amber-700 relative z-10 tracking-tight">Rs 0.00</div>
+                        <div class="flex justify-between items-center relative z-10">
+                            <div id="analyticsOverallCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 overall orders</div>
+                            <div id="analyticsOverallDiscounts" class="text-[11px] text-red-500 font-bold">Total discounts: Rs 0.00</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeSalesAnalyticsModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 justify-end flex">
+                <button onclick="closeSalesAnalyticsModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">
                     Close Analytics
                 </button>
             </div>
         </div>
     </div>
+
     <!-- EXPENSE MANAGEMENT MODAL -->
-<div id="expenseModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-    <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-        <div class="p-4 border-b bg-teal-700 text-white flex justify-between items-center">
+<div id="expenseModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+    <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
+        <div class="p-5 bg-gradient-to-r from-teal-600 to-emerald-700 text-white flex justify-between items-center shadow-inner">
             <div class="flex items-center gap-2">
                 <span class="text-xl">💸</span>
-                <h3 class="text-sm font-extrabold tracking-wide uppercase">Expense Management</h3>
+                <h3 class="text-sm font-black tracking-widest uppercase">Expense Management</h3>
             </div>
-            <button onclick="closeExpenseModal()" class="text-teal-200 hover:text-white font-bold text-xl">&times;</button>
+            <button onclick="closeExpenseModal()" class="text-teal-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
         </div>
 
-        <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-gray-50">
+        <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
             <!-- Add Expense Form -->
-            <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                <h4 id="expenseFormTitle" class="text-xs font-bold text-gray-700 uppercase tracking-wide">Add New Expense</h4>
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                <h4 id="expenseFormTitle" class="text-xs font-black text-gray-500 uppercase tracking-widest">Add New Expense</h4>
                 <input id="editExpenseId" type="hidden" />
-                
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    <input id="expenseDescription" type="text" placeholder="Description (e.g. Utility Bill)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-teal-500" />
-                    <input id="expenseAmount" type="number" step="0.01" min="0" placeholder="Amount (Rs)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-teal-500" />
-                    
-                    <select id="expenseCategory" class="p-2 border rounded-lg text-xs bg-white">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <input id="expenseDescription" type="text" placeholder="Description (e.g. Utility Bill)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow" />
+                    <input id="expenseAmount" type="number" step="0.01" min="0" placeholder="Amount (Rs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow font-bold text-teal-800" />
+
+                    <select id="expenseCategory" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow">
                         <option value="Utilities">Utilities</option>
                         <option value="Supplies">Supplies</option>
                         <option value="Maintenance">Maintenance</option>
@@ -444,7 +500,7 @@
                     </select>
 
                     <!-- NEW: Payment Method -->
-                    <select id="expensePaymentMethod" class="p-2 border rounded-lg text-xs bg-white focus:ring-1 focus:ring-teal-500">
+                    <select id="expensePaymentMethod" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow">
                         <option value="Cash Drawer">Cash Drawer</option>
                         <option value="Petty Cash">Petty Cash</option>
                         <option value="Bank Transfer">Bank Transfer</option>
@@ -452,102 +508,104 @@
                     </select>
 
                     <!-- NEW: Supplier Dropdown -->
-                    <select id="expenseSupplier" class="p-2 border rounded-lg text-xs bg-white focus:ring-1 focus:ring-teal-500">
+                    <select id="expenseSupplier" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow">
                         <option value="">-- No Supplier --</option>
                         <!-- Populated by JS -->
                     </select>
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <button onclick="saveExpense()" class="flex-1 bg-teal-600 text-white text-xs font-bold py-2.5 rounded-lg hover:bg-teal-700 transition shadow-sm">Save Expense</button>
-                    <button onclick="resetExpenseForm()" class="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-gray-300">Reset</button>
+                    <button onclick="saveExpense()" class="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-black py-3 rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Save Expense</button>
+                    <button onclick="resetExpenseForm()" class="bg-gray-100 text-gray-600 text-xs font-bold px-5 py-3 rounded-xl hover:bg-gray-200 transition">Reset</button>
                 </div>
             </div>
 
             <!-- Expense History & Management (Owner Only) -->
-            <div id="ownerExpenseSection" class="hidden bg-white p-4 rounded-xl border border-gray-200 space-y-3">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Expense History</h4>
-                    <span id="totalExpenseAmount" class="text-sm font-extrabold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">Total: Rs 0.00</span>
+            <div id="ownerExpenseSection" class="hidden bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-gray-100 pb-3">
+                    <h4 class="text-xs font-black text-gray-500 uppercase tracking-widest">Expense History</h4>
+                    <span id="totalExpenseAmount" class="text-sm font-black text-teal-700 bg-teal-50 px-4 py-1.5 rounded-xl border border-teal-100 shadow-inner">Total: Rs 0.00</span>
                 </div>
 
                 <!-- NEW: Date Range Filters -->
-                <div class="flex flex-wrap items-center gap-2 bg-gray-50 p-2 rounded-lg border">
-                    <input type="date" id="expenseStartDate" class="p-1.5 border rounded text-xs bg-white" onchange="renderExpenseList()">
-                    <span class="text-xs text-gray-500">to</span>
-                    <input type="date" id="expenseEndDate" class="p-1.5 border rounded text-xs bg-white" onchange="renderExpenseList()">
-                    
-                    <div class="flex gap-1 ml-auto">
-                        <button onclick="setExpenseFilter('today')" class="px-2 py-1 bg-white border rounded text-[10px] font-bold hover:bg-gray-100">Today</button>
-                        <button onclick="setExpenseFilter('week')" class="px-2 py-1 bg-white border rounded text-[10px] font-bold hover:bg-gray-100">This Week</button>
-                        <button onclick="setExpenseFilter('month')" class="px-2 py-1 bg-white border rounded text-[10px] font-bold hover:bg-gray-100">This Month</button>
-                        <button onclick="setExpenseFilter('all')" class="px-2 py-1 bg-gray-200 border rounded text-[10px] font-bold hover:bg-gray-300">Clear</button>
+                <div class="flex flex-wrap items-center justify-between gap-3 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <input type="date" id="expenseStartDate" class="p-2 border-0 ring-1 ring-gray-200 rounded-lg text-xs bg-white text-gray-700" onchange="renderExpenseList()">
+                        <span class="text-xs font-bold text-gray-400">to</span>
+                        <input type="date" id="expenseEndDate" class="p-2 border-0 ring-1 ring-gray-200 rounded-lg text-xs bg-white text-gray-700" onchange="renderExpenseList()">
+                    </div>
+
+                    <div class="flex gap-1 bg-gray-200/50 p-1 rounded-lg">
+                        <button onclick="setExpenseFilter('today')" class="px-3 py-1.5 bg-white shadow-sm rounded text-[10px] font-bold text-gray-700 hover:text-teal-600 transition">Today</button>
+                        <button onclick="setExpenseFilter('week')" class="px-3 py-1.5 bg-transparent rounded text-[10px] font-bold text-gray-500 hover:text-teal-600 hover:bg-white transition">Week</button>
+                        <button onclick="setExpenseFilter('month')" class="px-3 py-1.5 bg-transparent rounded text-[10px] font-bold text-gray-500 hover:text-teal-600 hover:bg-white transition">Month</button>
+                        <button onclick="setExpenseFilter('all')" class="px-3 py-1.5 bg-gray-200 rounded text-[10px] font-bold text-gray-600 hover:bg-gray-300 transition">Clear</button>
                     </div>
                 </div>
 
-                <div id="expenseList" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+                <div id="expenseList" class="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar"></div>
             </div>
 
             <!-- Manager Notice -->
-            <div id="managerExpenseNotice" class="hidden bg-teal-50 p-3 rounded-xl border border-teal-200 text-xs text-teal-900">
-                ℹ️ As a Manager, you can add new expenses. Viewing history, editing, and deleting are restricted to the Owner.
+            <div id="managerExpenseNotice" class="hidden bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-xl border border-teal-100 text-xs text-teal-800 font-medium">
+                <span class="text-lg mr-1 align-middle">ℹ️</span> As a Manager, you can add new expenses. Viewing history, editing, and deleting are restricted to the Owner securely.
             </div>
         </div>
 
-        <div class="p-3 bg-gray-100 border-t text-right">
-            <button onclick="closeExpenseModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+        <div class="p-4 bg-gray-50/80 border-t border-gray-100 justify-end flex">
+            <button onclick="closeExpenseModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">Close Dashboard</button>
         </div>
     </div>
 </div>
 
     <!-- HELD ORDERS MODAL -->
-    <div id="heldOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-orange-600 text-white flex justify-between items-center">
+    <div id="heldOrdersModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+        <div class="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div class="p-5 bg-gradient-to-r from-orange-500 to-amber-600 text-white flex justify-between items-center shadow-inner">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">⏸️</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Held Orders Management</h3>
+                    <h3 class="text-sm font-black tracking-widest uppercase">Held Orders</h3>
                 </div>
-                <button onclick="closeHeldOrdersModal()" class="text-orange-200 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeHeldOrdersModal()" class="text-orange-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
             </div>
 
-            <div class="p-4 space-y-3 overflow-y-auto flex-1">
-                <p class="text-xs text-gray-500">Select an order to restore it back into your active cart for checkout, or discard it.</p>
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
+                <p class="text-[11px] font-bold text-gray-500 uppercase tracking-widest px-1">Select an order to restore or discard</p>
                 <div id="heldOrdersList" class="space-y-3"></div>
             </div>
 
-            <div class="p-3 bg-gray-50 border-t text-right">
-                <button onclick="closeHeldOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
-                    Close
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 justify-end flex">
+                <button onclick="closeHeldOrdersModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">
+                    Close Dialog
                 </button>
             </div>
         </div>
     </div>
 
     <!-- SHIFT OPENING CASH MODAL -->
-    <div id="shiftOpeningModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-emerald-700 text-white flex justify-between items-center">
+    <div id="shiftOpeningModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+        <div class="bg-white rounded-3xl w-full max-w-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center shadow-inner">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">💵</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Opening Cash</h3>
+                    <h3 class="text-sm font-black tracking-widest uppercase">Opening Cash</h3>
                 </div>
-                <button onclick="closeShiftOpeningModal()" class="text-emerald-100 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeShiftOpeningModal()" class="text-emerald-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
             </div>
 
-            <div class="p-5 space-y-4 bg-gray-50">
+            <div class="p-8 space-y-5 bg-gray-50/50">
                 <div>
-                    <label for="openingCashInput" class="block text-xs font-bold text-gray-700 mb-2">Cash in drawer when the shift starts</label>
-                    <input id="openingCashInput" type="number" min="0" step="0.01" value="0" class="w-full border p-3 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" placeholder="0.00" />
+                    <label for="openingCashInput" class="block text-xs font-black text-gray-600 uppercase tracking-widest mb-2">Drawer Cash At Start</label>
+                    <input id="openingCashInput" type="number" min="0" step="0.01" value="0" class="w-full border-0 ring-1 ring-emerald-200 p-3.5 rounded-2xl text-lg font-black text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white shadow-inner transition-all" placeholder="0.00" />
                 </div>
-                <div class="text-xs text-gray-500">This amount is included in the shift summary and helps track the expected drawer balance.</div>
+                <div class="text-[11px] text-gray-500 font-medium">This initial cash value is secured and tracked for the final shift reconciliation summary.</div>
             </div>
 
-            <div class="p-3 bg-gray-100 border-t flex justify-between items-center">
-                <button onclick="closeShiftOpeningModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 flex justify-between items-center">
+                <button onclick="closeShiftOpeningModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">
                     Cancel
                 </button>
-                <button onclick="saveOpeningCash()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm">
+                <button onclick="saveOpeningCash()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:from-emerald-600 hover:to-teal-700 transition shadow-md hover:shadow-lg active:scale-95">
                     Save Opening Cash
                 </button>
             </div>
@@ -555,28 +613,31 @@
     </div>
 
     <!-- SHIFT CLOSING & REPORT MODAL -->
-    <div id="shiftReportModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-indigo-900 text-white flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">📊</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Shift Closing & Financial Summary</h3>
+    <div id="shiftReportModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">📊</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Shift Closing Summary</h3>
+                        <p class="text-[11px] text-indigo-200/80 font-medium">Reconcile cash drawer & final shift metrics</p>
+                    </div>
                 </div>
-                <button onclick="closeShiftReportModal()" class="text-indigo-200 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeShiftReportModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
 
-            <div class="p-5 space-y-4 overflow-y-auto flex-1 bg-gray-50" id="shiftReportContent"></div>
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50" id="shiftReportContent"></div>
 
-            <div class="p-3 bg-gray-100 border-t flex justify-between items-center">
-                <button onclick="printShiftReportPDF()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700 transition shadow-sm">
-                    📄 Export PDF
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 flex justify-between items-center gap-3">
+                <button onclick="printShiftReportPDF()" class="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-2.5 rounded-xl text-xs font-black hover:bg-indigo-100 transition shadow-sm flex items-center gap-1.5 active:scale-95">
+                    <span>📄</span> Export PDF
                 </button>
                 <div class="flex gap-2">
-                    <button onclick="closeShiftReportModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
+                    <button onclick="closeShiftReportModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">
                         Cancel
                     </button>
-                    <button onclick="confirmCloseShift()" class="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-700 transition shadow-sm">
-                        🔚 End Shift
+                    <button onclick="confirmCloseShift()" class="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:from-rose-700 hover:to-red-700 transition shadow-md hover:shadow-lg active:scale-95 flex items-center gap-1.5">
+                        <span>🔚</span> End Shift
                     </button>
                 </div>
             </div>
@@ -584,260 +645,294 @@
     </div>
 
     <!-- PAYMENT MODAL -->
-    <div id="paymentModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-      <div class="bg-white rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-        <div class="p-4 border-b bg-indigo-900 text-white flex justify-between items-center">
-          <h3 class="text-sm font-extrabold tracking-wide uppercase">💳 Complete Payment</h3>
-          <button onclick="closePaymentModal()" class="text-indigo-200 hover:text-white font-bold text-xl">&times;</button>
+    <div id="paymentModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+      <div class="bg-white rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+        <div class="p-5 bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white flex justify-between items-center shadow-sm">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">💳</div>
+            <div>
+              <h3 class="text-sm font-black tracking-wider uppercase text-white">Complete Payment</h3>
+              <p class="text-[11px] text-indigo-200/80 font-medium">Split or multi-tender settlement</p>
+            </div>
+          </div>
+          <button onclick="closePaymentModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
         </div>
 
-        <div class="p-4 space-y-3 overflow-y-auto flex-1 bg-gray-50">
-          <div class="text-xs text-gray-600">
-            Select one or more payment methods. For cash, enter customer amount to derive exact change.
+        <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
+          <div class="text-xs text-gray-500 font-medium bg-indigo-50/60 border border-indigo-100 p-3 rounded-2xl">
+            Select one or more payment methods. For cash, enter customer tender amount to calculate exact change.
           </div>
 
-          <div id="paymentRows" class="space-y-2"></div>
+          <div id="paymentRows" class="space-y-2.5"></div>
 
-          <div class="flex items-center gap-2">
-            <button id="addPaymentRowBtn" onclick="addPaymentRow()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm">+ Add Method</button>
-            <button onclick="clearPaymentRows()" class="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-300">Clear</button>
+          <div class="flex items-center gap-2 pt-1">
+            <button id="addPaymentRowBtn" onclick="addPaymentRow()" class="bg-indigo-50 border border-indigo-200 text-indigo-700 px-3.5 py-2 rounded-xl text-xs font-black hover:bg-indigo-100 transition shadow-sm active:scale-95">+ Add Method</button>
+            <button onclick="clearPaymentRows()" class="bg-white ring-1 ring-gray-200 text-gray-600 px-3.5 py-2 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Clear</button>
           </div>
 
-          <div class="border-t pt-3 space-y-1.5 text-xs">
-            <div class="flex justify-between">
-              <span>Total Due:</span>
-              <strong id="paymentTotalDue" class="text-sm">Rs 0.00</strong>
+          <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-inner space-y-2 text-xs font-medium">
+            <div class="flex justify-between items-center text-gray-600">
+              <span class="font-bold">Total Due:</span>
+              <strong id="paymentTotalDue" class="text-base font-black text-gray-900">Rs 0.00</strong>
             </div>
-            <div class="flex justify-between">
-              <span>Total Received:</span>
-              <strong id="paymentTotalPaid" class="text-sm">Rs 0.00</strong>
+            <div class="flex justify-between items-center text-gray-600">
+              <span class="font-bold">Total Received:</span>
+              <strong id="paymentTotalPaid" class="text-base font-black text-indigo-600">Rs 0.00</strong>
             </div>
-            <div class="flex justify-between">
-              <span>Change to Return:</span>
-              <strong id="paymentChange" class="text-sm text-red-600">Rs 0.00</strong>
+            <div class="flex justify-between items-center text-rose-600 pt-2 border-t border-gray-100">
+              <span class="font-black uppercase tracking-wider text-[11px]">Change to Return:</span>
+              <strong id="paymentChange" class="text-lg font-black text-rose-600">Rs 0.00</strong>
             </div>
-            <div id="paymentRemainingRow" class="flex justify-between text-xs text-gray-600">
-              <span>Remaining:</span>
-              <span id="paymentRemaining">Rs 0.00</span>
+            <div id="paymentRemainingRow" class="flex justify-between items-center text-xs text-amber-700 pt-1">
+              <span class="font-bold">Remaining Balance:</span>
+              <span id="paymentRemaining" class="font-black">Rs 0.00</span>
             </div>
           </div>
         </div>
 
-        <div class="p-3 bg-gray-100 border-t flex justify-between items-center">
-          <button onclick="closePaymentModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Cancel</button>
-          <button id="confirmPaymentBtn" onclick="confirmPaymentAndProcess()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition shadow-sm">Confirm Payment</button>
+        <div class="p-4 bg-gray-50/80 border-t border-gray-100 flex justify-between items-center gap-2">
+          <button onclick="closePaymentModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Cancel</button>
+          <button id="confirmPaymentBtn" onclick="confirmPaymentAndProcess()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:from-emerald-600 hover:to-teal-700 transition shadow-md hover:shadow-lg active:scale-95">Confirm Payment</button>
         </div>
       </div>
     </div>
 
     <!-- STOCK ACCESS MODAL -->
-    <div id="stockPinModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-[60] p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl space-y-4">
-            <h3 class="text-sm font-extrabold text-gray-800 text-center uppercase tracking-wide">Unlock Quick Stock Panel</h3>
-            <p class="text-xs text-gray-500 text-center">Re-authenticate your Firebase account to access raw ingredients</p>
-            <input id="stockPinInput" type="password" placeholder="Password" class="w-full p-2.5 border rounded-xl text-center font-bold text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none" />
-            <p id="stockPinError" class="hidden text-xs text-red-600 font-bold text-center">Invalid PIN! Try again.</p>
-            <div class="flex gap-2">
-                <button onclick="closeStockPinModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl font-bold text-xs hover:bg-gray-300">Cancel</button>
-                <button onclick="submitStockPin()" class="flex-1 bg-amber-600 text-white py-2 rounded-xl font-bold text-xs hover:bg-amber-700 shadow-sm">Unlock</button>
+    <div id="stockPinModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[60] p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 space-y-4 text-center transform transition-all">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-2xl mx-auto shadow-inner">🔒</div>
+            <div>
+                <h3 class="text-sm font-black text-gray-900 uppercase tracking-wider">Unlock Stock Panel</h3>
+                <p class="text-xs text-gray-500 font-medium mt-1">Re-authenticate your credentials to view raw ingredients</p>
+            </div>
+            <input id="stockPinInput" type="password" placeholder="Enter Password" class="w-full p-3 border-0 ring-1 ring-gray-200 rounded-2xl text-center font-black text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none shadow-inner transition-all" />
+            <p id="stockPinError" class="hidden text-xs text-rose-600 font-bold">Invalid PIN! Try again.</p>
+            <div class="flex gap-2 pt-1">
+                <button onclick="closeStockPinModal()" class="flex-1 bg-white ring-1 ring-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-50 transition">Cancel</button>
+                <button onclick="submitStockPin()" class="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-2.5 rounded-xl font-black text-xs hover:from-amber-600 hover:to-amber-700 shadow-md hover:shadow-lg transition active:scale-95">Unlock</button>
             </div>
         </div>
     </div>
 
     <!-- OWNER RE-AUTH MODAL -->
-    <div id="ownerAuthModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-[70] p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl space-y-4">
-            <h3 class="text-sm font-extrabold text-gray-800 text-center uppercase tracking-wide">Owner Re-authentication Required</h3>
-            <p class="text-xs text-gray-500 text-center">Re-authenticate your Firebase account to authorize this action.</p>
-            <input id="ownerAuthPinInput" type="password" placeholder="Password" class="w-full p-2.5 border rounded-xl text-center font-bold text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-amber-500 focus:outline-none" />
-            <p id="ownerAuthError" class="hidden text-xs text-red-600 font-bold text-center">Invalid PIN.</p>
-            <div class="flex gap-2">
-                <button onclick="closeOwnerAuthModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-xl font-bold text-xs hover:bg-gray-300">Cancel</button>
-                <button onclick="submitOwnerAuth()" class="flex-1 bg-amber-600 text-white py-2 rounded-xl font-bold text-xs hover:bg-amber-700 shadow-sm">Authorize</button>
+    <div id="ownerAuthModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[70] p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 space-y-4 text-center transform transition-all">
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center text-2xl mx-auto shadow-inner">👑</div>
+            <div>
+                <h3 class="text-sm font-black text-gray-900 uppercase tracking-wider">Owner Authorization</h3>
+                <p class="text-xs text-gray-500 font-medium mt-1">Re-authenticate your account to authorize this privileged action.</p>
+            </div>
+            <input id="ownerAuthPinInput" type="password" placeholder="Enter Password" class="w-full p-3 border-0 ring-1 ring-gray-200 rounded-2xl text-center font-black text-sm bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none shadow-inner transition-all" />
+            <p id="ownerAuthError" class="hidden text-xs text-rose-600 font-bold">Invalid PIN.</p>
+            <div class="flex gap-2 pt-1">
+                <button onclick="closeOwnerAuthModal()" class="flex-1 bg-white ring-1 ring-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-50 transition">Cancel</button>
+                <button onclick="submitOwnerAuth()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 rounded-xl font-black text-xs hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition active:scale-95">Authorize</button>
             </div>
         </div>
     </div>
 
     <!-- RAW STOCK INVENTORY MODAL -->
-    <div id="inventoryModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-amber-600 text-white flex justify-between items-center">
-                <h3 class="text-sm font-extrabold tracking-wide uppercase">📦 Raw Ingredients & Inventory Management</h3>
-                <button onclick="closeInventoryModal()" class="text-amber-200 hover:text-white font-bold text-xl">&times;</button>
+    <div id="inventoryModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">📦</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Raw Ingredients & Inventory</h3>
+                        <p class="text-[11px] text-amber-100/80 font-medium">Manage master ingredients, units & stock levels</p>
+                    </div>
+                </div>
+                <button onclick="closeInventoryModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
 
-            <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-gray-50">
-                <div class="bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm space-y-2">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Add New Ingredient</h4>
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
+                <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                    <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">Add New Ingredient</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
-                        <input id="newItemName" type="text" placeholder="Item Name (e.g. Chicken)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
-                        <input id="newItemStock" type="number" step="0.01" min="0" placeholder="Initial Stock" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
-                        <input id="newItemUnit" type="text" placeholder="Unit (kg, pcs)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
-                        <input id="newItemCost" type="number" step="0.01" min="0" placeholder="Cost per Unit" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-amber-500" />
-                        <button onclick="addNewInventoryItem()" class="bg-amber-600 text-white text-xs font-bold rounded-lg p-2 hover:bg-amber-700 transition shadow-sm">+ Add</button>
+                        <input id="newItemName" type="text" placeholder="Item Name (e.g. Chicken)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="newItemStock" type="number" step="0.01" min="0" placeholder="Initial Stock" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="newItemUnit" type="text" placeholder="Unit (kg, pcs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="newItemCost" type="number" step="0.01" min="0" placeholder="Cost per Unit" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <button onclick="addNewInventoryItem()" class="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-black rounded-xl p-2.5 hover:from-amber-600 hover:to-amber-700 transition shadow-md active:scale-95">+ Add</button>
                     </div>
                 </div>
 
                 <div id="modalInventoryList" class="space-y-2"></div>
             </div>
 
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeInventoryModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 text-right">
+                <button onclick="closeInventoryModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Close</button>
             </div>
         </div>
     </div>
 
     <!-- OWNER ADMIN MODAL -->
-    <div id="ownerAdminModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-purple-700 text-white flex justify-between items-center">
-                <h3 class="text-sm font-extrabold tracking-wide uppercase">👑 Owner Admin Panel</h3>
-                <button onclick="closeOwnerAdminModal()" class="text-purple-200 hover:text-white font-bold text-xl">&times;</button>
+    <div id="ownerAdminModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-purple-800 via-purple-900 to-indigo-950 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">👑</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Owner Admin Panel</h3>
+                        <p class="text-[11px] text-purple-200/80 font-medium">Categories, Recipes, Modifiers & Staff Permissions</p>
+                    </div>
+                </div>
+                <button onclick="closeOwnerAdminModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
 
-            <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-gray-50">
-                <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-3">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">1. Manage Food Categories</h4>
+            <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50">
+                <!-- Food Categories -->
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                    <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">1. Manage Food Categories</h4>
                     <div class="flex gap-2">
-                        <input id="newCatName" type="text" placeholder="Category Name" class="p-2 border rounded-lg text-xs flex-1 focus:ring-1 focus:ring-purple-500" />
-                        <button onclick="addCategory()" class="bg-purple-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-purple-700 transition shadow-sm">+ Add</button>
+                        <input id="newCatName" type="text" placeholder="Category Name" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium flex-1 focus:ring-2 focus:ring-purple-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <button onclick="addCategory()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition shadow-md active:scale-95">+ Add</button>
                     </div>
                     <div id="ownerCategoryList" class="flex flex-wrap gap-2 pt-2"></div>
                 </div>
 
-                <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-3">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">1b. Quick Custom Item to Cart</h4>
+                <!-- Quick Custom Item -->
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                    <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">1b. Quick Custom Item to Cart</h4>
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input id="instantItemName" type="text" placeholder="Item name (e.g. Extra Sauce)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-indigo-500" />
-                        <input id="instantItemPrice" type="number" step="0.01" min="0" placeholder="Price (Rs)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-indigo-500" />
-                        <button onclick="addInstantItemToCart()" class="bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">+ Add to Cart</button>
+                        <input id="instantItemName" type="text" placeholder="Item name (e.g. Extra Sauce)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="instantItemPrice" type="number" step="0.01" min="0" placeholder="Price (Rs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <button onclick="addInstantItemToCart()" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-black px-4 py-2.5 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition shadow-md active:scale-95">+ Add to Cart</button>
                     </div>
                 </div>
 
-                <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-3">
-                    <h4 id="foodFormTitle" class="text-xs font-bold text-gray-700 uppercase tracking-wide">2. Add New Menu Item & Link Recipe</h4>
+                <!-- Menu Item & Recipe Form -->
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                    <h4 id="foodFormTitle" class="text-xs font-black text-gray-800 uppercase tracking-wider">2. Add New Menu Item & Link Recipe</h4>
                     <input id="editFoodId" type="hidden" />
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <input id="foodName" type="text" placeholder="Dish Name (e.g. Zinger Burger)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-purple-500" />
-                        <input id="foodPrice" type="number" step="0.01" min="0" placeholder="Price (Rs)" class="p-2 border rounded-lg text-xs focus:ring-1 focus:ring-purple-500" />
-                        <select id="foodCategorySelect" class="p-2 border rounded-lg text-xs bg-white"></select>
+                        <input id="foodName" type="text" placeholder="Dish Name (e.g. Zinger Burger)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-purple-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="foodPrice" type="number" step="0.01" min="0" placeholder="Price (Rs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-purple-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <select id="foodCategorySelect" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none transition-all shadow-inner"></select>
                     </div>
 
-                    <div class="border rounded-xl p-3 bg-gray-50 space-y-2">
+                    <div class="border border-gray-100 rounded-2xl p-4 bg-gray-50/50 space-y-3">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-bold text-gray-600">Food Image</span>
-                            <label class="cursor-pointer bg-indigo-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+                            <span class="text-xs font-black text-gray-700 uppercase tracking-wide">Food Image</span>
+                            <label class="cursor-pointer bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-black px-3.5 py-1.5 rounded-xl hover:bg-indigo-100 transition shadow-sm">
                                 Upload Photo
                                 <input id="foodImageInput" type="file" accept="image/*" class="hidden" onchange="handleFoodImageUpload(event)" />
                             </label>
                         </div>
                         <div class="flex justify-center">
-                            <img id="foodImagePreview" class="hidden w-28 h-28 object-cover rounded-xl border bg-white shadow-sm" alt="Food preview" />
+                            <img id="foodImagePreview" class="hidden w-28 h-28 object-cover rounded-2xl border border-gray-200 bg-white shadow-md" alt="Food preview" />
                         </div>
                     </div>
 
-                    <div class="border-t pt-2">
+                    <div class="border-t border-gray-100 pt-3">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-bold text-gray-600">Ingredient Deductions (Recipe):</span>
-                            <button onclick="addRecipeIngredientRow()" class="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-lg font-bold hover:bg-indigo-100 transition">+ Add Ingredient</button>
+                            <span class="text-xs font-black text-gray-700 uppercase tracking-wide">Ingredient Deductions (Recipe):</span>
+                            <button onclick="addRecipeIngredientRow()" class="text-xs bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-xl font-black hover:bg-indigo-100 transition">+ Add Ingredient</button>
                         </div>
-                        <div id="recipeIngredientRows" class="space-y-2 mt-2"></div>
+                        <div id="recipeIngredientRows" class="space-y-2 mt-2.5"></div>
                     </div>
 
-                    <div class="border-t pt-2">
+                    <div class="border-t border-gray-100 pt-3">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-bold text-gray-600">Product Modifiers (Size, Add-ons, etc.):</span>
-                            <button type="button" onclick="addModifierGroupRow()" class="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-lg font-bold hover:bg-purple-100 transition">+ Add Group</button>
+                            <span class="text-xs font-black text-gray-700 uppercase tracking-wide">Product Modifiers (Size, Add-ons, etc.):</span>
+                            <button type="button" onclick="addModifierGroupRow()" class="text-xs bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1.5 rounded-xl font-black hover:bg-purple-100 transition">+ Add Group</button>
                         </div>
-                        <div id="modifierGroupsRows" class="space-y-3 mt-2"></div>
+                        <div id="modifierGroupsRows" class="space-y-3 mt-2.5"></div>
                     </div>
 
                     <div class="flex gap-2 pt-2">
-                        <button onclick="saveFoodItem()" class="flex-1 bg-emerald-600 text-white text-xs font-bold py-2.5 rounded-lg hover:bg-emerald-700 transition shadow-sm">Save Food Item</button>
-                        <button onclick="resetFoodForm()" class="bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-gray-300">Reset</button>
+                        <button onclick="saveFoodItem()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-black py-3 rounded-xl hover:from-emerald-600 hover:to-teal-700 transition shadow-md active:scale-95">Save Food Item</button>
+                        <button onclick="resetFoodForm()" class="bg-white ring-1 ring-gray-200 text-gray-700 text-xs font-bold px-5 py-3 rounded-xl hover:bg-gray-50 transition">Reset</button>
                     </div>
                 </div>
 
-                <div class="bg-white p-4 rounded-xl border border-gray-200 space-y-3">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">Current Menu List</h4>
+                <!-- Menu Item List -->
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                    <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">Current Menu List</h4>
                     <div id="ownerFoodList" class="space-y-2"></div>
                 </div>
 
                 <!-- Employee Security Management -->
-                <div class="bg-white p-4 rounded-xl border border-red-200 space-y-3">
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide">3. Employee Accounts & Permissions</h4>
-                    <p class="text-xs text-gray-500">Only the Owner can create, disable, enable, or change employee roles. New employees receive a Firebase password setup/reset email.</p>
+                <div class="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm space-y-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-rose-500"></div>
+                        <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">3. Employee Accounts & Permissions</h4>
+                    </div>
+                    <p class="text-xs text-gray-500 font-medium">Only the Owner can create, disable, enable, or change employee roles. New employees receive credentials for Firebase authentication.</p>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                        <input id="employeeName" type="text" placeholder="Employee Name" class="p-2 border rounded-lg text-xs" />
-                        <input id="employeeUsername" type="text" placeholder="Unique Username" autocomplete="off" class="p-2 border rounded-lg text-xs" />
-                        <input id="employeePassword" type="password" placeholder="Temporary Password" autocomplete="new-password" class="p-2 border rounded-lg text-xs" />
-                        <select id="employeeRole" class="p-2 border rounded-lg text-xs bg-white">
+                        <input id="employeeName" type="text" placeholder="Employee Name" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="employeeUsername" type="text" placeholder="Unique Username" autocomplete="off" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <input id="employeePassword" type="password" placeholder="Temporary Password" autocomplete="new-password" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                        <select id="employeeRole" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-black text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none transition-all shadow-inner">
                             <option value="WAITER">WAITER</option>
                             <option value="CASHIER">CASHIER</option>
                             <option value="MANAGER">MANAGER</option>
                         </select>
                     </div>
-                    <button onclick="createEmployee()" class="bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-700 transition shadow-sm">+ Create Employee</button>
-                    <div id="employeeManagementResult" class="text-xs hidden"></div>
+                    <button onclick="createEmployee()" class="bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-rose-700 hover:to-red-700 transition shadow-md active:scale-95">+ Create Employee</button>
+                    <div id="employeeManagementResult" class="text-xs hidden font-bold"></div>
                     <div id="employeeList" class="space-y-2 pt-2"></div>
                 </div>
 
                 <!-- Security note -->
-                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
-                    <h4 class="text-xs font-bold text-indigo-900 uppercase tracking-wide">Security</h4>
-                    <p class="text-xs text-indigo-800 mt-1">Passwords are managed by Firebase Authentication. The POS no longer stores employee passwords or Owner PINs in IndexedDB.</p>
+                <div class="bg-indigo-50/60 p-4 rounded-2xl border border-indigo-100">
+                    <h4 class="text-xs font-black text-indigo-900 uppercase tracking-wider">Security Architecture</h4>
+                    <p class="text-xs text-indigo-800/80 font-medium mt-1">Passwords are authenticated through Firebase Authentication. The POS no longer stores plain employee passwords or PINs locally.</p>
                 </div>
             </div>
 
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeOwnerAdminModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 text-right">
+                <button onclick="closeOwnerAdminModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Close</button>
             </div>
         </div>
     </div>
 
     <!-- DELIVERY MANAGEMENT MODAL -->
-    <div id="deliveryManagementModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-blue-700 text-white flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">🛵</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Delivery Orders Tracker</h3>
+    <div id="deliveryManagementModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">🛵</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Delivery Orders Tracker</h3>
+                        <p class="text-[11px] text-blue-100/80 font-medium">Real-time dispatcher & courier management</p>
+                    </div>
                 </div>
-                <button onclick="closeDeliveryManagementModal()" class="text-blue-200 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeDeliveryManagementModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-4 bg-gray-50">
+            <div class="flex-1 overflow-y-auto p-6 bg-gray-50/50">
                 <div class="space-y-6">
                     <!-- PENDING DELIVERIES -->
                     <div>
-                        <h4 class="text-xs font-extrabold text-amber-900 bg-amber-50 p-2.5 rounded-xl border border-amber-200 flex items-center gap-2 uppercase tracking-wide mb-3">
-                            <span>⏳</span> Pending Deliveries
+                        <h4 class="text-xs font-black text-amber-900 bg-amber-50/80 p-3 rounded-2xl border border-amber-200/60 flex items-center gap-2 uppercase tracking-wider mb-3.5 shadow-sm">
+                            <span class="text-base">⏳</span> Pending Deliveries
                         </h4>
-                        <div id="pendingDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                        <div id="pendingDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
                     </div>
 
                     <!-- ACTIVE DELIVERIES -->
                     <div>
-                        <h4 class="text-xs font-extrabold text-blue-900 bg-blue-50 p-2.5 rounded-xl border border-blue-200 flex items-center gap-2 uppercase tracking-wide mb-3">
-                            <span>🛵</span> Out for Delivery
+                        <h4 class="text-xs font-black text-blue-900 bg-blue-50/80 p-3 rounded-2xl border border-blue-200/60 flex items-center gap-2 uppercase tracking-wider mb-3.5 shadow-sm">
+                            <span class="text-base">🛵</span> Out for Delivery
                         </h4>
-                        <div id="activeDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                        <div id="activeDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
                     </div>
 
                     <!-- COMPLETED DELIVERIES -->
                     <div>
-                        <h4 class="text-xs font-extrabold text-emerald-900 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200 flex items-center gap-2 uppercase tracking-wide mb-3">
-                            <span>✅</span> Delivered Orders
+                        <h4 class="text-xs font-black text-emerald-900 bg-emerald-50/80 p-3 rounded-2xl border border-emerald-200/60 flex items-center gap-2 uppercase tracking-wider mb-3.5 shadow-sm">
+                            <span class="text-base">✅</span> Delivered Orders
                         </h4>
-                        <div id="completedDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+                        <div id="completedDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-gray-100 p-3 border-t flex justify-end">
-                <button onclick="closeDeliveryManagementModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">
+            <div class="bg-gray-50/80 p-4 border-t border-gray-100 flex justify-end">
+                <button onclick="closeDeliveryManagementModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">
                     Close
                 </button>
             </div>
@@ -845,110 +940,134 @@
     </div>
 
     <!-- PRODUCT MODIFIER SELECTION MODAL -->
-    <div id="modifierSelectModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div class="p-4 border-b bg-indigo-700 text-white flex justify-between items-center">
-                <h3 id="modifierModalTitle" class="text-sm font-extrabold tracking-wide uppercase">Customize Item</h3>
-                <button onclick="closeModifierModal()" class="text-indigo-200 hover:text-white font-bold text-xl">&times;</button>
+    <div id="modifierSelectModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-md shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden flex flex-col max-h-[85vh] transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">✨</div>
+                    <div>
+                        <h3 id="modifierModalTitle" class="text-sm font-black tracking-wider uppercase text-white">Customize Item</h3>
+                        <p class="text-[11px] text-indigo-100/80 font-medium">Select variations & add-on choices</p>
+                    </div>
+                </div>
+                <button onclick="closeModifierModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
-            <div id="modifierGroupsContainer" class="p-4 space-y-4 overflow-y-auto flex-1"></div>
-            <div class="p-3 border-t bg-gray-50 flex justify-between items-center">
-                <div class="text-sm font-bold text-gray-800">Total: <span id="modifierModalTotal" class="text-emerald-700">Rs 0.00</span></div>
+            <div id="modifierGroupsContainer" class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50"></div>
+            <div class="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-between items-center gap-3">
+                <div class="text-xs font-black uppercase tracking-wider text-gray-600">Total: <span id="modifierModalTotal" class="text-base font-black text-emerald-600">Rs 0.00</span></div>
                 <div class="flex gap-2">
-                    <button onclick="closeModifierModal()" class="bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button onclick="confirmAddModifiedItem()" class="bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-emerald-700 shadow-sm">Add to Cart</button>
+                    <button onclick="closeModifierModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition">Cancel</button>
+                    <button onclick="confirmAddModifiedItem()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-emerald-600 hover:to-teal-700 transition shadow-md active:scale-95">Add to Cart</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- REFUND MODAL -->
-    <div id="refundModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-[65] p-4">
-        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-            <div class="p-4 border-b bg-red-700 text-white flex justify-between items-center">
-                <h3 id="refundModalTitle" class="text-sm font-extrabold tracking-wide uppercase">Refund Order</h3>
-                <button onclick="closeRefundModal()" class="text-red-200 hover:text-white font-bold text-xl">&times;</button>
+    <div id="refundModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[65] p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-md shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden flex flex-col max-h-[85vh] transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-rose-700 via-red-700 to-rose-800 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">↩️</div>
+                    <div>
+                        <h3 id="refundModalTitle" class="text-sm font-black tracking-wider uppercase text-white">Refund Order</h3>
+                        <p class="text-[11px] text-rose-100/80 font-medium">Process full or itemized returns</p>
+                    </div>
+                </div>
+                <button onclick="closeRefundModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
-            <div class="p-4 space-y-3 overflow-y-auto flex-1">
-                <div id="refundItemsContainer" class="space-y-2"></div>
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
+                <div id="refundItemsContainer" class="space-y-2.5"></div>
                 <div>
-                    <label class="block text-xs font-bold text-gray-600 mb-1">Refund Reason</label>
-                    <input id="refundReasonInput" type="text" placeholder="e.g. Customer complaint, wrong order" class="w-full p-2 border rounded-lg text-xs" />
+                    <label class="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">Refund Reason</label>
+                    <input id="refundReasonInput" type="text" placeholder="e.g. Customer complaint, wrong order" class="w-full p-3 border-0 ring-1 ring-gray-200 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
                 </div>
             </div>
-            <div class="p-3 border-t bg-gray-50 flex justify-between items-center">
-                <div class="text-sm font-bold text-gray-800">Refund Total: <span id="refundModalTotal" class="text-red-700">Rs 0.00</span></div>
+            <div class="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-between items-center gap-3">
+                <div class="text-xs font-black uppercase tracking-wider text-gray-600">Refund Total: <span id="refundModalTotal" class="text-base font-black text-rose-600">Rs 0.00</span></div>
                 <div class="flex gap-2">
-                    <button onclick="closeRefundModal()" class="bg-gray-200 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg hover:bg-gray-300">Cancel</button>
-                    <button onclick="confirmRefund()" class="bg-red-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-red-700 shadow-sm">Process Refund</button>
+                    <button onclick="closeRefundModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition">Cancel</button>
+                    <button onclick="confirmRefund()" class="bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-rose-700 hover:to-red-700 transition shadow-md active:scale-95">Process Refund</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- AUDIT LOG MODAL -->
-    <div id="auditLogModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-gray-800 text-white flex justify-between items-center">
-                <h3 class="text-sm font-extrabold tracking-wide uppercase">🕵️ Audit Log</h3>
-                <button onclick="closeAuditLogModal()" class="text-gray-300 hover:text-white font-bold text-xl">&times;</button>
+    <div id="auditLogModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-slate-900 via-gray-900 to-slate-900 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">🕵️</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">System Audit Log</h3>
+                        <p class="text-[11px] text-gray-300 font-medium">Activity logs, cashier actions & security events</p>
+                    </div>
+                </div>
+                <button onclick="closeAuditLogModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
-            <div class="p-4 space-y-3 overflow-y-auto flex-1 bg-gray-50">
+            <div class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="auditLogList" class="space-y-2 text-xs"></div>
             </div>
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeAuditLogModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 text-right">
+                <button onclick="closeAuditLogModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Close</button>
             </div>
         </div>
     </div>
 
     <!-- WEBSITE ONLINE ORDERS MODAL -->
-    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-indigo-900 text-white flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">🌐</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Website Orders</h3>
+    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">🌐</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Website & Online Orders</h3>
+                        <p class="text-[11px] text-indigo-200/80 font-medium">Incoming direct consumer online orders</p>
+                    </div>
                 </div>
-                <button onclick="closeOnlineOrdersModal()" class="text-indigo-200 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeOnlineOrdersModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
-            <div class="p-4 space-y-3 overflow-y-auto flex-1 bg-gray-50">
+            <div class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="onlineOrdersList" class="space-y-3"></div>
             </div>
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeOnlineOrdersModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 text-right">
+                <button onclick="closeOnlineOrdersModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Close</button>
             </div>
         </div>
     </div>
 
     <!-- CUSTOMER CRM MODAL -->
-    <div id="customerModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-purple-700 text-white flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">👥</span>
-                    <h3 class="text-sm font-extrabold tracking-wide uppercase">Customer CRM & History</h3>
+    <div id="customerModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
+            <div class="p-5 bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white flex justify-between items-center shadow-sm">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">👥</div>
+                    <div>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Customer CRM & History</h3>
+                        <p class="text-[11px] text-purple-200/80 font-medium">Customer database, loyalty points & order history</p>
+                    </div>
                 </div>
-                <button onclick="closeCustomerModal()" class="text-purple-200 hover:text-white font-bold text-xl">&times;</button>
+                <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
             </div>
-            <div class="p-4 space-y-4 overflow-y-auto flex-1 bg-gray-50">
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
                 <!-- List View -->
                 <div id="customerListView" class="space-y-3">
                     <input id="customerSearchInput" type="text" placeholder="🔍 Search customer by name or phone..."
                            oninput="renderCustomerList(this.value)"
-                           class="w-full p-2.5 text-xs border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-sm" />
+                           class="w-full p-3 text-xs border-0 ring-1 ring-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-inner font-medium transition-all" />
                     <div id="customerListContainer" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1"></div>
                 </div>
                 <!-- History View -->
                 <div id="customerHistoryView" class="hidden space-y-3">
-                    <button onclick="showCustomerListView()" class="text-xs text-purple-700 font-bold hover:underline flex items-center gap-1">← Back to Customer List</button>
+                    <button onclick="showCustomerListView()" class="text-xs text-purple-700 font-bold hover:underline flex items-center gap-1.5 p-1 rounded-lg">← Back to Customer List</button>
                     <div id="customerHistoryDetails"></div>
-                    <h4 class="text-xs font-bold text-gray-700 uppercase tracking-wide pt-2 border-t">Past Orders</h4>
+                    <h4 class="text-xs font-black text-gray-700 uppercase tracking-wider pt-2 border-t border-gray-100">Past Orders</h4>
                     <div id="customerHistoryOrders" class="space-y-2 max-h-[45vh] overflow-y-auto pr-1"></div>
                 </div>
             </div>
-            <div class="p-3 bg-gray-100 border-t text-right">
-                <button onclick="closeCustomerModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-400 transition">Close</button>
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 text-right">
+                <button onclick="closeCustomerModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Close</button>
             </div>
         </div>
     </div>
