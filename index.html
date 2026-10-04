@@ -12,6 +12,246 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
 
+        :root {
+            --ui-bg: #111827;
+            --ui-panel: #1b2432;
+            --ui-panel-raised: #232e3d;
+            --ui-border: #344154;
+            --ui-text: #e5eaf1;
+            --ui-muted: #9caabd;
+            --ui-accent: #7dd3c7;
+        }
+
+        #posScreen {
+            background: var(--ui-bg);
+            color: var(--ui-text);
+            color-scheme: dark;
+        }
+
+        #loginScreen,
+        #autoLockOverlay {
+            color-scheme: dark;
+        }
+
+        #loginScreen > div,
+        #autoLockOverlay > div {
+            background-color: var(--ui-panel) !important;
+            border: 1px solid var(--ui-border);
+            color: var(--ui-text);
+        }
+
+        #loginScreen .text-gray-900,
+        #loginScreen .text-gray-600,
+        #autoLockOverlay .text-gray-900,
+        #autoLockOverlay .text-gray-500 {
+            color: var(--ui-text) !important;
+        }
+
+        #loginScreen input,
+        #autoLockOverlay input {
+            background-color: #151e2b !important;
+            border-color: var(--ui-border) !important;
+            color: var(--ui-text) !important;
+        }
+
+        .app-topbar {
+            background-color: #182130 !important;
+            background-image: none !important;
+            border-color: var(--ui-border) !important;
+        }
+
+        [id$="Modal"] {
+            color-scheme: dark;
+        }
+
+        #posScreen .bg-white,
+        [id$="Modal"] .bg-white {
+            background-color: var(--ui-panel) !important;
+        }
+
+        #posScreen .bg-gray-50,
+        #posScreen .bg-gray-50\/50,
+        #posScreen .bg-gray-50\/80,
+        #posScreen .bg-gray-100,
+        [id$="Modal"] .bg-gray-50,
+        [id$="Modal"] .bg-gray-50\/50,
+        [id$="Modal"] .bg-gray-50\/80,
+        [id$="Modal"] .bg-gray-100 {
+            background-color: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .bg-white\/50,
+        #posScreen .bg-white\/60,
+        [id$="Modal"] .bg-white\/50,
+        [id$="Modal"] .bg-white\/60 {
+            background-color: #293548 !important;
+        }
+
+        #posScreen .bg-gradient-to-br,
+        [id$="Modal"] .bg-gradient-to-br {
+            background-image: none !important;
+            background-color: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .bg-gradient-to-r.from-amber-50 {
+            background-image: none !important;
+            background-color: #293548 !important;
+        }
+
+        #posScreen .bg-gradient-to-br .text-purple-900,
+        #posScreen .bg-gradient-to-br .text-blue-900,
+        #posScreen .bg-gradient-to-r.from-amber-50 .text-amber-900 {
+            color: #e5eaf1 !important;
+        }
+
+        #posScreen .text-gray-900,
+        #posScreen .text-gray-800,
+        #posScreen .text-gray-700,
+        [id$="Modal"] .text-gray-900,
+        [id$="Modal"] .text-gray-800,
+        [id$="Modal"] .text-gray-700 {
+            color: #e5eaf1 !important;
+        }
+
+        #posScreen .text-gray-600,
+        #posScreen .text-gray-500,
+        #posScreen .text-gray-400,
+        [id$="Modal"] .text-gray-600,
+        [id$="Modal"] .text-gray-500,
+        [id$="Modal"] .text-gray-400 {
+            color: var(--ui-muted) !important;
+        }
+
+        #posScreen .border-gray-100,
+        #posScreen .border-gray-200,
+        #posScreen .border-gray-300,
+        [id$="Modal"] .border-gray-100,
+        [id$="Modal"] .border-gray-200,
+        [id$="Modal"] .border-gray-300 {
+            border-color: var(--ui-border) !important;
+        }
+
+        #posScreen input:not([type="checkbox"]),
+        #posScreen select,
+        #posScreen textarea,
+        [id$="Modal"] input:not([type="checkbox"]),
+        [id$="Modal"] select,
+        [id$="Modal"] textarea {
+            color: var(--ui-text);
+            background-color: #151e2b;
+            border-color: var(--ui-border);
+        }
+
+        #posScreen input::placeholder,
+        [id$="Modal"] input::placeholder {
+            color: #8c9bb0;
+        }
+
+        #posScreen button:focus-visible,
+        [id$="Modal"] button:focus-visible {
+            outline-color: var(--ui-accent);
+        }
+
+        #mainPosView {
+            width: 100%;
+        }
+
+        #mainActionSidebar {
+            scrollbar-width: thin;
+            scrollbar-color: #526176 transparent;
+        }
+
+        .sidebar-action {
+            min-height: 42px;
+            color: #cbd5e1;
+            transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+        }
+
+        .sidebar-action:hover {
+            background-color: #293548;
+            color: #fff;
+            transform: translateX(2px);
+        }
+
+        .sidebar-action:active {
+            transform: scale(.98);
+        }
+
+        .analytics-chart {
+            background: #151e2b;
+            border: 1px solid var(--ui-border);
+            border-radius: 1rem;
+        }
+
+        .menu-item-card {
+            min-height: 176px;
+            border-color: var(--ui-border);
+            background: var(--ui-panel);
+        }
+
+        .menu-item-card:hover {
+            border-color: #628b89;
+            box-shadow: 0 12px 28px rgb(0 0 0 / 20%);
+            transform: translateY(-2px);
+        }
+
+        @media (min-width: 1024px) {
+            #mainActionSidebar {
+                position: fixed;
+                z-index: 35;
+                left: 0;
+                top: 74px;
+                bottom: 0;
+                width: 232px;
+                overflow-y: auto;
+            }
+
+            #mainPosView {
+                width: calc(100% - 232px);
+                margin-left: 232px;
+            }
+        }
+
+        @media (max-width: 1023px) {
+            #mainActionSidebar {
+                position: sticky;
+                top: 60px;
+                z-index: 35;
+            }
+
+            #mainActionSidebar .sidebar-groups {
+                display: flex;
+                gap: .5rem;
+                overflow-x: auto;
+                scrollbar-width: none;
+            }
+
+            #mainActionSidebar .sidebar-groups::-webkit-scrollbar {
+                display: none;
+            }
+
+            #mainActionSidebar .sidebar-group {
+                display: contents;
+            }
+
+            #mainActionSidebar .sidebar-heading,
+            #mainActionSidebar .sidebar-footer {
+                display: none;
+            }
+
+            #mainActionSidebar .sidebar-action {
+                flex: 0 0 auto;
+                min-height: 42px;
+                padding: .5rem .75rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #mainActionSidebar {
+                top: 96px;
+            }
+        }
+
         /* Mobile-first responsive design improvements */
         @media (max-width: 640px) {
             /* Improved touch targets for mobile */
@@ -183,7 +423,7 @@
     <div id="posScreen" class="hidden min-h-screen flex flex-col">
 
         <!-- TOP BAR / EMPLOYEE HEADER -->
-        <header class="bg-gradient-to-r from-indigo-900 to-purple-900 text-white p-2 sm:p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 sticky top-0 z-40 border-b border-white/10">
+        <header class="app-topbar bg-slate-900 text-white p-2 sm:p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 sticky top-0 z-40 border-b">
             <div class="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 <h1 class="text-lg sm:text-xl font-black tracking-tight flex items-center gap-1.5 sm:gap-2 drop-shadow-sm">
                     <span class="text-xl sm:text-2xl">🦅</span> <span class="bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 hidden sm:inline">Hungry Birds</span>
@@ -191,12 +431,6 @@
                 <span id="roleBadge" class="text-[9px] sm:text-[10px] px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/10 border border-white/20 font-bold uppercase tracking-widest text-indigo-100 backdrop-blur-md shadow-inner"></span>
             </div>
             <div class="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm flex-wrap justify-end w-full sm:w-auto">
-                <button data-role="OWNER" onclick="openShiftOpeningModal()" class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center gap-1 shadow-sm hover:shadow-md whitespace-nowrap">
-                    💵 <span class="hidden sm:inline">Opening Cash</span>
-                </button>
-                <button data-role="OWNER,MANAGER" onclick="openShiftCloseModal()" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center gap-1 shadow-sm hover:shadow-md whitespace-nowrap">
-                    📊 <span class="hidden sm:inline">Shift Summary</span>
-                </button>
                 <div class="hidden lg:flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span class="text-indigo-200 text-xs">Welcome, <strong id="loggedUserName" class="text-white font-bold ml-1"></strong></span>
@@ -207,13 +441,81 @@
             </div>
         </header>
 
+        <aside id="mainActionSidebar" class="bg-[#182130] border-r border-slate-700/70 px-3 py-3 lg:py-5">
+            <div class="sidebar-heading px-3 mb-4">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
+                <p class="mt-1 text-sm font-semibold text-slate-100">Quick access</p>
+            </div>
+            <nav class="sidebar-groups lg:block" aria-label="Main navigation">
+                <div class="sidebar-group mb-4">
+                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Orders</p>
+                    <button type="button" onclick="document.getElementById('menuSearch').focus()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-semibold flex items-center gap-3">
+                        <span class="w-6 text-center">🍽️</span> Counter & menu
+                    </button>
+                    <button type="button" onclick="openOnlineOrdersModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3 relative">
+                        <span class="w-6 text-center">🌐</span> Online orders
+                        <span id="onlineOrdersBadge" class="ml-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
+                    </button>
+                    <button type="button" onclick="openHeldOrdersModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">⏸️</span> Held orders
+                        <span id="heldOrdersBadge" class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
+                    </button>
+                    <button type="button" onclick="openDeliveryManagementModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">🛵</span> Deliveries
+                    </button>
+                    <button type="button" onclick="openCustomerModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">👥</span> Customers
+                    </button>
+                </div>
+
+                <div class="sidebar-group mb-4">
+                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Insights</p>
+                    <button data-role="OWNER" type="button" onclick="openSalesAnalyticsModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">📈</span> Sales analytics
+                    </button>
+                    <button data-role="OWNER" type="button" onclick="openPnlModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">🧮</span> Profit &amp; loss
+                    </button>
+                </div>
+
+                <div class="sidebar-group mb-4">
+                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Operations</p>
+                    <button data-role="OWNER,MANAGER" type="button" onclick="protectedOpenInventoryModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">📦</span> Inventory
+                    </button>
+                    <button data-role="OWNER,MANAGER" type="button" onclick="openExpenseModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">💸</span> Expenses
+                    </button>
+                    <button data-role="OWNER" type="button" onclick="openShiftOpeningModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">💵</span> Opening cash
+                    </button>
+                    <button data-role="OWNER,MANAGER" type="button" onclick="openShiftCloseModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">📊</span> Shift summary
+                    </button>
+                    <button id="connectPrinterBtn" type="button" onclick="connectPrinter()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">🖨️</span> Connect printer
+                    </button>
+                    <button data-role="OWNER" type="button" onclick="openAuditLogModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">🕵️</span> Activity log
+                    </button>
+                    <button data-role="OWNER" type="button" onclick="authenticateOwner()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">👑</span> Admin settings
+                    </button>
+                </div>
+            </nav>
+            <div class="sidebar-footer mx-3 mt-6 border-t border-slate-700 pt-4 text-[11px] leading-relaxed text-slate-400">
+                <span class="block font-semibold text-slate-300">Hungry Birds POS</span>
+                <span>Signed in as <span id="sidebarUserName" class="font-semibold text-slate-200">Staff</span></span>
+            </div>
+        </aside>
+
         <!-- MAIN POS COUNTER PANEL -->
         <div id="mainPosView" class="w-full px-2 sm:px-4 py-2 sm:py-4 grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 flex-1">
 
             <!-- LEFT PANEL: Menu & Order Cart -->
             <div class="lg:col-span-2 space-y-2.5 sm:space-y-4">
-                <!-- Navigation & Quick Tools -->
-                <div class="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 space-y-3 transition-all hover:shadow-md">
+                <!-- Counter Header -->
+                <div class="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 space-y-3 transition-all">
                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                         <div class="flex items-center gap-2 sm:gap-3">
                             <div class="bg-indigo-50 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
@@ -228,51 +530,6 @@
                             </div>
                             <input id="menuSearch" type="text" placeholder="Search menu items..." class="w-full pl-10 pr-4 py-2 sm:py-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white transition-all duration-300 shadow-inner" />
                         </div>
-                    </div>
-
-                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-1.5 sm:gap-2.5">
-                        <button onclick="openOnlineOrdersModal()" class="bg-indigo-600/10 text-indigo-700 hover:bg-indigo-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm font-medium relative">
-                            <span class="text-sm sm:text-base">🌐</span>
-                            <span class="hidden sm:inline">Web</span>
-                            <span id="onlineOrdersBadge" class="bg-red-500 text-white font-black px-1.5 py-0.5 rounded-full text-[9px] transition-all duration-300 shadow-sm absolute -top-1 -right-1 sm:static sm:px-2">0</span>
-                        </button>
-                        <button onclick="openCustomerModal()" class="bg-purple-600/10 text-purple-700 hover:bg-purple-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">👥</span>
-                            <span class="hidden sm:inline">Customers</span>
-                        </button>
-                        <button data-role="OWNER" onclick="openSalesAnalyticsModal()" class="bg-emerald-600/10 text-emerald-700 hover:bg-emerald-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">📈</span>
-                            <span class="hidden sm:inline">Analytics</span>
-                        </button>
-                        <button onclick="openHeldOrdersModal()" class="bg-orange-600/10 text-orange-700 hover:bg-orange-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm relative">
-                            <span class="text-sm sm:text-base">⏸️</span>
-                            <span class="hidden sm:inline">Held</span>
-                            <span id="heldOrdersBadge" class="bg-orange-500 text-white font-black px-1.5 py-0.5 rounded-full text-[9px] shadow-sm absolute -top-1 -right-1 sm:static sm:px-2">0</span>
-                        </button>
-                        <button onclick="openDeliveryManagementModal()" class="bg-blue-600/10 text-blue-700 hover:bg-blue-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">🛵</span>
-                            <span class="hidden sm:inline">Delivery</span>
-                        </button>
-                        <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="bg-amber-600/10 text-amber-700 hover:bg-amber-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">📦</span>
-                            <span class="hidden sm:inline">Stock</span>
-                        </button>
-                        <button data-role="OWNER" onclick="authenticateOwner()" class="bg-pink-600/10 text-pink-700 hover:bg-pink-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">👑</span>
-                            <span class="hidden sm:inline">Admin</span>
-                        </button>
-                        <button id="connectPrinterBtn" onclick="connectPrinter()" class="bg-gray-600/10 text-gray-700 hover:bg-gray-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">🖨️</span>
-                            <span class="hidden sm:inline">Print</span>
-                        </button>
-                        <button data-role="OWNER,MANAGER" onclick="openExpenseModal()" class="bg-teal-600/10 text-teal-700 hover:bg-teal-600 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">💸</span>
-                            <span class="hidden sm:inline">Expense</span>
-                        </button>
-                        <button data-role="OWNER" onclick="openAuditLogModal()" class="bg-gray-800/10 text-gray-800 hover:bg-gray-800 hover:text-white px-2 sm:px-3 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-300 flex flex-col sm:flex-row items-center justify-center gap-1 shadow-sm">
-                            <span class="text-sm sm:text-base">🕵️</span>
-                            <span class="hidden sm:inline">Log</span>
-                        </button>
                     </div>
                 </div>
 
@@ -517,64 +774,96 @@
 </div>
 
     <!-- OWNER SALES ANALYTICS MODAL -->
-    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
-        <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center shadow-inner">
-                <div class="flex items-center gap-2">
-                    <span class="text-xl">📈</span>
-                    <h3 class="text-sm font-black tracking-widest uppercase">Owner Sales Analytics</h3>
+    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-900/80 backdrop-blur-md flex justify-center items-center z-50 p-3 sm:p-5 transition-all">
+        <div class="bg-white rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-700">
+            <div class="p-5 sm:px-7 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 text-white flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <span class="w-11 h-11 rounded-2xl bg-teal-300/10 border border-teal-200/10 flex items-center justify-center text-xl">📈</span>
+                    <div>
+                        <h3 class="text-base font-bold tracking-tight">Sales analytics</h3>
+                        <p class="text-xs text-slate-300 mt-1">Performance overview · owner view</p>
+                    </div>
                 </div>
-                <button onclick="closeSalesAnalyticsModal()" class="text-emerald-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
+                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white text-2xl transition">&times;</button>
             </div>
 
-            <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="bg-white p-5 rounded-2xl border border-emerald-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-50 rounded-full blur-xl group-hover:bg-emerald-100 transition"></div>
-                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">Today's Sales</div>
-                        <div id="analyticsTodaySales" class="text-3xl font-black text-emerald-700 relative z-10 tracking-tight">Rs 0.00</div>
-                        <div class="flex justify-between items-center relative z-10">
-                            <div id="analyticsTodayCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 orders today</div>
-                            <div id="analyticsTodayDiscounts" class="text-[11px] text-red-500 font-bold">Discounts: Rs 0.00</div>
+            <div class="p-4 sm:p-7 space-y-6 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                    <article class="bg-white p-4 rounded-2xl border border-gray-100">
+                        <p class="text-xs font-semibold text-gray-500">Today</p>
+                        <p id="analyticsTodaySales" class="mt-2 text-2xl font-bold text-emerald-300">Rs 0.00</p>
+                        <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
+                            <span id="analyticsTodayCount">0 orders today</span>
+                            <span id="analyticsTodayDiscounts">Discounts: Rs 0.00</span>
                         </div>
-                    </div>
+                    </article>
+                    <article class="bg-white p-4 rounded-2xl border border-gray-100">
+                        <p class="text-xs font-semibold text-gray-500">This week</p>
+                        <p id="analyticsWeekSales" class="mt-2 text-2xl font-bold text-sky-300">Rs 0.00</p>
+                        <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
+                            <span id="analyticsWeekCount">0 orders this week</span>
+                            <span id="analyticsWeekDiscounts">Discounts: Rs 0.00</span>
+                        </div>
+                    </article>
+                    <article class="bg-white p-4 rounded-2xl border border-gray-100">
+                        <p class="text-xs font-semibold text-gray-500">This month</p>
+                        <p id="analyticsMonthSales" class="mt-2 text-2xl font-bold text-violet-300">Rs 0.00</p>
+                        <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
+                            <span id="analyticsMonthCount">0 orders this month</span>
+                            <span id="analyticsMonthDiscounts">Discounts: Rs 0.00</span>
+                        </div>
+                    </article>
+                    <article class="bg-white p-4 rounded-2xl border border-gray-100">
+                        <p class="text-xs font-semibold text-gray-500">All-time revenue</p>
+                        <p id="analyticsOverallSales" class="mt-2 text-2xl font-bold text-amber-300">Rs 0.00</p>
+                        <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
+                            <span id="analyticsOverallCount">0 overall orders recorded</span>
+                            <span id="analyticsOverallDiscounts">Total discounts: Rs 0.00</span>
+                        </div>
+                    </article>
+                </div>
 
-                    <div class="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-indigo-50 rounded-full blur-xl group-hover:bg-indigo-100 transition"></div>
-                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">This Week's Sales</div>
-                        <div id="analyticsWeekSales" class="text-3xl font-black text-indigo-700 relative z-10 tracking-tight">Rs 0.00</div>
-                        <div class="flex justify-between items-center relative z-10">
-                            <div id="analyticsWeekCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 orders this week</div>
-                            <div id="analyticsWeekDiscounts" class="text-[11px] text-red-500 font-bold">Discounts: Rs 0.00</div>
+                <section class="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100">
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                        <div>
+                            <h4 class="font-semibold text-gray-100">Sales trend</h4>
+                            <p id="analyticsChartCaption" class="text-xs text-gray-500 mt-1">Daily revenue this week</p>
+                        </div>
+                        <div class="flex gap-1 rounded-xl bg-gray-50 p-1" role="group" aria-label="Sales chart period">
+                            <button type="button" data-analytics-period="day" onclick="renderSalesAnalyticsPeriod('day')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">Day</button>
+                            <button type="button" data-analytics-period="week" onclick="renderSalesAnalyticsPeriod('week')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">Week</button>
+                            <button type="button" data-analytics-period="month" onclick="renderSalesAnalyticsPeriod('month')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">Month</button>
                         </div>
                     </div>
+                    <div id="analyticsSalesChart" class="analytics-chart min-h-[240px] p-2 sm:p-4" role="img" aria-label="Sales chart"></div>
+                </section>
 
-                    <div class="bg-white p-5 rounded-2xl border border-purple-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-purple-50 rounded-full blur-xl group-hover:bg-purple-100 transition"></div>
-                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">This Month's Sales</div>
-                        <div id="analyticsMonthSales" class="text-3xl font-black text-purple-700 relative z-10 tracking-tight">Rs 0.00</div>
-                        <div class="flex justify-between items-center relative z-10">
-                            <div id="analyticsMonthCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 orders this month</div>
-                            <div id="analyticsMonthDiscounts" class="text-[11px] text-red-500 font-bold">Discounts: Rs 0.00</div>
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <section class="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100">
+                        <div class="flex items-start justify-between gap-2 mb-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-100">Top-selling items</h4>
+                                <p class="text-xs text-gray-500 mt-1">Ranked by units sold in selected period</p>
+                            </div>
+                            <span class="text-lg" aria-hidden="true">🍽️</span>
                         </div>
-                    </div>
-
-                    <div class="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm space-y-2 relative overflow-hidden group hover:shadow-md transition">
-                        <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-amber-50 rounded-full blur-xl group-hover:bg-amber-100 transition"></div>
-                        <div class="text-xs font-black text-gray-500 uppercase tracking-widest relative z-10">Total Overall Revenue</div>
-                        <div id="analyticsOverallSales" class="text-3xl font-black text-amber-700 relative z-10 tracking-tight">Rs 0.00</div>
-                        <div class="flex justify-between items-center relative z-10">
-                            <div id="analyticsOverallCount" class="text-[11px] font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-lg">0 overall orders</div>
-                            <div id="analyticsOverallDiscounts" class="text-[11px] text-red-500 font-bold">Total discounts: Rs 0.00</div>
+                        <div id="analyticsTopItems" class="space-y-4"></div>
+                    </section>
+                    <section class="bg-white p-4 sm:p-5 rounded-2xl border border-gray-100">
+                        <div class="flex items-start justify-between gap-2 mb-4">
+                            <div>
+                                <h4 class="font-semibold text-gray-100">Top ordering customers</h4>
+                                <p class="text-xs text-gray-500 mt-1">Saved customers · ranked by orders in period</p>
+                            </div>
+                            <span class="text-lg" aria-hidden="true">👥</span>
                         </div>
-                    </div>
+                        <div id="analyticsTopCustomers" class="space-y-4"></div>
+                    </section>
                 </div>
             </div>
 
             <div class="p-4 bg-gray-50/80 border-t border-gray-100 justify-end flex">
-                <button onclick="closeSalesAnalyticsModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">
-                    Close Analytics
-                </button>
+                <button type="button" onclick="closeSalesAnalyticsModal()" class="bg-white ring-1 ring-gray-200 text-gray-200 px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-gray-50 transition">Close analytics</button>
             </div>
         </div>
     </div>

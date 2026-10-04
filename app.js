@@ -563,6 +563,201 @@ async function getSalesAnalytics() {
     };
 }
 
+function getSalesAnalyticsBuckets(period, now = new Date()) {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    let count;
+    let step;
+    let caption;
+
+    if (period === "day") {
+        count = 24;
+        step = "hour";
+        caption = `Hourly revenue · ${now.toLocaleDateString("en-PK", { day: "numeric", month: "long" })}`;
+    } else if (period === "month") {
+        start.setDate(1);
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        count = daysInMonth;
+        step = "day";
+        caption = `Daily revenue · ${now.toLocaleDateString("en-PK", { month: "long", year: "numeric" })}`;
+    } else {
+        const day = start.getDay();
+        start.setDate(start.getDate() + (day === 0 ? -6 : 1 - day));
+        count = 7;
+        step = "day";
+        caption = "Daily revenue · this week";
+    }
+
+    const buckets = Array.from({ length: count }, (_, index) => {
+        const date = new Date(start);
+        if (step === "hour") date.setHours(index);
+        else date.setDate(date.getDate() + index);
+        return {
+            start: date,
+            end: new Date(step === "hour" ? date.getTime() + 60 * 60 * 1000 : new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime()),
+            label: step === "hour"
+                ? date.toLocaleTimeString("en-PK", { hour: "numeric" })
+                : date.toLocaleDateString("en-PK", { weekday: period === "week" ? "short" : undefined, day: "numeric" }),
+            amount: 0,
+            orders: 0
+        };
+    });
+
+    return { buckets, caption };
+}
+
+function renderAnalyticsLineChart(buckets, period) {
+    const width = 760;
+    const height = 240;
+    const padding = { top: 18, right: 18, bottom: 34, left: 64 };
+    const plotWidth = width - padding.left - padding.right;
+    const plotHeight = height - padding.top - padding.bottom;
+    const maxValue = Math.max(0, ...buckets.map(bucket => bucket.amount));
+    const scaleMax = maxValue || 1;
+    const points = buckets.map((bucket, index) => ({
+        x: padding.left + (buckets.length === 1 ? plotWidth / 2 : index * plotWidth / (buckets.length - 1)),
+        y: padding.top + plotHeight - bucket.amount / scaleMax * plotHeight,
+        bucket
+    }));
+    const linePoints = points.map(point => `${point.x},${point.y}`).join(" ");
+    const areaPath = `${padding.left},${padding.top + plotHeight} ${linePoints} ${padding.left + plotWidth},${padding.top + plotHeight}`;
+    const grid = Array.from({ length: 4 }, (_, index) => {
+        const y = padding.top + index * plotHeight / 3;
+        const amount = scaleMax * (1 - index / 3);
+        const label = amount >= 1000 ? `Rs ${(amount / 1000).toFixed(1)}k` : `Rs ${Math.round(amount)}`;
+        return `<g><line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#344154" stroke-dasharray="3 5"/><text x="${padding.left - 8}" y="${y + 4}" fill="#9caabd" text-anchor="end" font-size="10">${label}</text></g>`;
+    }).join("");
+    const labelInterval = period === "month" ? 5 : period === "day" ? 3 : 1;
+    const labels = points.map((point, index) => {
+        if (index % labelInterval !== 0 && index !== points.length - 1) return "";
+        return `<text x="${point.x}" y="${height - 8}" fill="#9caabd" text-anchor="middle" font-size="10">${escapeHtml(point.bucket.label)}</text>`;
+    }).join("");
+    const dots = points.map(point => `<circle cx="${point.x}" cy="${point.y}" r="3.5" fill="#7dd3c7"><title>${escapeHtml(point.bucket.label)}: ${escapeHtml(formatAmount(point.bucket.amount))}</title></circle>`).join("");
+
+    return `<svg viewBox="0 0 ${width} ${height}" class="w-full h-auto" role="img" aria-label="Sales trend chart">
+        <title>Sales trend, total ${escapeHtml(formatAmount(buckets.reduce((sum, bucket) => sum + bucket.amount, 0)))}</title>
+        ${grid}
+        <polygon points="${areaPath}" fill="#7dd3c7" opacity="0.12"></polygon>
+        <polyline points="${linePoints}" fill="none" stroke="#7dd3c7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+        ${dots}${labels}
+    </svg>`;
+}
+
+async function renderSalesAnalytics(period = "week") {
+    const sales = await db.sales.toArray();
+    const { buckets, caption } = getSalesAnalyticsBuckets(period);
+    const start = buckets[0].start;
+    const end = buckets[buckets.length - 1].end;
+    const periodSales = sales.filter(sale => {
+        const date = new Date(sale.timestamp);
+        return Number.isFinite(date.getTime()) && date >= start && date < end;
+    });
+
+    periodSales.forEach(sale => {
+        const date = new Date(sale.timestamp);
+        const bucket = buckets.find(candidate => date >= candidate.start && date < candidate.end);
+        if (bucket) {
+            bucket.amount += Number(sale.total) || 0;
+            bucket.orders++;
+        }
+    });
+
+    setText("analyticsChartCaption", caption);
+    const chart = document.getElementById("analyticsSalesChart");
+    if (chart) {
+        chart.setAttribute("aria-label", `${caption}. ${periodSales.length} orders in selected period.`);
+        chart.innerHTML = periodSales.length
+            ? renderAnalyticsLineChart(buckets, period)
+            : `<div class="min-h-[210px] flex flex-col items-center justify-center text-center text-sm text-gray-400"><span class="text-2xl mb-2">📊</span>No sales recorded for this period</div>`;
+    }
+
+    document.querySelectorAll(".analytics-period").forEach(button => {
+        const selected = button.dataset.analyticsPeriod === period;
+        button.classList.toggle("bg-teal-400", selected);
+        button.classList.toggle("text-slate-950", selected);
+        button.classList.toggle("text-gray-400", !selected);
+        button.setAttribute("aria-pressed", String(selected));
+    });
+
+    const itemTotals = new Map();
+    const customerTotals = new Map();
+    const customers = new Map((await db.customers.toArray()).map(customer => [normalizePhone(customer.phone || customer.id), customer]));
+
+    periodSales.forEach(sale => {
+        (sale.items || []).forEach(item => {
+            const quantity = Math.max(0, (Number(item.qty) || 0) - (Number(item.refundedQty) || 0));
+            if (!quantity) return;
+            const key = String(item.name || "Unnamed item");
+            const current = itemTotals.get(key) || { name: key, quantity: 0, revenue: 0 };
+            current.quantity += quantity;
+            current.revenue += quantity * (Number(item.price) || 0);
+            itemTotals.set(key, current);
+        });
+
+        const customer = sale.customer?.phone ? sale.customer : sale.deliveryInfo;
+        const phone = normalizePhone(customer?.phone || "");
+        if (!phone) return;
+        const profile = customers.get(phone);
+        const current = customerTotals.get(phone) || {
+            phone,
+            name: customer?.name || profile?.name || "Customer",
+            orders: 0,
+            spent: 0
+        };
+        current.orders++;
+        current.spent += Number(sale.total) || 0;
+        if (!current.name || current.name === "Customer") current.name = customer?.name || profile?.name || "Customer";
+        customerTotals.set(phone, current);
+    });
+
+    renderAnalyticsRankings(
+        "analyticsTopItems",
+        Array.from(itemTotals.values()).sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue).slice(0, 5),
+        "quantity",
+        value => `${value} sold`,
+        item => formatAmount(item.revenue),
+        "No item sales in this period"
+    );
+    renderAnalyticsRankings(
+        "analyticsTopCustomers",
+        Array.from(customerTotals.values()).sort((a, b) => b.orders - a.orders || b.spent - a.spent).slice(0, 5),
+        "orders",
+        value => `${value} ${value === 1 ? "order" : "orders"}`,
+        customer => formatAmount(customer.spent),
+        "No identified customer orders in this period"
+    );
+}
+
+function renderAnalyticsRankings(containerId, entries, metricKey, metricLabel, detailLabel, emptyMessage) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    if (!entries.length) {
+        container.innerHTML = `<p class="py-8 text-center text-sm text-gray-400">${escapeHtml(emptyMessage)}</p>`;
+        return;
+    }
+
+    const maxValue = Math.max(...entries.map(entry => entry[metricKey]));
+    container.innerHTML = entries.map((entry, index) => {
+        const value = entry[metricKey];
+        const width = Math.max(6, value / maxValue * 100);
+        return `<div>
+            <div class="mb-1.5 flex items-center justify-between gap-3">
+                <div class="flex min-w-0 items-center gap-2">
+                    <span class="w-5 text-[11px] font-semibold text-gray-500">${index + 1}.</span>
+                    <span class="truncate text-sm font-semibold text-gray-100" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+                </div>
+                <span class="shrink-0 text-xs font-semibold text-teal-300">${escapeHtml(metricLabel(value))}</span>
+            </div>
+            <div class="ml-7 h-1.5 overflow-hidden rounded-full bg-slate-700"><div class="h-full rounded-full bg-teal-300" style="width:${width}%"></div></div>
+            <p class="ml-7 mt-1 text-[11px] text-gray-500">${escapeHtml(detailLabel(entry))}</p>
+        </div>`;
+    }).join("");
+}
+
+window.renderSalesAnalyticsPeriod = function (period) {
+    if (!["day", "week", "month"].includes(period)) return;
+    return renderSalesAnalytics(period);
+};
+
 window.openSalesAnalyticsModal = async function () {
     if (currentRole !== "OWNER") {
         alert("Access Denied: Owner role required to view sales analytics.");
@@ -587,6 +782,7 @@ window.openSalesAnalyticsModal = async function () {
     setText("analyticsOverallDiscounts", `Total discounts given: ${formatAmount(data.totalDiscounts)}`);
 
     document.getElementById("salesAnalyticsModal")?.classList.remove("hidden");
+    await renderSalesAnalytics("week");
 };
 
 window.closeSalesAnalyticsModal = function () {
@@ -1619,6 +1815,7 @@ function startSession(user) {
     document.getElementById("posScreen")?.classList.remove("hidden");
 
     setText("loggedUserName", user.username);
+    setText("sidebarUserName", user.displayName || user.username);
 
     const roleTitle = user.role === 'OWNER' ? '👑 OWNER' : `👤 EMPLOYEE (${user.role})`;
     setText("roleBadge", roleTitle);
@@ -3647,15 +3844,15 @@ function renderMenuGroups(grouped, searchText = "") {
                 <div class="mb-2">
                     <h4 class="text-sm font-bold uppercase tracking-wide text-gray-600">${escapeHtml(group.category.name)} <span class="text-xs font-normal text-gray-400">(${group.items.length})</span></h4>
                 </div>
-                <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                     ${group.items.map(item => `
-                        <div class="bg-white rounded-lg shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition-all" onclick="handleMenuItemClick('${escapeHtml(item.id)}')">
-                            ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" class="w-full h-14 object-cover border-b" />` : `<div class="h-14 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center text-xl">🍽️</div>`}
-                            <div class="p-2">
-                                <h3 class="font-bold text-sm text-gray-800 leading-tight">${escapeHtml(item.name)}</h3>
-                                <p class="text-indigo-600 font-bold text-xs mt-1">${formatAmount(item.price)}</p>
+                        <button type="button" title="Add ${escapeHtml(item.name)} to the order" class="menu-item-card w-full text-left rounded-2xl shadow-sm border overflow-hidden cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-teal-300" onclick="handleMenuItemClick('${escapeHtml(item.id)}')">
+                            ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" class="w-full h-24 object-cover border-b border-gray-700" />` : `<div class="h-24 bg-slate-700/50 flex items-center justify-center text-3xl">🍽️</div>`}
+                            <div class="p-3">
+                                <h3 class="font-semibold text-sm sm:text-base text-gray-100 leading-snug line-clamp-2 min-h-10">${escapeHtml(item.name)}</h3>
+                                <p class="text-teal-300 font-bold text-sm mt-2">${formatAmount(item.price)}</p>
                             </div>
-                        </div>
+                        </button>
                     `).join("")}
                 </div>
             </div>
