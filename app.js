@@ -830,13 +830,13 @@ async function renderSalesAnalytics(period = "week") {
         chart.setAttribute("aria-label", `${caption}. ${periodSales.length} orders in selected period.`);
         chart.innerHTML = periodSales.length
             ? renderAnalyticsLineChart(buckets, period)
-            : `<div class="min-h-[210px] flex flex-col items-center justify-center text-center text-sm text-gray-400"><span class="text-2xl mb-2">📊</span>No sales recorded for this period</div>`;
+            : `<div class="min-h-[210px] flex flex-col items-center justify-center text-center text-sm text-gray-400">No sales recorded for this period</div>`;
     }
 
     document.querySelectorAll(".analytics-period").forEach(button => {
         const selected = button.dataset.analyticsPeriod === period;
-        button.classList.toggle("bg-teal-400", selected);
-        button.classList.toggle("text-slate-950", selected);
+        button.classList.toggle("bg-blue-600", selected);
+        button.classList.toggle("text-gray-900", selected);
         button.classList.toggle("text-gray-400", !selected);
         button.setAttribute("aria-pressed", String(selected));
     });
@@ -1592,9 +1592,9 @@ window.renderExpenseList = async function() {
         const currentStatus = exp.status || "APPROVED"; // Legacy records default to Approved
         
         let statusBadge = '';
-        if (currentStatus === "PENDING") statusBadge = '<span class="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded text-[9px] font-bold">⏳ PENDING</span>';
-        else if (currentStatus === "APPROVED") statusBadge = '<span class="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[9px] font-bold">✅ APPROVED</span>';
-        else if (currentStatus === "REJECTED") statusBadge = '<span class="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[9px] font-bold">❌ REJECTED</span>';
+        if (currentStatus === "PENDING") statusBadge = '<span class="bg-yellow-100 text-yellow-800 px-1.5 py-0.5 rounded text-[9px] font-bold">PENDING</span>';
+        else if (currentStatus === "APPROVED") statusBadge = '<span class="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[9px] font-bold">APPROVED</span>';
+        else if (currentStatus === "REJECTED") statusBadge = '<span class="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[9px] font-bold">REJECTED</span>';
 
         return `
         <div class="flex justify-between items-center bg-white p-3 rounded-xl border shadow-sm text-xs ${currentStatus === 'REJECTED' ? 'opacity-60' : ''}">
@@ -1613,11 +1613,11 @@ window.renderExpenseList = async function() {
                 ${currentRole === 'OWNER' ? `
                     <div class="flex gap-2 mt-1">
                         ${currentStatus === 'PENDING' ? `
-                            <button onclick="updateExpenseStatus(${exp.id}, 'APPROVED')" class="text-green-600 hover:text-green-800 font-bold" title="Approve">✔️</button>
-                            <button onclick="updateExpenseStatus(${exp.id}, 'REJECTED')" class="text-red-600 hover:text-red-800 font-bold" title="Reject">✖️</button>
+                            <button onclick="updateExpenseStatus(${exp.id}, 'APPROVED')" class="text-green-600 hover:text-green-800 font-bold" title="Approve">Approve</button>
+                            <button onclick="updateExpenseStatus(${exp.id}, 'REJECTED')" class="text-red-600 hover:text-red-800 font-bold" title="Reject">Reject</button>
                         ` : ''}
-                        <button onclick="editExpense(${exp.id})" class="text-indigo-600 hover:text-indigo-800 font-bold">✏️</button>
-                        <button onclick="deleteExpense(${exp.id})" class="text-red-600 hover:text-red-800 font-bold">🗑️</button>
+                        <button onclick="editExpense(${exp.id})" class="text-indigo-600 hover:text-indigo-800 font-bold">Edit</button>
+                        <button onclick="deleteExpense(${exp.id})" class="text-red-600 hover:text-red-800 font-bold">Delete</button>
                     </div>
                 ` : ''}
             </div>
@@ -2313,7 +2313,7 @@ function startSession(user) {
     setText("loggedUserName", user.username);
     setText("sidebarUserName", user.displayName || user.username);
 
-    const roleTitle = user.role === 'OWNER' ? '👑 OWNER' : `👤 EMPLOYEE (${user.role})`;
+    const roleTitle = user.role === 'OWNER' ? 'OWNER' : `EMPLOYEE (${user.role})`;
     setText("roleBadge", roleTitle);
 
     applyRoleViews();
@@ -2527,10 +2527,10 @@ async function renderHeldOrdersList() {
 
             <div class="flex items-center justify-end gap-2 pt-1">
                 <button onclick="restoreHeldOrder(${order.id})" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">
-                    🔄 Restore to Cart
+                    Restore to Cart
                 </button>
                 <button onclick="deleteHeldOrder(${order.id})" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 font-bold px-3 py-1.5 rounded-lg transition">
-                    🗑️ Discard
+                    Discard
                 </button>
             </div>
         </div>
@@ -3002,10 +3002,10 @@ function renderOnlineOrdersList() {
         const status = order.status || "PENDING";
 
         const statusLabel = {
-            PENDING:          "⏳ Awaiting Acceptance",
-            ACCEPTED:         "✅ Accepted",
-            PREPARING:        "👨‍🍳 Preparing",
-            OUT_FOR_DELIVERY: "🛵 Out for Delivery"
+            PENDING:          "Awaiting Acceptance",
+            ACCEPTED:         "Accepted",
+            PREPARING:        "Preparing",
+            OUT_FOR_DELIVERY: "Out for Delivery"
         }[status] || status;
 
         // Delivery-only progression buttons (shown after acceptance)
@@ -3013,11 +3013,11 @@ function renderOnlineOrdersList() {
         let progressionBtn = "";
         if (isDelivery) {
             if (status === "ACCEPTED") {
-                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'PREPARING')" class="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg transition">👨‍🍳 Mark as Preparing</button>`;
+                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'PREPARING')" class="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg transition">Preparing</button>`;
             } else if (status === "PREPARING") {
-                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'OUT_FOR_DELIVERY')" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg transition">🛵 Assign to Rider</button>`;
+                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'OUT_FOR_DELIVERY')" class="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg transition">Assign to Rider</button>`;
             } else if (status === "OUT_FOR_DELIVERY") {
-                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'COMPLETED')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">✅ Mark as Delivered</button>`;
+                progressionBtn = `<button onclick="advanceOnlineOrderStatus('${escapeHtml(order.id)}', 'COMPLETED')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">Mark as Delivered</button>`;
             }
         }
 
@@ -3041,12 +3041,12 @@ function renderOnlineOrdersList() {
                 ${escapeHtml((order.items || []).map(i => `${escapeHtml(i.name)} x${i.qty}`).join(", "))}
             </div>
 
-            ${order.customer?.address ? `<div class="text-[11px] text-gray-500">📍 ${escapeHtml(order.customer.address)}</div>` : ""}
+            ${order.customer?.address ? `<div class="text-[11px] text-gray-500">${escapeHtml(order.customer.address)}</div>` : ""}
 
             <div class="flex items-center justify-end gap-2 pt-1 flex-wrap">
                 ${isPending ? `
-                    <button onclick="acceptOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">✅ Accept to Cart</button>
-                    <button onclick="rejectOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 font-bold px-3 py-1.5 rounded-lg transition">✖️ Reject</button>
+                    <button onclick="acceptOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition">Accept to Cart</button>
+                    <button onclick="rejectOnlineOrder('${escapeHtml(order.id)}')" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 font-bold px-3 py-1.5 rounded-lg transition">Reject</button>
                 ` : progressionBtn}
             </div>
         </div>
@@ -3056,13 +3056,13 @@ function renderOnlineOrdersList() {
     let html = "";
 
     if (pendingOrders.length > 0) {
-        html += `<div class="text-[10px] font-bold uppercase tracking-widest text-blue-700 mb-1">🔔 New Orders (${pendingOrders.length})</div>`;
+        html += `<div class="text-[10px] font-bold uppercase tracking-widest text-blue-700 mb-1">New Orders (${pendingOrders.length})</div>`;
         html += pendingOrders.map(o => orderCard(o, true)).join("");
     }
 
     if (inProgressOrders.length > 0) {
         if (pendingOrders.length > 0) html += `<div class="my-2 border-t border-gray-200"></div>`;
-        html += `<div class="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">🚀 In Progress (${inProgressOrders.length})</div>`;
+        html += `<div class="text-[10px] font-bold uppercase tracking-widest text-amber-700 mb-1">In Progress (${inProgressOrders.length})</div>`;
         html += inProgressOrders.map(o => orderCard(o, false)).join("");
     }
 
@@ -3224,7 +3224,7 @@ const lookupCartCustomerDebounced = debounce(async (phone) => {
         if (nameInput && !nameInput.value.trim()) nameInput.value = existing.name || "";
         cartCustomerLoyaltyBalance = Number(existing.loyaltyPoints) || 0;
         if (infoEl) {
-            infoEl.textContent = `Returning customer: ${existing.totalOrders || 0} orders • Total spent ${formatAmount(existing.totalSpent || 0)} • ⭐ ${cartCustomerLoyaltyBalance} points`;
+            infoEl.textContent = `Returning customer: ${existing.totalOrders || 0} orders • Total spent ${formatAmount(existing.totalSpent || 0)} • ${cartCustomerLoyaltyBalance} points`;
             infoEl.classList.remove("hidden");
         }
         if (redeemBox) {
@@ -3406,7 +3406,7 @@ window.renderCustomerList = async function (searchText = "") {
             </div>
             <div class="text-right">
                 <div class="font-bold text-purple-700 text-xs">${formatAmount(c.totalSpent || 0)}</div>
-                <div class="text-[10px] text-gray-500">${c.totalOrders || 0} orders • ⭐ ${c.loyaltyPoints || 0} pts</div>
+                <div class="text-[10px] text-gray-500">${c.totalOrders || 0} orders • ${c.loyaltyPoints || 0} pts</div>
             </div>
         </div>
     `).join("");
@@ -3428,7 +3428,7 @@ window.viewCustomerHistory = async function (phone) {
                 <div class="flex gap-4 mt-2 text-xs">
                     <div><strong class="text-purple-700">${customer.totalOrders || 0}</strong> orders</div>
                     <div><strong class="text-purple-700">${formatAmount(customer.totalSpent || 0)}</strong> total spent</div>
-                    <div><strong class="text-purple-700">⭐ ${customer.loyaltyPoints || 0}</strong> points</div>
+                    <div><strong class="text-purple-700">${customer.loyaltyPoints || 0}</strong> points</div>
                 </div>
             </div>
         `;
@@ -4479,7 +4479,7 @@ async function renderOwnerFoodList() {
     container.innerHTML = menu.map(item => `
         <div class="flex justify-between items-center bg-white p-3 rounded-lg border shadow-sm gap-3">
             <div class="flex items-center gap-3 min-w-0 flex-1">
-                ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" class="w-12 h-12 object-cover rounded-lg border" />` : `<div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center text-lg">🍽️</div>`}
+                ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="${escapeHtml(item.name)}" class="w-12 h-12 object-cover rounded-lg border" />` : `<div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center text-lg">Menu</div>`}
                 <div class="min-w-0">
                     <div class="font-bold text-sm text-gray-800 truncate">${escapeHtml(item.name)}</div>
                     <div class="text-xs text-gray-500">${formatAmount(item.price)}</div>
@@ -4679,11 +4679,11 @@ function renderMenuGroups(grouped, searchText = "") {
                 </div>
                 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                     ${group.items.map(item => `
-                        <button type="button" title="Add ${escapeHtml(item.name)} to the order" class="menu-item-card w-full text-left rounded-2xl shadow-sm border overflow-hidden cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-teal-300" onclick="handleMenuItemClick('${escapeHtml(item.id)}')">
-                            ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" class="w-full h-24 object-cover border-b border-gray-700" />` : `<div class="h-24 bg-slate-700/50 flex items-center justify-center text-3xl">🍽️</div>`}
+                        <button type="button" title="Add ${escapeHtml(item.name)} to the order" class="menu-item-card w-full text-left rounded-2xl shadow-sm border overflow-hidden cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-blue-300" onclick="handleMenuItemClick('${escapeHtml(item.id)}')">
+                            ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" class="w-full h-24 object-cover border-b border-gray-700" />` : `<div class="h-24 bg-gray-300 flex items-center justify-center text-3xl">Menu</div>`}
                             <div class="p-3">
-                                <h3 class="font-semibold text-sm sm:text-base text-gray-100 leading-snug line-clamp-2 min-h-10">${escapeHtml(item.name)}</h3>
-                                <p class="text-teal-300 font-bold text-sm mt-2">${formatAmount(item.price)}</p>
+                                <h3 class="font-semibold text-sm sm:text-base text-gray-800 leading-snug line-clamp-2 min-h-10">${escapeHtml(item.name)}</h3>
+                                <p class="text-blue-700 font-bold text-sm mt-2">${formatAmount(item.price)}</p>
                             </div>
                         </button>
                     `).join("")}
@@ -5685,17 +5685,17 @@ async function renderReceiptSearchResults(query, requestVersion) {
                             </div>
                             <div class="mt-0.5 text-[11px] text-gray-500">${escapeHtml(new Date(sale.timestamp).toLocaleString())} • By ${escapeHtml(sale.serverUser || "Staff")}</div>
                         </div>
-                        <div class="shrink-0 font-bold text-emerald-700">${formatAmount(sale.total || 0)}</div>
+                        <div class="shrink-0 font-bold text-green-700">${formatAmount(sale.total || 0)}</div>
                     </div>
-                    <div class="text-gray-700 text-[11px]">👤 <strong>${escapeHtml(customerName)}</strong> <span class="text-gray-500">(${escapeHtml(customerPhone)})</span></div>
+                    <div class="text-gray-600 text-[11px]"><strong>${escapeHtml(customerName)}</strong> <span class="text-gray-500">(${escapeHtml(customerPhone)})</span></div>
                     <div class="flex flex-wrap items-center justify-end gap-1.5 border-t border-gray-100 pt-1.5">
-                        <button type="button" onclick="downloadReceiptPDF(${Number(sale.id)})" class="rounded bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">📄 PDF</button>
-                        <button type="button" onclick="printSavedReceipt(${Number(sale.id)})" class="rounded bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-700 hover:bg-teal-100">🖨️ Reprint</button>
-                        <button type="button" onclick="shareReceipt(${Number(sale.id)})" class="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">📲 Share</button>
-                        <button type="button" onclick="editSale(${Number(sale.id)})" class="rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-100">✏️ Edit</button>
+                        <button type="button" onclick="downloadReceiptPDF(${Number(sale.id)})" class="rounded bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">PDF</button>
+                        <button type="button" onclick="printSavedReceipt(${Number(sale.id)})" class="rounded bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-700 hover:bg-teal-100">Reprint</button>
+                        <button type="button" onclick="shareReceipt(${Number(sale.id)})" class="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">Share</button>
+                        <button type="button" onclick="editSale(${Number(sale.id)})" class="rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-100">Edit</button>
                         ${(currentRole === 'OWNER' || currentRole === 'MANAGER') && sale.refundStatus !== 'FULL' ? `
-                        <button type="button" onclick="openRefundModal(${Number(sale.id)})" class="rounded bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-700 hover:bg-orange-100">💵 Refund</button>` : ''}
-                        <button type="button" onclick="deleteSale(${Number(sale.id)})" class="rounded bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100">🗑️ Delete</button>
+                        <button type="button" onclick="openRefundModal(${Number(sale.id)})" class="rounded bg-orange-50 px-2 py-1 text-[10px] font-bold text-orange-700 hover:bg-orange-100">Refund</button>` : ''}
+                        <button type="button" onclick="deleteSale(${Number(sale.id)})" class="rounded bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100">Delete</button>
                     </div>
                 </div>
             `;
@@ -5780,28 +5780,28 @@ window.renderRecentSales = async function () {
                             </div>
                         </div>
                     </div>
-                    <div class="font-bold text-emerald-700 text-xs">${formatAmount(sale.total || 0)}</div>
+                    <div class="font-bold text-green-700 text-xs">${formatAmount(sale.total || 0)}</div>
                 </div>
 
                 <div class="flex items-center justify-end gap-1.5 pt-1 border-t border-gray-200">
                     <button onclick="printSavedReceipt(${Number(sale.id)})" title="Reprint 80 mm receipt" class="text-[10px] bg-teal-50 text-teal-700 hover:bg-teal-100 font-bold px-2 py-1 rounded flex items-center gap-1 transition">
-                        🖨️ Reprint
+                        Reprint
                     </button>
                     <button onclick="downloadReceiptPDF(${sale.id})" title="Download Receipt PDF" class="text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold px-2 py-1 rounded flex items-center gap-1 transition">
-                        📄 PDF
+                        PDF
                     </button>
                     <button onclick="shareReceipt(${sale.id})" title="Share Receipt via WhatsApp/Native" class="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-2 py-1 rounded flex items-center gap-1 transition">
-                        📲 Share
+                        Share
                     </button>
                     <button onclick="editSale(${sale.id})" title="Re-open into cart for editing" class="text-[10px] bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold px-2 py-1 rounded transition">
-                        ✏️ Edit
+                        Edit
                     </button>
                     ${(currentRole === 'OWNER' || currentRole === 'MANAGER') && sale.refundStatus !== 'FULL' ? `
                     <button onclick="openRefundModal(${sale.id})" title="Refund items from this order" class="text-[10px] bg-orange-50 text-orange-700 hover:bg-orange-100 font-bold px-2 py-1 rounded transition">
-                        💵 Refund
+                        Refund
                     </button>` : ''}
                     <button onclick="deleteSale(${sale.id})" title="Delete receipt record" class="text-[10px] bg-red-50 text-red-600 hover:bg-red-100 font-bold px-2 py-1 rounded transition">
-                        🗑️ Delete
+                        Delete
                     </button>
                 </div>
             </div>
@@ -6007,7 +6007,7 @@ window.shareReceipt = async function (saleId) {
     const sale = await db.sales.get(saleId);
     if (!sale) return alert("Sale record not found.");
 
-    let text = `🧾 *Hungry Birds Receipt*\n`;
+    let text = `*Hungry Birds Receipt*\n`;
     text += `*Phone:* 0325-7867774\n`;
     text += `*Order ID:* #${sale.id}\n`;
     text += `*Date:* ${new Date(sale.timestamp).toLocaleString()}\n`;
@@ -6525,7 +6525,7 @@ async function renderLowStockAlert() {
 
     const names = lowStockItems.slice(0, 3).map(item => item.name).join(", ");
     const extra = lowStockItems.length > 3 ? ` +${lowStockItems.length - 3} more` : "";
-    setText("lowStockBannerText", `⚠️ ${lowStockItems.length} item${lowStockItems.length === 1 ? "" : "s"} low on stock: ${names}${extra}`);
+    setText("lowStockBannerText", `! ${lowStockItems.length} item${lowStockItems.length === 1 ? "" : "s"} low on stock: ${names}${extra}`);
     banner.classList.remove("hidden");
 }
 
@@ -6663,11 +6663,11 @@ window.renderStaffList = async function () {
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${s.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}">${escapeHtml(s.status || "ACTIVE")}</span>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">${escapeHtml(s.role || "")}</span>
                 </div>
-                <div class="text-[11px] text-gray-500 mt-1">📞 ${escapeHtml(s.phone || "—")} &nbsp;•&nbsp; Joined ${escapeHtml(s.joinDate || "—")} &nbsp;•&nbsp; Salary <span class="font-bold text-gray-700">${formatAmount(s.monthlySalary || 0)}</span></div>
+                <div class="text-[11px] text-gray-500 mt-1"> ${escapeHtml(s.phone || "—")} &nbsp;•&nbsp; Joined ${escapeHtml(s.joinDate || "—")} &nbsp;•&nbsp; Salary <span class="font-bold text-gray-700">${formatAmount(s.monthlySalary || 0)}</span></div>
             </div>
             <div class="flex gap-1.5 shrink-0">
-                <button onclick="editStaff(${Number(s.id)})" class="rounded-lg bg-amber-50 px-3 py-1.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100 transition">✏️ Edit</button>
-                <button onclick="deleteStaff(${Number(s.id)})" class="rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">🗑️ Delete</button>
+                <button onclick="editStaff(${Number(s.id)})" class="rounded-lg bg-amber-50 px-3 py-1.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100 transition">Edit</button>
+                <button onclick="deleteStaff(${Number(s.id)})" class="rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">Delete</button>
             </div>
         </div>`).join("");
 };
@@ -6708,10 +6708,10 @@ window.renderAttendanceList = async function () {
                 <span class="text-[10px] text-gray-400 font-bold ml-1">${escapeHtml(s.role || "")}</span>
             </div>
             <div class="flex flex-wrap gap-1.5">
-                ${btn(s, "PRESENT", "✅ Present", "bg-emerald-500 text-white shadow-sm")}
-                ${btn(s, "ABSENT", "❌ Absent", "bg-red-500 text-white shadow-sm")}
-                ${btn(s, "LATE", "⏰ Late", "bg-amber-500 text-white shadow-sm")}
-                ${btn(s, "HALF_DAY", "🌗 Half Day", "bg-blue-500 text-white shadow-sm")}
+                ${btn(s, "PRESENT", "Present", "bg-emerald-500 text-white shadow-sm")}
+                ${btn(s, "ABSENT", "Absent", "bg-red-500 text-white shadow-sm")}
+                ${btn(s, "LATE", "Late", "bg-amber-500 text-white shadow-sm")}
+                ${btn(s, "HALF_DAY", "Half Day", "bg-blue-500 text-white shadow-sm")}
             </div>
         </div>`).join("");
 
@@ -6798,12 +6798,12 @@ window.renderLeaveList = async function () {
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">${escapeHtml(l.type || "CASUAL")}</span>
                     ${badge(l.status)}
                 </div>
-                <div class="text-[11px] text-gray-500 mt-1">${escapeHtml(l.startDate || "")} → ${escapeHtml(l.endDate || "")}${l.reason ? ` &nbsp;•&nbsp; ${escapeHtml(l.reason)}` : ""}</div>
+                <div class="text-[11px] text-gray-500 mt-1">${escapeHtml(l.startDate || "")} to ${escapeHtml(l.endDate || "")}${l.reason ? ` &nbsp;•&nbsp; ${escapeHtml(l.reason)}` : ""}</div>
             </div>
             ${l.status === "PENDING" ? `
             <div class="flex gap-1.5 shrink-0">
-                <button onclick="updateLeaveStatus(${Number(l.id)}, 'APPROVED')" class="rounded-lg bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition">✔ Approve</button>
-                <button onclick="updateLeaveStatus(${Number(l.id)}, 'REJECTED')" class="rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">✖ Reject</button>
+                <button onclick="updateLeaveStatus(${Number(l.id)}, 'APPROVED')" class="rounded-lg bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition">Approve</button>
+                <button onclick="updateLeaveStatus(${Number(l.id)}, 'REJECTED')" class="rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">Reject</button>
             </div>` : ""}
         </div>`).join("");
 };
@@ -6813,7 +6813,7 @@ window.updateLeaveStatus = async function (leaveId, status) {
     if (!leave) return;
     await db.leaves.update(Number(leaveId), { status, decidedBy: currentUser?.username || "Staff", decidedAt: new Date().toISOString() });
     const s = await db.staff.get(leave.staffId);
-    logAudit(`LEAVE_${status}`, `Leave ${status.toLowerCase()} for ${s?.name || leave.staffId} (${leave.startDate} → ${leave.endDate})`);
+    logAudit(`LEAVE_${status}`, `Leave ${status.toLowerCase()} for ${s?.name || leave.staffId} (${leave.startDate} to ${leave.endDate})`);
     await renderLeaveList();
 };
 
@@ -6861,7 +6861,7 @@ window.renderPayrollList = async function () {
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="font-bold text-gray-800 text-sm">${escapeHtml(s.name)}</span>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">${escapeHtml(s.role || "")}</span>
-                    ${paidIds.has(s.id) ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">✔ PAID</span>' : ""}
+                    ${paidIds.has(s.id) ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">PAID</span>' : ""}
                 </div>
                 <div class="text-[11px] text-gray-500 mt-1">
                     Base <span class="font-bold text-gray-700">${formatAmount(s.monthlySalary || 0)}</span>
@@ -6871,7 +6871,7 @@ window.renderPayrollList = async function () {
             </div>
             ${paidIds.has(s.id)
                 ? `<span class="text-[10px] font-bold text-gray-400 shrink-0">Already paid</span>`
-                : `<button onclick="paySalary(${Number(s.id)})" class="shrink-0 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 text-[10px] font-black hover:from-emerald-600 hover:to-emerald-700 transition shadow-sm">💵 Pay Salary</button>`}
+                : `<button onclick="paySalary(${Number(s.id)})" class="shrink-0 rounded-xl bg-emerald-600 text-white px-4 py-2 text-[10px] font-black hover:bg-emerald-700 transition shadow-sm">Pay Salary</button>`}
         </div>`;
     }));
 
@@ -6958,7 +6958,7 @@ window.renderAdvanceList = async function () {
                 <div class="text-[10px] text-gray-400 mt-0.5">${escapeHtml(a.date || "")}${a.note ? ` • ${escapeHtml(a.note)}` : ""}</div>
             </div>
             <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${a.status === "SETTLED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}">${escapeHtml(a.status || "PENDING")}</span>
-            <button onclick="deleteAdvance(${Number(a.id)})" class="shrink-0 rounded-lg bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">🗑️</button>
+            <button onclick="deleteAdvance(${Number(a.id)})" class="shrink-0 rounded-lg bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">Delete</button>
         </div>`).join("");
 };
 

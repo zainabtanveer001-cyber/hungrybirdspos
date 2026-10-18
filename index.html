@@ -6,70 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hungry Birds Restaurant POS v4.0</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="tailwind.css">
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
     <style>
-        body { font-family: 'Arial Narrow', system-ui, sans-serif; }
+        body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
         :root {
-            --ui-bg: #222831;
-            --ui-panel: #303640;
-            --ui-panel-raised: #393f4a;
-            --ui-border: #4a535e;
-            --ui-text: #eeeeee;
-            --ui-muted: #b8c2cc;
-            --ui-accent: #00adb5;
-            --ui-accent-soft: #17464a;
-            --ui-success: #16a34a;
-            --ui-warning: #d97706;
-            --ui-danger: #dc2626;
+            --ui-bg: #f8fafc;
+            --ui-panel: #ffffff;
+            --ui-panel-raised: #f1f5f9;
+            --ui-border: #e2e8f0;
+            --ui-text: #0f172a;
+            --ui-muted: #64748b;
+            --ui-accent: #2563eb;
+            --ui-accent-soft: #eff6ff;
+            --ui-success: #10b981;
+            --ui-warning: #f59e0b;
+            --ui-danger: #ef4444;
         }
 
-        #posScreen {
-            background: var(--ui-bg);
-            color: var(--ui-text);
-            color-scheme: dark;
-        }
-
+        #posScreen,
         #loginScreen,
-        #autoLockOverlay {
-            color-scheme: dark;
-            color: var(--ui-text);
-        }
-
-        #loginScreen > div,
-        #autoLockOverlay > div {
-            background-color: var(--ui-panel) !important;
-            border: 1px solid var(--ui-border);
-            color: var(--ui-text);
-        }
-
-        #loginScreen .text-gray-900,
-        #loginScreen .text-gray-600,
-        #autoLockOverlay .text-gray-900,
-        #autoLockOverlay .text-gray-500 {
-            color: var(--ui-text) !important;
-        }
-
-        #loginScreen .text-indigo-600 {
-            color: #55d6d9 !important;
-        }
-
-        #loginScreen input,
-        #autoLockOverlay input {
-            background-color: #151e2b !important;
-            border-color: var(--ui-border) !important;
-            color: var(--ui-text) !important;
-        }
-
-        .app-topbar {
-            background-color: #182130 !important;
-            background-image: none !important;
-            border-color: var(--ui-border) !important;
-        }
-
+        #autoLockOverlay,
         [id$="Modal"] {
-            color-scheme: dark;
+            background: var(--ui-bg);
             color: var(--ui-text);
         }
 
@@ -95,500 +55,41 @@
 
         #posScreen .bg-white\/50,
         #posScreen .bg-white\/60,
+        #posScreen .bg-white\/95,
         [id$="Modal"] .bg-white\/50,
-        [id$="Modal"] .bg-white\/60 {
-            background-color: #293548 !important;
+        [id$="Modal"] .bg-white\/60,
+        [id$="Modal"] .bg-white\/95 {
+            background-color: var(--ui-panel-raised) !important;
         }
 
         #posScreen .bg-gradient-to-br,
-        [id$="Modal"] .bg-gradient-to-br {
+        #posScreen .bg-gradient-to-r,
+        [id$="Modal"] .bg-gradient-to-br,
+        [id$="Modal"] .bg-gradient-to-r {
             background-image: none !important;
             background-color: var(--ui-panel-raised) !important;
         }
 
-        #posScreen .bg-gradient-to-r.from-amber-50 {
-            background-image: none !important;
-            background-color: #293548 !important;
+        #posScreen .bg-gradient-to-br.from-green-50,
+        [id$="Modal"] .bg-gradient-to-br.from-green-50 {
+            background: #f0fdf4 !important;
         }
-
-        #posScreen .bg-gradient-to-br .text-purple-900,
-        #posScreen .bg-gradient-to-br .text-blue-900,
-        #posScreen .bg-gradient-to-r.from-amber-50 .text-amber-900 {
-            color: #e5eaf1 !important;
+        #posScreen .bg-gradient-to-br.from-red-50,
+        [id$="Modal"] .bg-gradient-to-br.from-red-50 {
+            background: #fef2f2 !important;
         }
-
-        #posScreen .text-gray-900,
-        #posScreen .text-gray-800,
-        #posScreen .text-gray-700,
-        [id$="Modal"] .text-gray-900,
-        [id$="Modal"] .text-gray-800,
-        [id$="Modal"] .text-gray-700 {
-            color: #e5eaf1 !important;
+        #posScreen .bg-gradient-to-r.from-indigo-50,
+        [id$="Modal"] .bg-gradient-to-r.from-indigo-50 {
+            background: #eff6ff !important;
         }
-
-        #posScreen .text-gray-600,
-        #posScreen .text-gray-500,
-        #posScreen .text-gray-400,
-        [id$="Modal"] .text-gray-600,
-        [id$="Modal"] .text-gray-500,
-        [id$="Modal"] .text-gray-400 {
-            color: var(--ui-muted) !important;
-        }
-
-        #posScreen .border-gray-100,
-        #posScreen .border-gray-200,
-        #posScreen .border-gray-300,
-        [id$="Modal"] .border-gray-100,
-        [id$="Modal"] .border-gray-200,
-        [id$="Modal"] .border-gray-300 {
-            border-color: var(--ui-border) !important;
-        }
-
-        #posScreen input:not([type="checkbox"]),
-        #posScreen select,
-        #posScreen textarea,
-        [id$="Modal"] input:not([type="checkbox"]),
-        [id$="Modal"] select,
-        [id$="Modal"] textarea {
-            color: var(--ui-text);
-            background-color: #151e2b;
-            border-color: var(--ui-border);
-        }
-
-        #posScreen input::placeholder,
-        [id$="Modal"] input::placeholder {
-            color: #8c9bb0;
-        }
-
-        #posScreen button:focus-visible,
-        [id$="Modal"] button:focus-visible {
-            outline-color: var(--ui-accent);
-        }
-
-        #mainPosView {
-            width: 100%;
-        }
-
-        #mainActionSidebar {
-            scrollbar-width: thin;
-            scrollbar-color: #526176 transparent;
-        }
-
-        .sidebar-action {
-            min-height: 42px;
-            color: #cbd5e1;
-            transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
-        }
-
-        .sidebar-action:hover {
-            background-color: #293548;
-            color: #fff;
-            transform: translateX(2px);
-        }
-
-        .sidebar-action:active {
-            transform: scale(.98);
-        }
-
-        .analytics-chart {
-            background: #151e2b;
-            border: 1px solid var(--ui-border);
-            border-radius: 1rem;
-        }
-
-        .menu-item-card {
-            min-height: 176px;
-            border-color: var(--ui-border);
-            background: var(--ui-panel);
-        }
-
-        .menu-item-card:hover {
-            border-color: #628b89;
-            box-shadow: 0 12px 28px rgb(0 0 0 / 20%);
-            transform: translateY(-2px);
-        }
-
-        @media (min-width: 1024px) {
-            #mainActionSidebar {
-                position: fixed;
-                z-index: 35;
-                left: 0;
-                top: 74px;
-                bottom: 0;
-                width: 232px;
-                overflow-y: auto;
-            }
-
-            #mainPosView {
-                width: calc(100% - 232px);
-                margin-left: 232px;
-            }
-        }
-
-        @media (max-width: 1023px) {
-            #mainActionSidebar {
-                position: sticky;
-                top: 60px;
-                z-index: 35;
-            }
-
-            #mainActionSidebar .sidebar-groups {
-                display: flex;
-                gap: .5rem;
-                overflow-x: auto;
-                scrollbar-width: none;
-            }
-
-            #mainActionSidebar .sidebar-groups::-webkit-scrollbar {
-                display: none;
-            }
-
-            #mainActionSidebar .sidebar-group {
-                display: contents;
-            }
-
-            #mainActionSidebar .sidebar-heading,
-            #mainActionSidebar .sidebar-footer {
-                display: none;
-            }
-
-            #mainActionSidebar .sidebar-action {
-                flex: 0 0 auto;
-                min-height: 42px;
-                padding: .5rem .75rem;
-            }
-        }
-
-        @media (max-width: 640px) {
-            #mainActionSidebar {
-                top: 96px;
-                padding: 8px 12px;
-            }
-
-            #mainActionSidebar .sidebar-groups {
-                display: none;
-            }
-
-            #mainActionSidebar .mobile-navigation-select {
-                display: block;
-                width: 100%;
-                min-height: 44px;
-                padding: 8px 36px 8px 12px;
-                border: 1px solid var(--ui-border);
-                border-radius: 8px;
-                color: var(--ui-text);
-                background-color: var(--ui-panel);
-                font-size: 14px;
-            }
-
-            #mainActionSidebar .mobile-navigation-select optgroup,
-            #mainActionSidebar .mobile-navigation-select option {
-                color: var(--ui-text);
-                background-color: var(--ui-panel);
-            }
-        }
-
-        /* Mobile-first responsive design improvements */
-        @media (max-width: 640px) {
-            /* Improved touch targets for mobile */
-            button, .clickable {
-                min-height: 44px;
-                min-width: 44px;
-            }
-
-            /* Better spacing for mobile */
-            .mobile-stack > * + * {
-                margin-top: 0.75rem;
-            }
-
-            /* Prevent horizontal scroll on mobile */
-            body {
-                overflow-x: hidden;
-            }
-
-            /* Optimize modal sizing for mobile */
-            .modal-content {
-                max-height: calc(100vh - 2rem);
-                margin: 1rem;
-            }
-
-            /* Better text readability on mobile */
-            .text-mobile-readable {
-                font-size: 14px;
-                line-height: 1.5;
-            }
-
-            /* Improved form controls for mobile */
-            input[type="text"], input[type="number"], input[type="password"], select, textarea {
-                font-size: 16px; /* Prevents zoom on iOS */
-                padding: 12px;
-            }
-
-            /* Better grid spacing on mobile */
-            .mobile-grid {
-                gap: 0.5rem;
-            }
-
-            /* Sticky footer for mobile */
-            .mobile-sticky-footer {
-                position: sticky;
-                bottom: 0;
-                background: white;
-                border-top: 1px solid #e5e7eb;
-                padding: 1rem;
-                margin: -1rem;
-                margin-top: 1rem;
-            }
-        }
-
-        /* Custom scrollbar styles */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        /* Hide scrollbar for category filters on mobile */
-        @media (max-width: 640px) {
-            .scrollbar-none::-webkit-scrollbar {
-                display: none;
-            }
-            .scrollbar-none {
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-            }
-        }
-
-        /* Improved touch feedback */
-        .touch-feedback:active {
-            transform: scale(0.98);
-            transition: transform 0.1s ease;
-        }
-
-        /* Better focus states for accessibility */
-        button:focus-visible,
-        input:focus-visible,
-        select:focus-visible {
-            outline: 2px solid #3b82f6;
-            outline-offset: 2px;
-        }
-
-        /* ── Noir Teal POS system ── */
-        #posScreen,
-        #loginScreen,
-        [id$="Modal"] {
-            font-family: 'Arial Narrow', system-ui, sans-serif;
-        }
-
-        #posScreen {
-            min-height: 100vh;
-            background: var(--ui-bg);
-            color: var(--ui-text);
-        }
-
-        #posScreen .font-black,
-        #posScreen .font-extrabold,
-        [id$="Modal"] .font-black,
-        [id$="Modal"] .font-extrabold {
-            font-weight: 700;
-        }
-
-        #posScreen .tracking-widest,
-        [id$="Modal"] .tracking-widest {
-            letter-spacing: .04em;
-        }
-
-        .app-topbar {
-            min-height: 64px;
-            background: #1d232c !important;
-            border-color: var(--ui-border) !important;
-            box-shadow: 0 1px 0 rgb(0 0 0 / 16%);
-        }
-
-        #mainActionSidebar {
-            background: #1d232c !important;
-            border-color: var(--ui-border) !important;
-        }
-
-        #mainActionSidebar .sidebar-heading {
-            color: #9eabb8;
-        }
-
-        #mainActionSidebar .sidebar-footer {
-            border-color: var(--ui-border);
-            color: #9eabb8;
-        }
-
-        .sidebar-action {
-            min-height: 40px;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            color: #d6dde4;
-            font-size: 13px;
-            transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
-        }
-
-        .sidebar-action:hover {
-            transform: none;
-            color: #fff;
-            background: var(--ui-accent-soft);
-            border-color: rgb(0 173 181 / 28%);
-        }
-
-        .mobile-navigation-select {
-            display: none;
-        }
-
-        #mainPosView {
-            min-width: 0;
-            padding: 24px;
-            gap: 16px;
-            background: var(--ui-bg);
-        }
-
-        #posScreen .bg-white,
-        [id$="Modal"] .bg-white {
-            background-color: var(--ui-panel) !important;
-        }
-
-        #posScreen .bg-gray-50,
-        #posScreen .bg-gray-50\/50,
-        #posScreen .bg-gray-50\/80,
-        #posScreen .bg-gray-100,
-        [id$="Modal"] .bg-gray-50,
-        [id$="Modal"] .bg-gray-50\/50,
-        [id$="Modal"] .bg-gray-50\/80,
-        [id$="Modal"] .bg-gray-100 {
-            background-color: #272d36 !important;
-        }
-
-        #posScreen .bg-white\/50,
-        #posScreen .bg-white\/60,
-        [id$="Modal"] .bg-white\/50,
-        [id$="Modal"] .bg-white\/60 {
-            background-color: #3a424d !important;
-        }
-
-        #posScreen .bg-gradient-to-br,
-        [id$="Modal"] .bg-gradient-to-br {
-            background: var(--ui-panel-raised) !important;
-        }
-
-        #posScreen .bg-gradient-to-r:not(button),
-        [id$="Modal"] .bg-gradient-to-r:not(button) {
-            background: var(--ui-panel-raised) !important;
-        }
-
-        #posScreen .bg-green-100,
-        #posScreen .bg-emerald-100,
-        #posScreen .bg-teal-100,
-        #posScreen .bg-red-100,
-        #posScreen .bg-rose-100,
-        #posScreen .bg-orange-100,
-        [id$="Modal"] .bg-green-100,
-        [id$="Modal"] .bg-emerald-100,
-        [id$="Modal"] .bg-teal-100,
-        [id$="Modal"] .bg-red-100,
-        [id$="Modal"] .bg-rose-100,
-        [id$="Modal"] .bg-orange-100 {
-            background: var(--ui-panel-raised) !important;
+        #posScreen .bg-gradient-to-br.from-amber-50,
+        [id$="Modal"] .bg-gradient-to-br.from-amber-50 {
+            background: #fffbeb !important;
         }
 
         #posScreen .bg-indigo-50,
-        #posScreen .bg-indigo-100,
-        #posScreen .bg-purple-50,
-        #posScreen .bg-purple-100,
-        #posScreen .bg-blue-50,
-        #posScreen .bg-blue-100,
-        #posScreen .bg-amber-50,
-        #posScreen .bg-amber-100,
-        #posScreen .bg-green-50,
-        #posScreen .bg-emerald-50,
-        #posScreen .bg-teal-50,
-        #posScreen .bg-red-50,
-        #posScreen .bg-rose-50,
-        #posScreen .bg-orange-50,
-        #posScreen .bg-cyan-50,
-        [id$="Modal"] .bg-indigo-50,
-        [id$="Modal"] .bg-indigo-100,
-        [id$="Modal"] .bg-purple-50,
-        [id$="Modal"] .bg-purple-100,
-        [id$="Modal"] .bg-blue-50,
-        [id$="Modal"] .bg-blue-100,
-        [id$="Modal"] .bg-amber-50,
-        [id$="Modal"] .bg-amber-100,
-        [id$="Modal"] .bg-green-50,
-        [id$="Modal"] .bg-emerald-50,
-        [id$="Modal"] .bg-teal-50,
-        [id$="Modal"] .bg-red-50,
-        [id$="Modal"] .bg-rose-50,
-        [id$="Modal"] .bg-orange-50 {
-            background-color: #35404a !important;
-        }
-
-        [id$="Modal"] .bg-cyan-50 {
-            background-color: #35404a !important;
-        }
-
-        #posScreen [class~="bg-gray-200/50"],
-        [id$="Modal"] [class~="bg-gray-200/50"],
-        #posScreen [class~="bg-amber-50/60"],
-        #posScreen [class~="bg-amber-50/80"],
-        #posScreen [class~="bg-blue-50/50"],
-        #posScreen [class~="bg-blue-50/60"],
-        #posScreen [class~="bg-blue-50/80"],
-        #posScreen [class~="bg-emerald-50/80"],
-        #posScreen [class~="bg-indigo-50/60"],
-        #posScreen [class~="bg-red-50/50"],
-        [id$="Modal"] [class~="bg-amber-50/60"],
-        [id$="Modal"] [class~="bg-amber-50/80"],
-        [id$="Modal"] [class~="bg-blue-50/50"],
-        [id$="Modal"] [class~="bg-blue-50/60"],
-        [id$="Modal"] [class~="bg-blue-50/80"],
-        [id$="Modal"] [class~="bg-emerald-50/80"],
-        [id$="Modal"] [class~="bg-indigo-50/60"],
-        [id$="Modal"] [class~="bg-red-50/50"] {
-            background-color: var(--ui-panel-raised) !important;
-        }
-
-        #posScreen .bg-amber-200,
-        #posScreen .bg-blue-200,
-        #posScreen .bg-cyan-100,
-        #posScreen .bg-emerald-200,
-        #posScreen .bg-green-200,
-        #posScreen .bg-indigo-200,
-        #posScreen .bg-orange-200,
-        #posScreen .bg-purple-200,
-        #posScreen .bg-red-200,
-        #posScreen .bg-rose-200,
-        #posScreen .bg-teal-200,
-        #posScreen .bg-yellow-100,
-        [id$="Modal"] .bg-amber-200,
-        [id$="Modal"] .bg-blue-200,
-        [id$="Modal"] .bg-cyan-100,
-        [id$="Modal"] .bg-emerald-200,
-        [id$="Modal"] .bg-green-200,
-        [id$="Modal"] .bg-indigo-200,
-        [id$="Modal"] .bg-orange-200,
-        [id$="Modal"] .bg-purple-200,
-        [id$="Modal"] .bg-red-200,
-        [id$="Modal"] .bg-rose-200,
-        [id$="Modal"] .bg-teal-200,
-        [id$="Modal"] .bg-yellow-100 {
-            background-color: var(--ui-panel-raised) !important;
+        [id$="Modal"] .bg-indigo-50 {
+            background-color: #eff6ff !important;
         }
 
         #posScreen .text-gray-900,
@@ -609,131 +110,6 @@
             color: var(--ui-muted) !important;
         }
 
-        #posScreen .text-indigo-900,
-        #posScreen .text-indigo-800,
-        #posScreen .text-purple-900,
-        #posScreen .text-purple-800,
-        #posScreen .text-blue-900,
-        #posScreen .text-blue-800,
-        #posScreen .text-amber-900,
-        #posScreen .text-amber-800,
-        #posScreen .text-teal-900,
-        #posScreen .text-teal-800,
-        #posScreen .text-green-900,
-        #posScreen .text-green-800,
-        #posScreen .text-emerald-900,
-        #posScreen .text-emerald-800,
-        #posScreen .text-red-900,
-        #posScreen .text-red-800,
-        #posScreen .text-rose-900,
-        #posScreen .text-rose-800,
-        #posScreen .text-amber-950,
-        #posScreen .text-cyan-900,
-        #posScreen .text-cyan-800,
-        #posScreen .text-slate-950,
-        #posScreen .text-yellow-900,
-        #posScreen .text-yellow-800,
-        [id$="Modal"] .text-indigo-900,
-        [id$="Modal"] .text-indigo-800,
-        [id$="Modal"] .text-purple-900,
-        [id$="Modal"] .text-purple-800,
-        [id$="Modal"] .text-blue-900,
-        [id$="Modal"] .text-blue-800,
-        [id$="Modal"] .text-amber-900,
-        [id$="Modal"] .text-amber-800,
-        [id$="Modal"] .text-teal-900,
-        [id$="Modal"] .text-teal-800,
-        [id$="Modal"] .text-green-900,
-        [id$="Modal"] .text-green-800,
-        [id$="Modal"] .text-emerald-900,
-        [id$="Modal"] .text-emerald-800,
-        [id$="Modal"] .text-red-900,
-        [id$="Modal"] .text-red-800,
-        [id$="Modal"] .text-rose-900,
-        [id$="Modal"] .text-rose-800,
-        [id$="Modal"] .text-amber-950,
-        [id$="Modal"] .text-cyan-900,
-        [id$="Modal"] .text-cyan-800,
-        [id$="Modal"] .text-slate-950,
-        [id$="Modal"] .text-yellow-900,
-        [id$="Modal"] .text-yellow-800 {
-            color: #e2e8ed !important;
-        }
-
-        #posScreen [class~="text-indigo-800/80"],
-        [id$="Modal"] [class~="text-indigo-800/80"] {
-            color: #c7d2fe !important;
-        }
-
-        #posScreen .text-indigo-700,
-        #posScreen .text-indigo-600,
-        [id$="Modal"] .text-indigo-700,
-        [id$="Modal"] .text-indigo-600 {
-            color: #a5b4fc !important;
-        }
-
-        #posScreen .text-purple-700,
-        #posScreen .text-purple-600,
-        [id$="Modal"] .text-purple-700,
-        [id$="Modal"] .text-purple-600 {
-            color: #c4b5fd !important;
-        }
-
-        #posScreen .text-blue-700,
-        #posScreen .text-blue-600,
-        [id$="Modal"] .text-blue-700,
-        [id$="Modal"] .text-blue-600 {
-            color: #93c5fd !important;
-        }
-
-        #posScreen .text-amber-700,
-        #posScreen .text-amber-600,
-        [id$="Modal"] .text-amber-700,
-        [id$="Modal"] .text-amber-600 {
-            color: #fcd34d !important;
-        }
-
-        #posScreen .text-green-700,
-        #posScreen .text-green-600,
-        #posScreen .text-emerald-700,
-        #posScreen .text-emerald-600,
-        #posScreen .text-teal-700,
-        #posScreen .text-teal-600,
-        [id$="Modal"] .text-green-700,
-        [id$="Modal"] .text-green-600,
-        [id$="Modal"] .text-emerald-700,
-        [id$="Modal"] .text-emerald-600,
-        [id$="Modal"] .text-teal-700,
-        [id$="Modal"] .text-teal-600 {
-            color: #6ee7b7 !important;
-        }
-
-        #posScreen .text-red-700,
-        #posScreen .text-red-600,
-        #posScreen .text-rose-700,
-        #posScreen .text-rose-600,
-        [id$="Modal"] .text-red-700,
-        [id$="Modal"] .text-red-600,
-        [id$="Modal"] .text-rose-700,
-        [id$="Modal"] .text-rose-600 {
-            color: #fca5a5 !important;
-        }
-
-        #posScreen button.bg-indigo-600,
-        #loginScreen button.bg-indigo-600,
-        #autoLockOverlay button.bg-indigo-600,
-        [id$="Modal"] button.bg-indigo-600 {
-            background-color: var(--ui-accent) !important;
-            border-color: var(--ui-accent) !important;
-        }
-
-        #posScreen button.bg-indigo-600:hover,
-        #loginScreen button.bg-indigo-600:hover,
-        #autoLockOverlay button.bg-indigo-600:hover,
-        [id$="Modal"] button.bg-indigo-600:hover {
-            background-color: #008b92 !important;
-        }
-
         #posScreen .border-gray-100,
         #posScreen .border-gray-200,
         #posScreen .border-gray-300,
@@ -750,95 +126,88 @@
         [id$="Modal"] select,
         [id$="Modal"] textarea {
             color: var(--ui-text);
-            background-color: #222831;
+            background-color: var(--ui-panel-raised);
             border-color: var(--ui-border);
             border-radius: 8px;
-            box-shadow: none;
         }
 
         #posScreen input::placeholder,
         [id$="Modal"] input::placeholder {
-            color: #9eabb8;
-        }
-
-        #posScreen .rounded-xl,
-        #posScreen .rounded-2xl,
-        #posScreen .rounded-3xl,
-        [id$="Modal"] .rounded-xl,
-        [id$="Modal"] .rounded-2xl,
-        [id$="Modal"] .rounded-3xl {
-            border-radius: 8px;
-        }
-
-        #posScreen .rounded-3xl,
-        [id$="Modal"] .rounded-3xl {
-            border-radius: 12px;
-        }
-
-        #posScreen .shadow-sm,
-        #posScreen .shadow-md,
-        #posScreen .shadow-lg,
-        [id$="Modal"] .shadow-sm,
-        [id$="Modal"] .shadow-md,
-        [id$="Modal"] .shadow-lg {
-            box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+            color: var(--ui-muted);
         }
 
         #posScreen button:focus-visible,
-        #posScreen input:focus-visible,
-        #posScreen select:focus-visible,
         [id$="Modal"] button:focus-visible,
+        #posScreen input:focus-visible,
         [id$="Modal"] input:focus-visible,
+        #posScreen select:focus-visible,
         [id$="Modal"] select:focus-visible {
             outline: 2px solid var(--ui-accent);
             outline-offset: 2px;
         }
 
-        #categoryFilterBar button {
-            flex: 0 0 auto;
+        /* Sidebar: light theme */
+        .app-topbar {
+            min-height: 64px;
+            background: var(--ui-panel) !important;
+            border-color: var(--ui-border) !important;
+            box-shadow: 0 1px 3px rgb(0 0 0 / 4%);
         }
 
+        #mainActionSidebar {
+            background: var(--ui-panel) !important;
+            border-color: var(--ui-border) !important;
+        }
+
+        #mainActionSidebar .sidebar-heading { color: var(--ui-muted); }
+        #mainActionSidebar .sidebar-footer { border-color: var(--ui-border); color: var(--ui-muted); }
+
+        .sidebar-action {
+            min-height: 40px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: var(--ui-text);
+            font-size: 13px;
+            transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+        }
+
+        .sidebar-action:hover {
+            color: var(--ui-accent);
+            background: var(--ui-accent-soft);
+            border-color: var(--ui-accent);
+        }
+
+        .sidebar-action .text-red-500 { color: var(--ui-danger) !important; }
+        .sidebar-action .text-amber-500 { color: var(--ui-warning) !important; }
+        .sidebar-action .text-blue-500 { color: var(--ui-accent) !important; }
+        .sidebar-action .text-indigo-500 { color: var(--ui-accent) !important; }
+        .sidebar-action .text-cyan-500 { color: #06b6d4 !important; }
+        .sidebar-action .text-teal-500 { color: #14b8a3 !important; }
+        .sidebar-action .text-purple-500 { color: #a855f7 !important; }
+        .sidebar-action .text-sky-500 { color: #0ea5e9 !important; }
+        .sidebar-action .text-rose-500 { color: #f43f5e !important; }
+
+        /* Category filter */
         #categoryFilterBar button[aria-pressed="true"] {
-            color: #fff !important;
+            color: var(--ui-panel) !important;
             background: var(--ui-accent) !important;
-            border-color: var(--ui-accent) !important;
         }
-
         #categoryFilterBar button[aria-pressed="false"]:hover {
-            color: #fff !important;
+            color: var(--ui-accent) !important;
             background: var(--ui-accent-soft) !important;
-            border-color: var(--ui-accent) !important;
         }
 
-        #posScreen button[class*="from-indigo-"],
-        #posScreen button[class*="from-purple-"],
-        #posScreen button[class*="from-blue-"],
-        #loginScreen button[class*="from-indigo-"],
-        #loginScreen button[class*="from-purple-"],
-        #loginScreen button[class*="from-blue-"],
-        #autoLockOverlay button[class*="from-indigo-"],
-        #autoLockOverlay button[class*="from-purple-"],
-        #autoLockOverlay button[class*="from-blue-"],
-        [id$="Modal"] button[class*="from-indigo-"],
-        [id$="Modal"] button[class*="from-purple-"],
-        [id$="Modal"] button[class*="from-blue-"] {
-            background-image: none !important;
-            background-color: var(--ui-accent) !important;
+        #btnDineIn {
+            background: var(--ui-accent);
+            color: #ffffff;
         }
-
-        #posScreen button[class*="from-indigo-"]:hover,
-        #posScreen button[class*="from-purple-"]:hover,
-        #posScreen button[class*="from-blue-"]:hover,
-        #loginScreen button[class*="from-indigo-"]:hover,
-        #loginScreen button[class*="from-purple-"]:hover,
-        #loginScreen button[class*="from-blue-"]:hover,
-        #autoLockOverlay button[class*="from-indigo-"]:hover,
-        #autoLockOverlay button[class*="from-purple-"]:hover,
-        #autoLockOverlay button[class*="from-blue-"]:hover,
-        [id$="Modal"] button[class*="from-indigo-"]:hover,
-        [id$="Modal"] button[class*="from-purple-"]:hover,
-        [id$="Modal"] button[class*="from-blue-"]:hover {
-            background-color: #008b92 !important;
+        #btnTakeaway, #btnDelivery {
+            color: var(--ui-text);
+            background: var(--ui-panel-raised);
+        }
+        #btnTakeaway:hover, #btnDelivery:hover {
+            color: var(--ui-accent);
+            background: var(--ui-panel);
         }
 
         .menu-item-card {
@@ -847,59 +216,114 @@
             background: var(--ui-panel);
             transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
         }
-
         .menu-item-card:hover {
             border-color: var(--ui-accent);
-            box-shadow: 0 8px 20px rgb(0 0 0 / 20%);
+            box-shadow: 0 1px 3px rgb(0 0 0 / 8%);
             transform: translateY(-1px);
         }
 
-        #cartTotal,
-        #pnlNetProfit {
-            color: #55d6bc !important;
+        .analytics-chart {
+            background: var(--ui-panel);
+            border: 1px solid var(--ui-border);
+            border-radius: 8px;
         }
 
-        .custom-scrollbar {
-            scrollbar-color: #65717e #272d36;
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f8fafc; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Modal header: white with status left border */
+        .modal-header-gradient {
+            background: var(--ui-panel) !important;
+            border-bottom: 4px solid var(--ui-accent) !important;
+        }
+        .modal-header-text { color: var(--ui-text) !important; }
+
+        /* Status left borders per modal */
+        #pnlModal .modal-header-gradient { border-left: 4px solid #2563eb; border-bottom-color: var(--ui-border); }
+        #salesAnalyticsModal .modal-header-gradient { border-left: 4px solid #0ea5e9; }
+        #expenseModal .modal-header-gradient { border-left: 4px solid #14b8a3; }
+        #heldOrdersModal .modal-header-gradient { border-left: 4px solid #f59e0b; }
+        #shiftOpeningModal .modal-header-gradient { border-left: 4px solid #10b981; }
+        #shiftReportModal .modal-header-gradient { border-left: 4px solid #6366f1; }
+        #paymentModal .modal-header-gradient { border-left: 4px solid #2563eb; }
+        #inventoryModal .modal-header-gradient { border-left: 4px solid #f59e0b; }
+        #ownerAdminModal .modal-header-gradient { border-left: 4px solid #a855f7; }
+        #deliveryManagementModal .modal-header-gradient { border-left: 4px solid #3b82f6; }
+        #modifierSelectModal .modal-header-gradient { border-left: 4px solid #8b5cf6; }
+        #refundModal .modal-header-gradient { border-left: 4px solid #ef4444; }
+        #auditLogModal .modal-header-gradient { border-left: 4px solid #374151; }
+        #onlineOrdersModal .modal-header-gradient { border-left: 4px solid #2563eb; }
+        #customerModal .modal-header-gradient { border-left: 4px solid #8b5cf6; }
+        #staffManagementModal .modal-header-gradient { border-left: 4px solid #06b6d4; }
+        #supplierModal .modal-header-gradient { border-left: 4px solid #2563eb; }
+
+        /* Modal close button text */
+        [id$="Modal"] button.text-white\/60,
+        [id$="Modal"] button.text-cyan-200\/80,
+        [id$="Modal"] button.text-indigo-200\/80,
+        [id$="Modal"] button.text-purple-200\/80,
+        [id$="Modal"] button.text-blue-100\/80,
+        [id$="Modal"] button.text-emerald-200\/80,
+        [id$="Modal"] button.text-amber-100\/80 {
+            color: var(--ui-muted) !important;
+        }
+        [id$="Modal"] button.text-white\/60:hover,
+        [id$="Modal"] button.text-cyan-200\/80:hover,
+        [id$="Modal"] button.text-indigo-200\/80:hover,
+        [id$="Modal"] button.text-purple-200\/80:hover,
+        [id$="Modal"] button.text-blue-100\/80:hover,
+        [id$="Modal"] button.text-emerald-200\/80:hover,
+        [id$="Modal"] button.text-amber-100\/80:hover {
+            color: var(--ui-text) !important;
         }
 
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #272d36;
+        [id$="Modal"] .bg-white\/10,
+        [id$="Modal"] .bg-indigo-50\/60,
+        [id$="Modal"] .bg-amber-50\/80,
+        [id$="Modal"] .bg-indigo-50\/50,
+        [id$="Modal"] .bg-amber-50\/60,
+        [id$="Modal"] .bg-emerald-50\/80,
+        [id$="Modal"] .bg-gray-50\/50,
+        [id$="Modal"] .bg-gray-50\/80 {
+            background-color: var(--ui-panel-raised) !important;
         }
 
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #65717e;
+        .text-emerald-300, .text-sky-300, .text-violet-300, .text-amber-300 {
+            color: var(--ui-text) !important;
         }
 
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #8794a1;
+        /* Login screen light */
+        #loginScreen, #autoLockOverlay {
+            background: rgba(248, 250, 252, 0.95);
+        }
+        #loginScreen .bg-white\/95, #loginScreen .bg-white, #autoLockOverlay .bg-white {
+            background-color: var(--ui-panel) !important;
         }
 
-        @media (max-width: 1023px) {
-            #mainPosView {
-                padding: 16px;
-            }
+        /* Gradient buttons everywhere - neutralize via CSS, but also replaced in HTML */
+        button[class*="from-indigo-"] { background-image: none !important; background-color: var(--ui-accent) !important; }
+        button[class*="from-indigo-"]:hover { background-color: #1d4ed8 !important; }
+        button[class*="from-emerald-"] { background-image: none !important; background-color: var(--ui-success) !important; }
+        button[class*="from-emerald-"]:hover { background-color: #16a34a !important; }
+        button[class*="from-rose-"], button[class*="from-red-"] { background-image: none !important; background-color: var(--ui-danger) !important; }
+        button[class*="from-rose-"]:hover, button[class*="from-red-"]:hover { background-color: #dc2626 !important; }
+        button[class*="from-teal-"] { background-image: none !important; background-color: #14b8a3 !important; }
+        button[class*="from-amber-"] { background-image: none !important; background-color: var(--ui-warning) !important; }
+        button[class*="from-cyan-"] { background-image: none !important; background-color: #06b6d4 !important; }
+        button[class*="from-purple-"] { background-image: none !important; background-color: #a855f7 !important; }
+        button[class*="from-blue-"] { background-image: none !important; background-color: var(--ui-accent) !important; }
+
+        .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl {
+            box-shadow: 0 1px 3px rgb(0 0 0 / 4%) !important;
         }
 
-        @media (max-width: 640px) {
-            #mainPosView {
-                padding: 12px;
-                gap: 12px;
-            }
-
-            #mainActionSidebar {
-                background: #1d232c !important;
-            }
-
-            #mainActionSidebar .sidebar-action {
-                min-height: 44px;
-                border: 1px solid var(--ui-border);
-            }
-        }
-
+        @media (max-width: 1023px) { #mainPosView { padding: 16px; } }
+        @media (max-width: 640px) { #mainPosView { padding: 12px; gap: 12px; } }
         @media (prefers-reduced-motion: reduce) {
-            #posScreen *,
-            [id$="Modal"] * {
+            #posScreen *, [id$="Modal"] * {
                 scroll-behavior: auto !important;
                 animation-duration: .01ms !important;
                 animation-iteration-count: 1 !important;
@@ -919,13 +343,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
 
 
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://www.gstatic.com https://www.googleapis.com https://firebaseapp.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com; img-src 'self' data: https://; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' sw.js">
-    <meta http-equiv="X-Content-Type-Options" content="nosniff">
-    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 </head>
 
-<body class="bg-gray-100 font-sans antialiased text-gray-800">
+<body class="bg-gray-100 font-sans antialiased text-gray-800 bg-slate-50">
 
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
@@ -934,10 +354,10 @@
     <audio id="notificationSound" preload="auto" src="mixkit-software-interface-start-2574.wav"></audio>
 
     <!-- SECURE LOGIN SCREEN -->
-    <div id="loginScreen" class="fixed inset-0 bg-gradient-to-br from-indigo-900 via-gray-900 to-black backdrop-blur-md flex items-center justify-center z-50 p-3 sm:p-4 transition-all duration-300">
+    <div id="loginScreen" class="fixed inset-0 bg-gray-50 flex items-center justify-center z-50 p-3 sm:p-4 transition-all duration-300">
         <div class="bg-white/95 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-6 sm:p-10 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.3)] relative transform transition-all duration-300">
             <div class="flex justify-center mb-3 sm:mb-4">
-                <span class="text-4xl sm:text-5xl drop-shadow-md">🦅</span>
+                <span class="text-3xl sm:text-4xl text-indigo-600 font-black">HB</span>
             </div>
             <h2 class="text-2xl sm:text-3xl font-black mb-1 text-center text-gray-900 tracking-tight">Hungry Birds</h2>
             <p class="text-xs sm:text-sm text-center text-indigo-600 font-medium mb-6 sm:mb-8 uppercase tracking-widest">Point of Sale</p>
@@ -955,7 +375,7 @@
                            class="border border-gray-200 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 focus:bg-white transition-all duration-200 shadow-inner"
                            placeholder="••••••••" />
                 </div>
-                <button type="submit" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl font-bold hover:from-indigo-700 hover:to-purple-700 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 shadow-md text-sm sm:text-base">
+                <button type="submit" class="bg-blue-600 text-white w-full p-3 sm:p-4 rounded-xl font-bold hover:bg-blue-700 transition shadow-sm text-sm sm:text-base">
                     Secure Login
                 </button>
                 <p class="text-[10px] sm:text-[11px] text-center text-gray-400 mt-4 sm:mt-6">
@@ -966,9 +386,9 @@
     </div>
 
     <!-- AUTOMATIC POS LOCK -->
-    <div id="autoLockOverlay" class="hidden fixed inset-0 bg-gray-950/95 z-[9999] items-center justify-center p-4">
+    <div id="autoLockOverlay" class="hidden fixed inset-0 bg-gray-50/95 z-[9999] items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
-            <div class="text-4xl mb-3">🔒</div>
+            <div class="text-4xl mb-3"></div>
             <h2 class="text-xl font-black">POS Locked</h2>
             <p class="text-xs text-gray-500 mt-1 mb-5">The terminal was locked because it was inactive.</p>
             <input id="unlockPassword" type="password" autocomplete="current-password"
@@ -988,13 +408,13 @@
         <header class="app-topbar bg-slate-900 text-white p-2 sm:p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 sticky top-0 z-40 border-b">
             <div class="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 <h1 class="text-lg sm:text-xl font-black tracking-tight flex items-center gap-1.5 sm:gap-2 drop-shadow-sm">
-                    <span class="text-xl sm:text-2xl">🦅</span> <span class="bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300 hidden sm:inline">Hungry Birds</span>
+                    <span class="text-xl sm:text-2xl text-indigo-600 font-black">HB</span> <span class="text-gray-900 hidden sm:inline font-black">Hungry Birds</span>
                 </h1>
-                <span id="roleBadge" class="text-[9px] sm:text-[10px] px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/10 border border-white/20 font-bold uppercase tracking-widest text-indigo-100 backdrop-blur-md shadow-inner"></span>
+                <span id="roleBadge" class="text-[9px] sm:text-[10px] px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/10 border border-white/20 font-bold uppercase tracking-widest text-indigo-100  shadow-inner"></span>
             </div>
             <div class="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm flex-wrap justify-end w-full sm:w-auto">
                 <div class="hidden lg:flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
                     <span class="text-indigo-200 text-xs">Welcome, <strong id="loggedUserName" class="text-white font-bold ml-1"></strong></span>
                 </div>
                 <button onclick="logout()" class="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-md">
@@ -1012,64 +432,64 @@
                 <div class="sidebar-group mb-4">
                     <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Orders</p>
                     <button type="button" onclick="document.getElementById('menuSearch').focus()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-semibold flex items-center gap-3">
-                        <span class="w-6 text-center">🍽️</span> Counter & menu
+                        <span class="w-6 text-center"></span> Counter & menu
                     </button>
                     <button type="button" onclick="openOnlineOrdersModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3 relative">
-                        <span class="w-6 text-center">🌐</span> Online orders
-                        <span id="onlineOrdersBadge" class="ml-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
+                        <span class="w-6 text-center"></span> Online orders
+                        <span id="onlineOrdersBadge" class="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
                     </button>
                     <button type="button" onclick="openHeldOrdersModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">⏸️</span> Held orders
+                        <span class="w-6 text-center"></span> Held orders
                         <span id="heldOrdersBadge" class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
                     </button>
                     <button type="button" onclick="openDeliveryManagementModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">🛵</span> Deliveries
+                        <span class="w-6 text-center"></span> Deliveries
                     </button>
                     <button type="button" onclick="openCustomerModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">👥</span> Customers
+                        <span class="w-6 text-center"></span> Customers
                     </button>
                 </div>
 
                 <div class="sidebar-group mb-4">
                     <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Insights</p>
                     <button data-role="OWNER" type="button" onclick="openSalesAnalyticsModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">📈</span> Sales analytics
+                        <span class="w-6 text-center"></span> Sales analytics
                     </button>
                     <button data-role="OWNER" type="button" onclick="openPnlModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">🧮</span> Profit &amp; loss
+                        <span class="w-6 text-center"></span> Profit &amp; loss
                     </button>
                 </div>
 
                 <div class="sidebar-group mb-4">
                     <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Operations</p>
                     <button data-role="OWNER,MANAGER" type="button" onclick="protectedOpenInventoryModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">📦</span> Inventory
+                        <span class="w-6 text-center"></span> Inventory
                     </button>
                     
                         <button data-role="OWNER,MANAGER" type="button" onclick="openSupplierModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                            <span class="w-6 text-center">🏭</span> Suppliers
+                            <span class="w-6 text-center"></span> Suppliers
                         </button>
 
-                        <span class="w-6 text-center">💸</span> Expenses
+                        <span class="w-6 text-center"></span> Expenses
                     </button>
                     <button data-role="OWNER,MANAGER" type="button" onclick="openStaffManagementModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">👨‍💼</span> Staff management
+                        <span class="w-6 text-center"></span> Staff management
                     </button>
                     <button data-role="OWNER" type="button" onclick="openShiftOpeningModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">💵</span> Opening cash
+                        <span class="w-6 text-center"></span> Opening cash
                     </button>
                     <button data-role="OWNER,MANAGER" type="button" onclick="openShiftCloseModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">📊</span> Shift summary
+                        <span class="w-6 text-center"></span> Shift summary
                     </button>
                     <button id="connectPrinterBtn" type="button" onclick="connectPrinter()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">🖨️</span> Connect printer
+                        <span class="w-6 text-center"></span> Connect printer
                         <span id="printerStatusIndicator" class="text-xs text-gray-500 font-medium">Disconnected</span>
                     </button>
                     <button data-role="OWNER" type="button" onclick="openAuditLogModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">🕵️</span> Activity log
+                        <span class="w-6 text-center"></span> Activity log
                     </button>
                     <button data-role="OWNER" type="button" onclick="authenticateOwner()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center">👑</span> Admin settings
+                        <span class="w-6 text-center"></span> Admin settings
                     </button>
                 </div>
             </nav>
@@ -1094,12 +514,12 @@
                             <div class="bg-indigo-50 p-1.5 sm:p-2 rounded-lg sm:rounded-xl">
                                 <h2 class="text-xs sm:text-sm font-extrabold text-indigo-900 uppercase tracking-widest">Counter</h2>
                             </div>
-                            <span id="activeTableIndicator" class="text-xs bg-indigo-100 text-indigo-800 font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl hidden shadow-inner"></span>
+                            <span id="activeTableIndicator" class="text-xs bg-blue-50 text-blue-800 font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl hidden shadow-inner"></span>
                         </div>
 
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <span class="text-gray-400">🔍</span>
+                                <span class="text-gray-400"></span>
                             </div>
                             <input id="menuSearch" type="text" placeholder="Search menu items..." class="w-full pl-10 pr-4 py-2 sm:py-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-xl sm:rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white transition-all duration-300 shadow-inner" />
                         </div>
@@ -1110,7 +530,7 @@
                 <div class="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all">
                     <div class="flex items-center justify-between gap-2 mb-2 sm:mb-3">
                         <div class="flex items-center gap-1.5 sm:gap-2">
-                            <span class="text-base sm:text-lg drop-shadow-sm">🍽️</span>
+                            <span class="text-base sm:text-lg drop-shadow-sm"></span>
                             <h3 class="text-xs sm:text-sm font-black uppercase tracking-widest text-gray-800">Menu Categories</h3>
                         </div>
                     </div>
@@ -1129,30 +549,30 @@
 
                 <!-- Order Cart -->
                 <div class="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden flex flex-col">
-                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="hidden"></div>
 
                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-5 gap-3 relative z-10">
                         <h3 class="text-sm sm:text-base font-black text-gray-900 tracking-tight flex items-center gap-1.5 sm:gap-2">
-                            🛒 Current Order
+                             Current Order
                         </h3>
 
                         <div class="flex bg-gray-50/80 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-gray-200 text-[10px] sm:text-xs font-bold gap-0.5 sm:gap-1 shadow-inner backdrop-blur-sm">
                             <button id="btnDineIn" onclick="setOrderType('DINE_IN')" class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-indigo-600 text-white shadow-sm transition-all duration-300 whitespace-nowrap">
-                                🍽️ <span class="hidden sm:inline">Dine In</span>
+                                 <span class="hidden sm:inline">Dine In</span>
                             </button>
                             <button id="btnTakeaway" onclick="setOrderType('TAKEAWAY')" class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-white hover:shadow-sm hover:text-indigo-600 transition-all duration-300 whitespace-nowrap">
-                                🛍️ <span class="hidden sm:inline">Take</span>
+                                 <span class="hidden sm:inline">Take</span>
                             </button>
                             <button id="btnDelivery" onclick="setOrderType('DELIVERY')" class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-white hover:shadow-sm hover:text-indigo-600 transition-all duration-300 whitespace-nowrap">
-                                🛵 <span class="hidden sm:inline">Deliver</span>
+                                 <span class="hidden sm:inline">Deliver</span>
                             </button>
                         </div>
                     </div>
 
                     <!-- Delivery Details Panel -->
-                    <div id="deliveryInfoBox" class="hidden mb-3 sm:mb-5 p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/60 rounded-2xl space-y-2 sm:space-y-3 text-sm relative z-10 shadow-inner">
+                    <div id="deliveryInfoBox" class="hidden mb-3 sm:mb-5 p-3 sm:p-4 bg-blue-50 border border-blue-200 border border-blue-200/60 rounded-2xl space-y-2 sm:space-y-3 text-sm relative z-10 shadow-inner">
                         <div class="font-bold text-blue-900 flex justify-between items-center border-b border-blue-200/50 pb-2 text-xs sm:text-sm">
-                            <span class="flex items-center gap-1.5">🛵 Delivery Info <span class="text-[9px] sm:text-[10px] bg-red-100 text-red-700 px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider ml-2">Min Order: Rs 500</span></span>
+                            <span class="flex items-center gap-1.5"> Delivery Info <span class="text-[9px] sm:text-[10px] bg-red-100 text-red-700 px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider ml-2">Min Order: Rs 500</span></span>
                             <button onclick="clearDeliveryDetails()" class="text-blue-400 hover:text-red-500 transition-colors text-[10px] sm:text-xs uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg border border-transparent hover:border-red-200">Clear</button>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
@@ -1164,9 +584,9 @@
                     </div>
 
                     <!-- Customer CRM Lookup for Dine-In / Takeaway -->
-                    <div id="cartCustomerBox" class="mb-3 sm:mb-5 p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-purple-100/50 border border-purple-200/60 rounded-2xl space-y-2 sm:space-y-3 text-sm relative z-10 shadow-inner">
+                    <div id="cartCustomerBox" class="mb-3 sm:mb-5 p-3 sm:p-4 bg-purple-50 border border-purple-200 border border-purple-200/60 rounded-2xl space-y-2 sm:space-y-3 text-sm relative z-10 shadow-inner">
                         <div class="flex justify-between items-center font-bold text-purple-900 border-b border-purple-200/50 pb-2 text-xs sm:text-sm">
-                            <span class="flex items-center gap-1.5">👤 Customer / Loyalty Program</span>
+                            <span class="flex items-center gap-1.5"> Customer / Loyalty Program</span>
                             <button type="button" onclick="clearCartCustomer()" class="text-purple-400 hover:text-red-500 transition-colors text-[10px] sm:text-xs uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg border border-transparent hover:border-red-200">Clear</button>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
@@ -1174,8 +594,8 @@
                             <input id="cartCustomerName" type="text" placeholder="Customer Name" class="w-full p-2 sm:p-2.5 border-0 ring-1 ring-purple-200 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow shadow-sm" />
                         </div>
                         <div id="cartCustomerInfo" class="hidden text-xs text-purple-800 font-bold bg-white/60 border border-purple-100 p-2 sm:p-2.5 rounded-xl shadow-sm"></div>
-                        <div id="cartLoyaltyRedeemBox" class="hidden flex items-center justify-between gap-3 pt-2 bg-gradient-to-r from-amber-50 to-yellow-50 p-2.5 sm:p-3 rounded-xl border border-amber-200/50 mt-1 shadow-sm">
-                            <span class="text-[10px] sm:text-xs font-black text-amber-800 flex items-center gap-1">⭐ Redeem Points:</span>
+                        <div id="cartLoyaltyRedeemBox" class="hidden flex items-center justify-between gap-3 pt-2 bg-amber-50 border border-amber-200 p-2.5 sm:p-3 rounded-xl border border-amber-200/50 mt-1 shadow-sm">
+                            <span class="text-[10px] sm:text-xs font-black text-amber-800 flex items-center gap-1"> Redeem Points:</span>
                             <input id="cartLoyaltyRedeemInput" type="number" min="0" placeholder="0" oninput="applyLoyaltyRedemption(this.value)" class="w-20 sm:w-24 p-1.5 sm:p-2 border-0 ring-1 ring-amber-300 rounded-lg text-xs sm:text-sm font-bold text-right bg-white focus:ring-2 focus:ring-amber-500 shadow-inner text-amber-900" />
                         </div>
                     </div>
@@ -1188,9 +608,9 @@
                             <span id="cartSubtotal" class="font-extrabold text-gray-800">Rs 0.00</span>
                         </div>
 
-                        <div class="flex justify-between items-center gap-2 bg-gradient-to-r from-amber-50 to-orange-50/30 p-2.5 sm:p-3 rounded-2xl border border-amber-200/60 shadow-sm">
+                        <div class="flex justify-between items-center gap-2 bg-amber-50 border border-amber-200 p-2.5 sm:p-3 rounded-2xl border border-amber-200/60 shadow-sm">
                             <label for="discountInput" class="text-xs sm:text-sm font-bold text-amber-900 flex items-center gap-1.5">
-                                🏷️ Discount:
+                                 Discount:
                             </label>
                             <div class="flex items-center gap-1.5 sm:gap-2 bg-white rounded-lg sm:rounded-xl ring-1 ring-amber-300 p-1 shadow-inner">
                                 <input id="discountInput" type="number" min="0" max="100" placeholder="0" value="0"
@@ -1201,12 +621,12 @@
                         </div>
 
                         <div id="discountAmountRow" class="hidden flex justify-between items-center text-xs sm:text-sm text-red-500 font-bold bg-red-50/50 p-2 rounded-xl">
-                            <span class="flex items-center gap-1">📉 Saved:</span>
+                            <span class="flex items-center gap-1"> Saved:</span>
                             <span id="cartDiscountAmount">-Rs 0.00</span>
                         </div>
 
                         <div id="deliveryChargeRow" class="hidden flex justify-between items-center text-xs sm:text-sm text-blue-700 font-bold bg-blue-50/50 p-2 rounded-xl">
-                            <span class="flex items-center gap-1">🛵 Delivery:</span>
+                            <span class="flex items-center gap-1"> Delivery:</span>
                             <span id="cartDeliveryCharge">Rs 0.00</span>
                         </div>
 
@@ -1217,12 +637,12 @@
                     </div>
 
                     <div class="grid grid-cols-4 gap-2 sm:gap-3 mt-3 sm:mt-5">
-                        <button onclick="holdCurrentOrder()" class="col-span-1 bg-gradient-to-b from-amber-400 to-amber-500 text-amber-950 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl font-bold hover:from-amber-500 hover:to-amber-600 transition-all shadow-md hover:shadow-lg active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm">
-                            <span class="text-sm sm:text-base">⏸️</span>
+                        <button onclick="holdCurrentOrder()" class="col-span-1 bg-amber-400">
+                            <span class="text-sm sm:text-base"></span>
                             <span class="hidden sm:inline">Hold</span>
                         </button>
-                        <button id="checkoutBtn" onclick="processSale()" class="col-span-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl font-black text-sm sm:text-lg hover:from-emerald-600 hover:to-teal-700 transition-all shadow-md hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-1.5 sm:gap-2 border border-emerald-400/30">
-                            <span class="text-base sm:text-lg">🧾</span>
+                        <button id="checkoutBtn" onclick="processSale()" class="col-span-3 bg-emerald-500">
+                            <span class="text-base sm:text-lg"></span>
                             <span>Checkout <span class="hidden sm:inline">& Print</span></span>
                         </button>
                     </div>
@@ -1232,21 +652,21 @@
             <!-- RIGHT PANEL: Tables Control & Live Stock -->
             <div class="space-y-3 sm:space-y-5 flex flex-col">
                 <div class="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all relative overflow-hidden">
-                    <div class="absolute -bottom-6 -left-6 w-32 h-32 bg-amber-50 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="hidden"></div>
                     <div class="flex justify-between items-center mb-3 sm:mb-4 relative z-10">
                         <h3 class="text-xs sm:text-sm font-black text-gray-800 uppercase tracking-widest flex items-center gap-1 sm:gap-1.5">
-                            <span class="text-base sm:text-lg">📦</span> Live Stock
+                            <span class="text-base sm:text-lg"></span> Live Stock
                         </h3>
                         <div class="flex items-center gap-1.5 sm:gap-2">
                             <button id="lockStockBtn" onclick="lockStockView()" class="hidden text-[10px] sm:text-xs bg-red-50 text-red-600 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg font-bold hover:bg-red-100 transition ring-1 ring-red-200">
-                                🔒 Lock
+                                 Lock
                             </button>
                             <button data-role="OWNER,MANAGER" onclick="protectedOpenInventoryModal()" class="text-[10px] sm:text-xs text-amber-700 bg-amber-100/50 hover:bg-amber-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg font-bold transition ring-1 ring-amber-200/50">Manage</button>
                         </div>
                     </div>
 
                     <div id="stockLockedState" class="text-center py-6 sm:py-8 border border-dashed border-gray-300 rounded-2xl bg-gray-50/50 space-y-2 sm:space-y-3 relative z-10">
-                        <div class="text-3xl sm:text-4xl drop-shadow-sm">🔒</div>
+                        <div class="text-3xl sm:text-4xl drop-shadow-sm"></div>
                         <p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-widest">Stock Protected</p>
                         <button onclick="promptStockPin()" class="bg-gray-800 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-gray-900 transition shadow-sm mt-2">
                             Authenticate to View
@@ -1260,20 +680,20 @@
 
                 <!-- Recent Sales & Receipt Management -->
                 <div class="bg-white p-3 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-gray-100 hover:shadow-md transition-all flex-1 flex flex-col relative overflow-hidden">
-                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-purple-50 rounded-full blur-3xl pointer-events-none opacity-60"></div>
+                    <div class="hidden"></div>
 
                     <div class="flex justify-between items-center mb-3 sm:mb-4 relative z-10">
                         <h3 class="text-xs sm:text-sm font-black text-gray-800 uppercase tracking-widest flex items-center gap-1 sm:gap-1.5">
-                            <span class="text-base sm:text-lg">🧾</span> Recent Sales
+                            <span class="text-base sm:text-lg"></span> Recent Sales
                         </h3>
-                        <span class="text-[8px] sm:text-[9px] text-emerald-500 font-bold uppercase tracking-widest bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-full ring-1 ring-emerald-200">Sync Active</span>
+                        <span class="text-[8px] sm:text-[9px] text-emerald-500 font-bold uppercase tracking-widest bg-green-50 px-1.5 sm:px-2 py-0.5 rounded-full ring-1 ring-green-200">Sync Active</span>
                     </div>
 
                     <!-- ORDER / RECEIPT SEARCH -->
                     <div class="mb-3 sm:mb-4 space-y-2 relative z-10">
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
-                                <span class="text-gray-400 text-sm">🔍</span>
+                                <span class="text-gray-400 text-sm"></span>
                             </div>
                             <input id="receiptSearchInput" type="text" placeholder="Search Order..."
                                    oninput="searchOldReceipts(this.value)"
@@ -1291,7 +711,7 @@
                             <span class="text-[10px] sm:text-sm">Select All</span>
                         </label>
                         <button id="bulkDeleteBtn" onclick="deleteSelectedSales()" data-role="OWNER,MANAGER" class="hidden text-[10px] sm:text-xs bg-red-600/10 text-red-700 font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center gap-1">
-                            🗑️ Void (<span id="selectedSalesCount">0</span>)
+                             Void (<span id="selectedSalesCount">0</span>)
                         </button>
                     </div>
 
@@ -1301,15 +721,15 @@
         </div>
     </div>
     <!-- P&L DASHBOARD MODAL -->
-<div id="pnlModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+<div id="pnlModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-4 transition-all">
     <div class="bg-white rounded-3xl w-full max-w-lg shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col transform transition-transform scale-100">
-        <div class="p-5 bg-gradient-to-r from-indigo-700 to-purple-800 text-white flex justify-between items-center shadow-inner relative overflow-hidden">
-            <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+        <div class="modal-header-gradient p-5 flex justify-between items-center shadow-sm relative overflow-hidden">
+            <div class="hidden"></div>
             <div class="flex items-center gap-2 relative z-10">
-                <span class="text-xl">📊</span>
+                <span class="text-xl"></span>
                 <h3 class="text-sm font-black tracking-widest uppercase text-indigo-50">Profit & Loss</h3>
             </div>
-            <button onclick="closePnlModal()" class="text-white/60 hover:text-white font-bold text-2xl transition relative z-10 leading-none">&times;</button>
+            <button onclick="closePnlModal()" class="text-white/60 hover:text-white font-bold text-2xl transition relative z-10 leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
 
         <div class="p-6 space-y-5 bg-gray-50/50 flex-1">
@@ -1326,19 +746,19 @@
 
             <!-- Dashboard Cards -->
             <div class="grid grid-cols-2 gap-4">
-                <div class="bg-gradient-to-br from-green-50 to-emerald-50 p-5 rounded-2xl border border-green-200/50 shadow-sm relative overflow-hidden">
-                    <div class="absolute -right-4 -top-4 text-5xl opacity-10">💵</div>
+                <div class="bg-green-50 border border-green-200 p-5 rounded-2xl border border-green-200/50 shadow-sm relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 text-5xl opacity-10"></div>
                     <p class="text-[10px] text-green-700 font-extrabold uppercase tracking-widest mb-1 relative z-10">Total Sales</p>
                     <h4 id="pnlTotalSales" class="text-2xl font-black text-green-800 relative z-10">Rs 0.00</h4>
                 </div>
-                <div class="bg-gradient-to-br from-red-50 to-rose-50 p-5 rounded-2xl border border-red-200/50 shadow-sm relative overflow-hidden">
-                    <div class="absolute -right-4 -bottom-4 text-5xl opacity-10">📉</div>
+                <div class="bg-red-50 border border-red-200 p-5 rounded-2xl border border-red-200/50 shadow-sm relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-5xl opacity-10"></div>
                     <p class="text-[10px] text-red-700 font-extrabold uppercase tracking-widest mb-1 relative z-10">Total Expenses</p>
                     <h4 id="pnlTotalExpenses" class="text-2xl font-black text-red-800 relative z-10">Rs 0.00</h4>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-r from-indigo-50 to-indigo-100/50 p-5 rounded-2xl border border-indigo-200 shadow-sm flex flex-col items-center justify-center mt-5 py-8">
+            <div class="bg-indigo-50 border border-indigo-200 p-5 rounded-2xl border border-indigo-200 shadow-sm flex flex-col items-center justify-center mt-5 py-8">
                 <p class="text-[11px] text-indigo-800 font-black uppercase tracking-widest mb-1 shadow-sm">Net Profit</p>
                 <h2 id="pnlNetProfit" class="text-4xl font-black text-indigo-700 drop-shadow-sm">Rs 0.00</h2>
             </div>
@@ -1347,17 +767,17 @@
 </div>
 
     <!-- OWNER SALES ANALYTICS MODAL -->
-    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-900/80 backdrop-blur-md flex justify-center items-center z-50 p-3 sm:p-5 transition-all">
+    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-3 sm:p-5 transition-all">
         <div class="bg-white rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-700">
-            <div class="p-5 sm:px-7 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-950 text-white flex justify-between items-center">
+            <div class="modal-header-gradient px-5 py-4 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <span class="w-11 h-11 rounded-2xl bg-teal-300/10 border border-teal-200/10 flex items-center justify-center text-xl">📈</span>
+                    <span class="w-11 h-11 rounded-2xl bg-teal-300/10 border border-teal-200/10 flex items-center justify-center text-xl"></span>
                     <div>
                         <h3 class="text-base font-bold tracking-tight">Sales analytics</h3>
                         <p class="text-xs text-slate-300 mt-1">Performance overview · owner view</p>
                     </div>
                 </div>
-                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-white text-2xl transition">&times;</button>
+                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-lg font-bold modal-header-text transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-4 sm:p-7 space-y-6 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -1418,7 +838,7 @@
                                 <h4 class="font-semibold text-gray-100">Top-selling items</h4>
                                 <p class="text-xs text-gray-500 mt-1">Ranked by units sold in selected period</p>
                             </div>
-                            <span class="text-lg" aria-hidden="true">🍽️</span>
+                            <span class="text-lg" aria-hidden="true"></span>
                         </div>
                         <div id="analyticsTopItems" class="space-y-4"></div>
                     </section>
@@ -1428,7 +848,7 @@
                                 <h4 class="font-semibold text-gray-100">Top ordering customers</h4>
                                 <p class="text-xs text-gray-500 mt-1">Saved customers · ranked by orders in period</p>
                             </div>
-                            <span class="text-lg" aria-hidden="true">👥</span>
+                            <span class="text-lg" aria-hidden="true"></span>
                         </div>
                         <div id="analyticsTopCustomers" class="space-y-4"></div>
                     </section>
@@ -1442,14 +862,14 @@
     </div>
 
     <!-- EXPENSE MANAGEMENT MODAL -->
-<div id="expenseModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+<div id="expenseModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-4 transition-all">
     <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
-        <div class="p-5 bg-gradient-to-r from-teal-600 to-emerald-700 text-white flex justify-between items-center shadow-inner">
+        <div class="modal-header-gradient p-5 flex justify-between items-center">
             <div class="flex items-center gap-2">
-                <span class="text-xl">💸</span>
+                <span class="text-xl"></span>
                 <h3 class="text-sm font-black tracking-widest uppercase">Expense Management</h3>
             </div>
-            <button onclick="closeExpenseModal()" class="text-teal-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
+            <button onclick="closeExpenseModal()" class="text-teal-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
 
         <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -1486,7 +906,7 @@
                 </div>
 
                 <div class="flex gap-2 pt-2">
-                    <button onclick="saveExpense()" class="flex-1 bg-gradient-to-r from-teal-500 to-teal-600 text-white text-xs font-black py-3 rounded-xl hover:from-teal-600 hover:to-teal-700 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Save Expense</button>
+                    <button onclick="saveExpense()" class="flex-1 bg-teal-500">Save Expense</button>
                     <button onclick="resetExpenseForm()" class="bg-gray-100 text-gray-600 text-xs font-bold px-5 py-3 rounded-xl hover:bg-gray-200 transition">Reset</button>
                 </div>
             </div>
@@ -1518,8 +938,8 @@
             </div>
 
             <!-- Manager Notice -->
-            <div id="managerExpenseNotice" class="hidden bg-gradient-to-r from-teal-50 to-emerald-50 p-4 rounded-xl border border-teal-100 text-xs text-teal-800 font-medium">
-                <span class="text-lg mr-1 align-middle">ℹ️</span> As a Manager, you can add new expenses. Viewing history, editing, and deleting are restricted to the Owner securely.
+            <div id="managerExpenseNotice" class="hidden bg-teal-50 border border-teal-200 p-4 rounded-xl border border-teal-100 text-xs text-teal-800 font-medium">
+                <span class="text-lg mr-1 align-middle"></span> As a Manager, you can add new expenses. Viewing history, editing, and deleting are restricted to the Owner securely.
             </div>
         </div>
 
@@ -1530,14 +950,14 @@
 </div>
 
     <!-- HELD ORDERS MODAL -->
-    <div id="heldOrdersModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+    <div id="heldOrdersModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-4 transition-all">
         <div class="bg-white rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-orange-500 to-amber-600 text-white flex justify-between items-center shadow-inner">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">⏸️</span>
+                    <span class="text-xl"></span>
                     <h3 class="text-sm font-black tracking-widest uppercase">Held Orders</h3>
                 </div>
-                <button onclick="closeHeldOrdersModal()" class="text-orange-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
+                <button onclick="closeHeldOrdersModal()" class="text-orange-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -1554,14 +974,14 @@
     </div>
 
     <!-- SHIFT OPENING CASH MODAL -->
-    <div id="shiftOpeningModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+    <div id="shiftOpeningModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-4 transition-all">
         <div class="bg-white rounded-3xl w-full max-w-md shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex justify-between items-center shadow-inner">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">💵</span>
+                    <span class="text-xl"></span>
                     <h3 class="text-sm font-black tracking-widest uppercase">Opening Cash</h3>
                 </div>
-                <button onclick="closeShiftOpeningModal()" class="text-emerald-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
+                <button onclick="closeShiftOpeningModal()" class="text-emerald-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-8 space-y-5 bg-gray-50/50">
@@ -1576,7 +996,7 @@
                 <button onclick="closeShiftOpeningModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">
                     Cancel
                 </button>
-                <button onclick="saveOpeningCash()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:from-emerald-600 hover:to-teal-700 transition shadow-md hover:shadow-lg active:scale-95">
+                <button onclick="saveOpeningCash()" class="bg-emerald-500">
                     Save Opening Cash
                 </button>
             </div>
@@ -1584,31 +1004,31 @@
     </div>
 
     <!-- SHIFT CLOSING & REPORT MODAL -->
-    <div id="shiftReportModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="shiftReportModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">📊</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">Shift Closing Summary</h3>
-                        <p class="text-[11px] text-indigo-200/80 font-medium">Reconcile cash drawer & final shift metrics</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Reconcile cash drawer & final shift metrics</p>
                     </div>
                 </div>
-                <button onclick="closeShiftReportModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeShiftReportModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50" id="shiftReportContent"></div>
 
             <div class="p-4 bg-gray-50/80 border-t border-gray-100 flex justify-between items-center gap-3">
                 <button onclick="printShiftReportPDF()" class="bg-indigo-50 border border-indigo-200 text-indigo-700 px-4 py-2.5 rounded-xl text-xs font-black hover:bg-indigo-100 transition shadow-sm flex items-center gap-1.5 active:scale-95">
-                    <span>📄</span> Export PDF
+                    <span></span> Export PDF
                 </button>
                 <div class="flex gap-2">
                     <button onclick="closeShiftReportModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">
                         Cancel
                     </button>
-                    <button onclick="confirmCloseShift()" class="bg-gradient-to-r from-rose-600 to-red-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:from-rose-700 hover:to-red-700 transition shadow-md hover:shadow-lg active:scale-95 flex items-center gap-1.5">
-                        <span>🔚</span> End Shift
+                    <button onclick="confirmCloseShift()" class="bg-red-600">
+                        <span></span> End Shift
                     </button>
                 </div>
             </div>
@@ -1616,17 +1036,17 @@
     </div>
 
     <!-- PAYMENT MODAL -->
-    <div id="paymentModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-3 sm:p-4 transition-all duration-300">
+    <div id="paymentModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-3 sm:p-4 transition-all duration-300">
       <div class="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-        <div class="p-4 sm:p-5 bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 text-white flex justify-between items-center shadow-sm">
+        <div class="modal-header-gradient p-4 sm:p-5 flex justify-between items-center">
           <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-8 sm:w-10 h-8 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-base sm:text-lg border border-white/10 shadow-inner">💳</div>
+            <div class="w-8 sm:w-10 h-8 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10  flex items-center justify-center text-base sm:text-lg border border-white/10 shadow-inner"></div>
             <div>
               <h3 class="text-xs sm:text-sm font-black tracking-wider uppercase text-white">Complete Payment</h3>
-              <p class="text-[10px] sm:text-[11px] text-indigo-200/80 font-medium">Split or multi-tender settlement</p>
+              <p class="text-[10px] sm:text-[11px] text-gray-500 font-medium">Split or multi-tender settlement</p>
             </div>
           </div>
-          <button onclick="closePaymentModal()" class="w-7 sm:w-8 h-7 sm:h-8 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg sm:text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+          <button onclick="closePaymentModal()" class="w-7 sm:w-8 h-7 sm:h-8 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg sm:text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
 
         <div class="p-4 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
@@ -1663,17 +1083,17 @@
 
         <div class="p-3 sm:p-4 bg-gray-50/80 border-t border-gray-100 flex justify-between items-center gap-2">
           <button onclick="closePaymentModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-xs font-bold hover:bg-gray-50 transition">Cancel</button>
-          <button id="confirmPaymentBtn" onclick="confirmPaymentAndProcess()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-xs sm:text-xs font-black hover:from-emerald-600 hover:to-teal-700 transition shadow-md hover:shadow-lg active:scale-95">Confirm Payment</button>
+          <button id="confirmPaymentBtn" onclick="confirmPaymentAndProcess()" class="bg-emerald-500">Confirm Payment</button>
         </div>
       </div>
     </div>
 
     <!-- SUPPLIER MODAL -->
-    <div id="supplierModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[60] p-4 transition-all duration-300">
+    <div id="supplierModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-[60] p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6 shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 flex flex-col transform transition-all">
-            <div class="flex justify-between items-center mb-4">
+            <div class="modal-header-gradient flex justify-between items-center mb-4">
                 <h2 class="text-xl font-black text-gray-800">Supplier</h2>
-                <button onclick="closeSupplierModal()" class="text-gray-600 hover:text-gray-800 text-2xl font-bold">&times;</button>
+                <button onclick="closeSupplierModal()" class="text-gray-600 hover:text-gray-800 text-2xl font-bold"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             
             <div id="supplierListContainer" class="space-y-2">
@@ -1751,9 +1171,9 @@
         </div>
     </div>
     <!-- STOCK ACCESS MODAL -->
-    <div id="stockPinModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[60] p-4 transition-all duration-300">
+    <div id="stockPinModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-[60] p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 space-y-4 text-center transform transition-all">
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-2xl mx-auto shadow-inner">🔒</div>
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-2xl mx-auto shadow-inner"></div>
             <div>
                 <h3 class="text-sm font-black text-gray-900 uppercase tracking-wider">Unlock Stock Panel</h3>
                 <p class="text-xs text-gray-500 font-medium mt-1">Re-authenticate your credentials to view raw ingredients</p>
@@ -1762,15 +1182,15 @@
             <p id="stockPinError" class="hidden text-xs text-rose-600 font-bold">Invalid PIN! Try again.</p>
             <div class="flex gap-2 pt-1">
                 <button onclick="closeStockPinModal()" class="flex-1 bg-white ring-1 ring-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-50 transition">Cancel</button>
-                <button onclick="submitStockPin()" class="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 text-white py-2.5 rounded-xl font-black text-xs hover:from-amber-600 hover:to-amber-700 shadow-md hover:shadow-lg transition active:scale-95">Unlock</button>
+                <button onclick="submitStockPin()" class="flex-1 bg-amber-500">Unlock</button>
             </div>
         </div>
     </div>
 
     <!-- OWNER RE-AUTH MODAL -->
-    <div id="ownerAuthModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[70] p-4 transition-all duration-300">
+    <div id="ownerAuthModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-[70] p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 space-y-4 text-center transform transition-all">
-            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center text-2xl mx-auto shadow-inner">👑</div>
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200 flex items-center justify-center text-2xl mx-auto shadow-inner"></div>
             <div>
                 <h3 class="text-sm font-black text-gray-900 uppercase tracking-wider">Owner Authorization</h3>
                 <p class="text-xs text-gray-500 font-medium mt-1">Re-authenticate your account to authorize this privileged action.</p>
@@ -1779,23 +1199,23 @@
             <p id="ownerAuthError" class="hidden text-xs text-rose-600 font-bold">Invalid PIN.</p>
             <div class="flex gap-2 pt-1">
                 <button onclick="closeOwnerAuthModal()" class="flex-1 bg-white ring-1 ring-gray-200 text-gray-700 py-2.5 rounded-xl font-bold text-xs hover:bg-gray-50 transition">Cancel</button>
-                <button onclick="submitOwnerAuth()" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2.5 rounded-xl font-black text-xs hover:from-purple-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition active:scale-95">Authorize</button>
+                <button onclick="submitOwnerAuth()" class="flex-1 bg-purple-600">Authorize</button>
             </div>
         </div>
     </div>
 
     <!-- RAW STOCK INVENTORY MODAL -->
-    <div id="inventoryModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="inventoryModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white flex justify-between items-center shadow-sm">
+            <div class="p-5 bg-amber-600">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">📦</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">Raw Ingredients & Inventory</h3>
-                        <p class="text-[11px] text-amber-100/80 font-medium">Manage master ingredients, units & stock levels</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Manage master ingredients, units & stock levels</p>
                     </div>
                 </div>
-                <button onclick="closeInventoryModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeInventoryModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
@@ -1806,7 +1226,7 @@
                         <input id="newItemStock" type="number" step="0.01" min="0" placeholder="Initial Stock" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
                         <input id="newItemUnit" type="text" placeholder="Unit (kg, pcs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
                         <input id="newItemCost" type="number" step="0.01" min="0" placeholder="Cost per Unit" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
-                        <button onclick="addNewInventoryItem()" class="bg-gradient-to-r from-amber-500 to-amber-600 text-white text-xs font-black rounded-xl p-2.5 hover:from-amber-600 hover:to-amber-700 transition shadow-md active:scale-95">+ Add</button>
+                        <button onclick="addNewInventoryItem()" class="bg-amber-500">+ Add</button>
                     </div>
                 </div>
 
@@ -1820,17 +1240,17 @@
     </div>
 
     <!-- OWNER ADMIN MODAL -->
-    <div id="ownerAdminModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="ownerAdminModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-purple-800 via-purple-900 to-indigo-950 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">👑</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">Owner Admin Panel</h3>
-                        <p class="text-[11px] text-purple-200/80 font-medium">Categories, Recipes, Modifiers & Staff Permissions</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Categories, Recipes, Modifiers & Staff Permissions</p>
                     </div>
                 </div>
-                <button onclick="closeOwnerAdminModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeOwnerAdminModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50">
@@ -1839,7 +1259,7 @@
                     <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">1. Manage Food Categories</h4>
                     <div class="flex gap-2">
                         <input id="newCatName" type="text" placeholder="Category Name" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium flex-1 focus:ring-2 focus:ring-purple-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
-                        <button onclick="addCategory()" class="bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-purple-700 hover:to-indigo-700 transition shadow-md active:scale-95">+ Add</button>
+                        <button onclick="addCategory()" class="bg-purple-600">+ Add</button>
                     </div>
                     <div id="ownerCategoryList" class="flex flex-wrap gap-2 pt-2"></div>
                 </div>
@@ -1850,7 +1270,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <input id="instantItemName" type="text" placeholder="Item name (e.g. Extra Sauce)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
                         <input id="instantItemPrice" type="number" step="0.01" min="0" placeholder="Price (Rs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
-                        <button onclick="addInstantItemToCart()" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-black px-4 py-2.5 rounded-xl hover:from-indigo-700 hover:to-purple-700 transition shadow-md active:scale-95">+ Add to Cart</button>
+                        <button onclick="addInstantItemToCart()" class="bg-blue-600">+ Add to Cart</button>
                     </div>
                 </div>
 
@@ -1895,7 +1315,7 @@
                     </div>
 
                     <div class="flex gap-2 pt-2">
-                        <button onclick="saveFoodItem()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-black py-3 rounded-xl hover:from-emerald-600 hover:to-teal-700 transition shadow-md active:scale-95">Save Food Item</button>
+                        <button onclick="saveFoodItem()" class="flex-1 bg-emerald-500">Save Food Item</button>
                         <button onclick="resetFoodForm()" class="bg-white ring-1 ring-gray-200 text-gray-700 text-xs font-bold px-5 py-3 rounded-xl hover:bg-gray-50 transition">Reset</button>
                     </div>
                 </div>
@@ -1909,7 +1329,7 @@
                 <!-- Employee Security Management -->
                 <div class="bg-white p-5 rounded-2xl border border-rose-100 shadow-sm space-y-4">
                     <div class="flex items-center gap-2">
-                        <div class="w-2 h-2 rounded-full bg-rose-500"></div>
+                        <div class="w-2 h-2 rounded-full bg-blue-600"></div>
                         <h4 class="text-xs font-black text-gray-800 uppercase tracking-wider">3. Employee Accounts & Permissions</h4>
                     </div>
                     <p class="text-xs text-gray-500 font-medium">Only the Owner can create, disable, enable, or change employee roles. New employees receive credentials for Firebase authentication.</p>
@@ -1924,7 +1344,7 @@
                             <option value="MANAGER">MANAGER</option>
                         </select>
                     </div>
-                    <button onclick="createEmployee()" class="bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-rose-700 hover:to-red-700 transition shadow-md active:scale-95">+ Create Employee</button>
+                    <button onclick="createEmployee()" class="bg-red-600">+ Create Employee</button>
                     <div id="employeeManagementResult" class="text-xs hidden font-bold"></div>
                     <div id="employeeList" class="space-y-2 pt-2"></div>
                 </div>
@@ -1943,17 +1363,17 @@
     </div>
 
     <!-- DELIVERY MANAGEMENT MODAL -->
-    <div id="deliveryManagementModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="deliveryManagementModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">🛵</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">Delivery Orders Tracker</h3>
-                        <p class="text-[11px] text-blue-100/80 font-medium">Real-time dispatcher & courier management</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Real-time dispatcher & courier management</p>
                     </div>
                 </div>
-                <button onclick="closeDeliveryManagementModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeDeliveryManagementModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="flex-1 overflow-y-auto p-6 bg-gray-50/50">
@@ -1961,7 +1381,7 @@
                     <!-- PENDING DELIVERIES -->
                     <div>
                         <h4 class="text-xs font-black text-amber-900 bg-amber-50/80 p-3 rounded-2xl border border-amber-200/60 flex items-center gap-2 uppercase tracking-wider mb-3.5 shadow-sm">
-                            <span class="text-base">⏳</span> Pending Deliveries
+                            <span class="text-base"></span> Pending Deliveries
                         </h4>
                         <div id="pendingDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
                     </div>
@@ -1969,7 +1389,7 @@
                     <!-- ACTIVE DELIVERIES -->
                     <div>
                         <h4 class="text-xs font-black text-blue-900 bg-blue-50/80 p-3 rounded-2xl border border-blue-200/60 flex items-center gap-2 uppercase tracking-wider mb-3.5 shadow-sm">
-                            <span class="text-base">🛵</span> Out for Delivery
+                            <span class="text-base"></span> Out for Delivery
                         </h4>
                         <div id="activeDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
                     </div>
@@ -1977,7 +1397,7 @@
                     <!-- COMPLETED DELIVERIES -->
                     <div>
                         <h4 class="text-xs font-black text-emerald-900 bg-emerald-50/80 p-3 rounded-2xl border border-emerald-200/60 flex items-center gap-2 uppercase tracking-wider mb-3.5 shadow-sm">
-                            <span class="text-base">✅</span> Delivered Orders
+                            <span class="text-base"></span> Delivered Orders
                         </h4>
                         <div id="completedDeliveriesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
                     </div>
@@ -1993,41 +1413,41 @@
     </div>
 
     <!-- PRODUCT MODIFIER SELECTION MODAL -->
-    <div id="modifierSelectModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="modifierSelectModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-md shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden flex flex-col max-h-[85vh] transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-indigo-700 via-purple-700 to-indigo-800 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">✨</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 id="modifierModalTitle" class="text-sm font-black tracking-wider uppercase text-white">Customize Item</h3>
                         <p class="text-[11px] text-indigo-100/80 font-medium">Select variations & add-on choices</p>
                     </div>
                 </div>
-                <button onclick="closeModifierModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeModifierModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div id="modifierGroupsContainer" class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50"></div>
             <div class="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-between items-center gap-3">
                 <div class="text-xs font-black uppercase tracking-wider text-gray-600">Total: <span id="modifierModalTotal" class="text-base font-black text-emerald-600">Rs 0.00</span></div>
                 <div class="flex gap-2">
                     <button onclick="closeModifierModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition">Cancel</button>
-                    <button onclick="confirmAddModifiedItem()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-emerald-600 hover:to-teal-700 transition shadow-md active:scale-95">Add to Cart</button>
+                    <button onclick="confirmAddModifiedItem()" class="bg-emerald-500">Add to Cart</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- REFUND MODAL -->
-    <div id="refundModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[65] p-4 transition-all duration-300">
+    <div id="refundModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-[65] p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-md shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden flex flex-col max-h-[85vh] transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-rose-700 via-red-700 to-rose-800 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">↩️</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 id="refundModalTitle" class="text-sm font-black tracking-wider uppercase text-white">Refund Order</h3>
                         <p class="text-[11px] text-rose-100/80 font-medium">Process full or itemized returns</p>
                     </div>
                 </div>
-                <button onclick="closeRefundModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeRefundModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="refundItemsContainer" class="space-y-2.5"></div>
@@ -2044,24 +1464,24 @@
                 <div class="text-xs font-black uppercase tracking-wider text-gray-600">Refund Total: <span id="refundModalTotal" class="text-base font-black text-rose-600">Rs 0.00</span></div>
                 <div class="flex gap-2">
                     <button onclick="closeRefundModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition">Cancel</button>
-                    <button onclick="confirmRefund()" class="bg-gradient-to-r from-rose-600 to-red-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:from-rose-700 hover:to-red-700 transition shadow-md active:scale-95">Process Refund</button>
+                    <button onclick="confirmRefund()" class="bg-red-600">Process Refund</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- AUDIT LOG MODAL -->
-    <div id="auditLogModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="auditLogModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-slate-900 via-gray-900 to-slate-900 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">🕵️</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">System Audit Log</h3>
                         <p class="text-[11px] text-gray-300 font-medium">Activity logs, cashier actions & security events</p>
                     </div>
                 </div>
-                <button onclick="closeAuditLogModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeAuditLogModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="auditLogList" class="space-y-2 text-xs"></div>
@@ -2073,17 +1493,17 @@
     </div>
 
     <!-- WEBSITE ONLINE ORDERS MODAL -->
-    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="onlineOrdersModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-900 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">🌐</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">Website & Online Orders</h3>
-                        <p class="text-[11px] text-indigo-200/80 font-medium">Incoming direct consumer online orders</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Incoming direct consumer online orders</p>
                     </div>
                 </div>
-                <button onclick="closeOnlineOrdersModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeOnlineOrdersModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="onlineOrdersList" class="space-y-3"></div>
@@ -2095,22 +1515,22 @@
     </div>
 
     <!-- CUSTOMER CRM MODAL -->
-    <div id="customerModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all duration-300">
+    <div id="customerModal" class="hidden fixed inset-0 bg-gray-50/70  flex justify-center items-center z-50 p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
-            <div class="p-5 bg-gradient-to-r from-purple-800 via-indigo-800 to-purple-900 text-white flex justify-between items-center shadow-sm">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-lg border border-white/10 shadow-inner">👥</div>
+                    <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
                         <h3 class="text-sm font-black tracking-wider uppercase text-white">Customer CRM & History</h3>
-                        <p class="text-[11px] text-purple-200/80 font-medium">Customer database, loyalty points & order history</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Customer database, loyalty points & order history</p>
                     </div>
                 </div>
-                <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none">&times;</button>
+                <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
                 <!-- List View -->
                 <div id="customerListView" class="space-y-3">
-                    <input id="customerSearchInput" type="text" placeholder="🔍 Search customer by name or phone..."
+                    <input id="customerSearchInput" type="text" placeholder=" Search customer by name or phone..."
                            oninput="renderCustomerList(this.value)"
                            class="w-full p-3 text-xs border-0 ring-1 ring-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white shadow-inner font-medium transition-all" />
                     <div id="customerListContainer" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1"></div>
@@ -2130,25 +1550,25 @@
     </div>
 
     <!-- STAFF MANAGEMENT MODAL -->
-    <div id="staffManagementModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+    <div id="staffManagementModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-4 transition-all">
         <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
-            <div class="p-5 bg-gradient-to-r from-cyan-700 to-blue-800 text-white flex justify-between items-center shadow-inner">
+            <div class="modal-header-gradient p-5 flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">👨‍💼</span>
+                    <span class="text-xl"></span>
                     <div>
                         <h3 class="text-sm font-black tracking-widest uppercase">Staff Management</h3>
-                        <p class="text-[11px] text-cyan-200/80 font-medium">Employees, attendance, leaves &amp; payroll</p>
+                        <p class="text-[11px] text-gray-500 font-medium">Employees, attendance, leaves &amp; payroll</p>
                     </div>
                 </div>
-                <button onclick="closeStaffManagementModal()" class="text-cyan-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
+                <button onclick="closeStaffManagementModal()" class="text-cyan-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <!-- Tabs -->
             <div class="px-5 pt-4 pb-3 bg-gray-50/50 border-b border-gray-100 flex flex-wrap gap-2">
-                <button id="staffTab-employees" onclick="switchStaffTab('employees')" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-cyan-800 shadow-sm ring-1 ring-gray-200 transition">👥 Employees</button>
-                <button id="staffTab-attendance" onclick="switchStaffTab('attendance')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">🗓️ Attendance</button>
-                <button id="staffTab-leaves" onclick="switchStaffTab('leaves')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">🌴 Leaves</button>
-                <button id="staffTab-payroll" onclick="switchStaffTab('payroll')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">💰 Payroll &amp; Advances</button>
+                <button id="staffTab-employees" onclick="switchStaffTab('employees')" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-cyan-800 shadow-sm ring-1 ring-gray-200 transition"> Employees</button>
+                <button id="staffTab-attendance" onclick="switchStaffTab('attendance')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition"> Attendance</button>
+                <button id="staffTab-leaves" onclick="switchStaffTab('leaves')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">Leaves</button>
+                <button id="staffTab-payroll" onclick="switchStaffTab('payroll')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition"> Payroll &amp; Advances</button>
             </div>
 
             <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -2176,7 +1596,7 @@
                             </select>
                         </div>
                         <div class="flex gap-2 pt-2">
-                            <button onclick="saveStaff()" class="flex-1 bg-gradient-to-r from-cyan-600 to-blue-700 text-white text-xs font-black py-3 rounded-xl hover:from-cyan-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Save Employee</button>
+                            <button onclick="saveStaff()" class="flex-1 bg-cyan-600">Save Employee</button>
                             <button onclick="resetStaffForm()" class="bg-gray-100 text-gray-600 text-xs font-bold px-5 py-3 rounded-xl hover:bg-gray-200 transition">Reset</button>
                         </div>
                     </div>
@@ -2211,7 +1631,7 @@
                             </select>
                             <input id="leaveReason" type="text" placeholder="Reason (optional)" class="sm:col-span-2 p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
                         </div>
-                        <button onclick="submitLeaveRequest()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-700 text-white text-xs font-black py-3 rounded-xl hover:from-cyan-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Submit Leave Request</button>
+                        <button onclick="submitLeaveRequest()" class="w-full bg-cyan-600">Submit Leave Request</button>
                     </div>
                     <div id="leaveList" class="space-y-2"></div>
                 </div>
@@ -2235,7 +1655,7 @@
                             <input id="advanceDate" type="date" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
                             <input id="advanceNote" type="text" placeholder="Note (optional)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
                         </div>
-                        <button onclick="recordAdvancePayment()" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-black py-3 rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Record Advance</button>
+                        <button onclick="recordAdvancePayment()" class="w-full bg-amber-500">Record Advance</button>
                     </div>
 
                     <div class="space-y-2">
