@@ -1,0 +1,37 @@
+{
+  "name": "rest_pos",
+  "version": "1.0.0",
+  "description": "Offline-capable POS PWA for restaurants",
+  "main": "hungrybirdspos/app.js",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
+    "lint:fix": "eslint --fix hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
+    "format": "prettier --write hungrybirdspos/",
+    "type-check": "tsc --noEmit 2>&1 || true"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zainabtanveer001-cyber/hungrybirdspos.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/zainabtanveer001-cyber/hungrybirdspos/issues"
+  },
+  "homepage": "https://github.com/zainabtanveer001-cyber/hungrybirdspos#readme",
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/ui": "^5.0.5",
+    "eslint": "^8.57.1",
+    "jsdom": "^30.1.3",
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
