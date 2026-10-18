@@ -22,7 +22,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://www.gstatic.com https://www.googleapis.com https://firebaseapp.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://*.firebase.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' sw.js"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://www.gstatic.com https://www.googleapis.com https://firebaseapp.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://*.firebase.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' sw.js"
         }
       ]
     },
