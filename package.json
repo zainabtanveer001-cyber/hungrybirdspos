@@ -10,7 +10,8 @@
     "lint": "eslint hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
     "lint:fix": "eslint --fix hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
     "format": "prettier --write hungrybirdspos/",
-    "type-check": "tsc --noEmit 2>&1 || true"
+    "type-check": "tsc --noEmit 2>&1 || true",
+    "build:css": "tailwindcss -i ./src/input.css -o ./hungrybirdspos/tailwind.css --minify"
   },
   "repository": {
     "type": "git",
@@ -32,6 +33,7 @@
     "jsdom": "^30.1.3",
     "prettier": "^3.9.10",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "tailwindcss": "^3.4.17"
   }
 }
