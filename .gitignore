@@ -6,6 +6,9 @@ dist/
 coverage/
 *.local
 
+# Inner repo clone (source files tracked at root level)
+hungrybirdspos/
+
 # IDE
 .vscode/
 .idea/

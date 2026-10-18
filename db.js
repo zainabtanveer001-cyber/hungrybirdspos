@@ -1,5 +1,8 @@
 // ==========================================
-// Hungry Birds Restaurant POS v2.0 (Consolidated & Patched)
+// DEPRECATED — NOT LOADED BY index.html
+// This file is superseded by app.js, which contains the
+// authoritative Dexie schema (version 19) and all active code.
+// It is kept for reference only; do not rely on it.
 // ==========================================
 
 // ------------------------------
@@ -90,12 +93,21 @@ async function initializeUsers() {
     const count = await db.users.count();
     if (count > 0) return;
 
-    await db.users.bulkAdd([
-        { username: "owner", password: "1234", role: "OWNER" },
-        { username: "manager", password: "1234", role: "MANAGER" },
-        { username: "cashier", password: "1234", role: "CASHIER" },
-        { username: "waiter", password: "1234", role: "WAITER" }
-    ]);
+    // Hash passwords using SHA-256 via Web Crypto API (available from app.js).
+    const defaultUsers = [
+        { username: "owner", passwordPlain: "1234", role: "OWNER" },
+        { username: "manager", passwordPlain: "1234", role: "MANAGER" },
+        { username: "cashier", passwordPlain: "1234", role: "CASHIER" },
+        { username: "waiter", passwordPlain: "1234", role: "WAITER" }
+    ];
+
+    await db.users.bulkAdd(
+        await Promise.all(defaultUsers.map(async u => ({
+            username: u.username,
+            password: await hashPin(u.passwordPlain),
+            role: u.role
+        })))
+    );
     console.log("Default users created.");
 }
 
@@ -108,33 +120,40 @@ window.login = async function () {
     const username = usernameEl.value.trim();
     const password = passwordEl.value;
 
-    const user = await db.users.where("username").equals(username).first();
+    try {
+        const user = await db.users.where("username").equals(username).first();
 
-    if (!user) {
-        alert("User not found.");
-        return;
+        if (!user) {
+            alert("User not found.");
+            return;
+        }
+
+        // Compare hashed password (SHA-256 via Web Crypto API).
+        const hashedInput = await hashPin(password);
+        if (user.password !== hashedInput) {
+            alert("Incorrect password.");
+            return;
+        }
+
+        currentUser = user;
+        currentRole = user.role;
+
+        sessionStorage.setItem("loggedUser", JSON.stringify(user));
+
+        document.getElementById("loginScreen")?.classList.add("hidden");
+        document.getElementById("posScreen")?.classList.remove("hidden");
+        setText("loggedUserName", user.username);
+        setText("loggedUserRole", user.role);
+
+        applyPermissions();
+        renderDashboard();
+        renderMenu();
+        renderTables();
+        renderCart();
+    } catch (e) {
+        console.error("Login error:", e);
+        alert("Login failed — please try again. If the problem persists, refresh the page.");
     }
-
-    if (user.password !== password) {
-        alert("Incorrect password.");
-        return;
-    }
-
-    currentUser = user;
-    currentRole = user.role;
-
-    sessionStorage.setItem("loggedUser", JSON.stringify(user));
-
-    document.getElementById("loginScreen")?.classList.add("hidden");
-    document.getElementById("posScreen")?.classList.remove("hidden");
-    setText("loggedUserName", user.username);
-    setText("loggedUserRole", user.role);
-
-    applyPermissions();
-    renderDashboard();
-    renderMenu();
-    renderTables();
-    renderCart();
 };
 
 window.restoreSession = function () {
@@ -290,9 +309,9 @@ window.renderTables = async function () {
 
         return `
             <div onclick="selectTable(${table.id})" class="${color} text-white rounded-xl p-4 cursor-pointer shadow text-center">
-                <div class="text-lg font-bold">Table ${table.number}</div>
-                <div class="text-sm">${table.status}</div>
-                <div class="text-xs">${table.waiter || "-"}</div>
+                <div class="text-lg font-bold">Table ${escapeHtml(String(table.number || ""))}</div>
+                <div class="text-sm">${escapeHtml(table.status || "")}</div>
+                <div class="text-xs">${escapeHtml(table.waiter || "-")}</div>
             </div>
         `;
     }).join("");
@@ -387,9 +406,11 @@ async function renderCategoryBar() {
 }
 
 function categoryButton(id, name) {
+    const safeId = escapeHtml(id || "");
+    const safeName = escapeHtml(name || "");
     return `
-        <button onclick="selectCategory('${id}')" class="px-4 py-2 rounded-lg m-1 ${selectedCategoryId === id ? "bg-indigo-600 text-white" : "bg-white border"}">
-            ${name}
+        <button onclick="selectCategory('${safeId}')" class="px-4 py-2 rounded-lg m-1 ${selectedCategoryId === id ? "bg-indigo-600 text-white" : "bg-white border"}">
+            ${safeName}
         </button>
     `;
 }
@@ -411,9 +432,9 @@ async function renderMenu() {
     if (!container) return;
 
     container.innerHTML = menu.map(item => `
-        <div class="bg-white rounded-xl shadow border cursor-pointer hover:shadow-lg p-4" onclick="addItemToCart('${item.id}')">
-            <h3 class="font-bold text-lg">${item.name}</h3>
-            <p class="text-gray-500">Rs ${item.price.toFixed(2)}</p>
+        <div class="bg-white rounded-xl shadow border cursor-pointer hover:shadow-lg p-4" onclick="addItemToCart('${escapeHtml(item.id)}')">
+            <h3 class="font-bold text-lg">${escapeHtml(item.name)}</h3>
+            <p class="text-gray-500">Rs ${(parseFloat(item.price) || 0).toFixed(2)}</p>
         </div>
     `).join("");
 }
@@ -431,9 +452,9 @@ function initializeSearch() {
         if (!container) return;
 
         container.innerHTML = filtered.map(item => `
-            <div class="bg-white rounded-xl shadow border cursor-pointer p-4" onclick="addItemToCart('${item.id}')">
-                <h3 class="font-bold">${item.name}</h3>
-                <p>Rs ${item.price.toFixed(2)}</p>
+            <div class="bg-white rounded-xl shadow border cursor-pointer p-4" onclick="addItemToCart('${escapeHtml(item.id)}')">
+                <h3 class="font-bold text-lg">${escapeHtml(item.name)}</h3>
+                <p class="text-gray-500">Rs ${(parseFloat(item.price) || 0).toFixed(2)}</p>
             </div>
         `).join("");
     });
@@ -478,20 +499,20 @@ function renderCart() {
             <div class="border rounded-lg p-3 mb-2 bg-white">
                 <div class="flex justify-between">
                     <div>
-                        <div class="font-semibold">${item.name}</div>
-                        <div class="text-sm text-gray-500">Rs ${item.price.toFixed(2)}</div>
+                        <div class="font-semibold">${escapeHtml(item.name)}</div>
+                        <div class="text-sm text-gray-500">Rs ${(parseFloat(item.price) || 0).toFixed(2)}</div>
                     </div>
                     <div class="text-right">
-                        <div class="font-bold">Rs ${lineTotal.toFixed(2)}</div>
+                        <div class="font-bold">Rs ${(parseFloat(lineTotal) || 0).toFixed(2)}</div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mt-3">
                     <div class="flex gap-2">
-                        <button onclick="decreaseQty('${item.id}')" class="px-3 py-1 bg-red-500 text-white rounded">-</button>
+                        <button onclick="decreaseQty('${escapeHtml(item.id)}')" class="px-3 py-1 bg-red-500 text-white rounded">-</button>
                         <span class="font-bold px-2">${item.qty}</span>
-                        <button onclick="increaseQty('${item.id}')" class="px-3 py-1 bg-green-500 text-white rounded">+</button>
+                        <button onclick="increaseQty('${escapeHtml(item.id)}')" class="px-3 py-1 bg-green-500 text-white rounded">+</button>
                     </div>
-                    <button onclick="removeCartItem('${item.id}')" class="text-red-600">Remove</button>
+                    <button onclick="removeCartItem('${escapeHtml(item.id)}')" class="text-red-600">Remove</button>
                 </div>
             </div>
         `;
@@ -671,14 +692,14 @@ window.renderKitchenOrders = async function () {
     container.innerHTML = orders.map(order => `
         <div class="rounded-xl border-2 p-4 ${getKitchenCardClass(order)}">
             <div class="flex justify-between">
-                <h2 class="font-bold">${order.tableId ? "TABLE " + order.tableId : "TAKE AWAY"}</h2>
+                <h2 class="font-bold">${order.tableId ? "TABLE " + escapeHtml(String(order.tableId)) : "TAKE AWAY"}</h2>
                 <div class="font-bold">${kitchenTimer(order.createdAt)}</div>
             </div>
-            <div class="text-sm text-gray-500">${order.waiter || "-"}</div>
+            <div class="text-sm text-gray-500">${escapeHtml(order.waiter || "-")}</div>
             <hr class="my-2">
             ${order.items.map(item => `
                 <div class="flex justify-between">
-                    <span>${item.name}</span>
+                    <span>${escapeHtml(item.name || "Item")}</span>
                     <strong>x${item.qty}</strong>
                 </div>
             `).join("")}

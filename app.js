@@ -1,4 +1,4 @@
-﻿// ==========================================
+// ==========================================
 // Hungry Birds Restaurant POS v3.6
 // - Added Delivery Management: Pending / Active / Completed deliveries
 // - KDS (Kitchen) ticket printing along with customer/cash receipt on thermal printer
@@ -99,6 +99,18 @@ function formatAmount(amount) {
     }
 }
 
+// Centralized error handler for async operations.
+// Logs to console, shows user-friendly alert, and never exposes internal details.
+async function withErrorHandling(asyncFn, userMessage = "An error occurred. Please try again.") {
+    try {
+        return await asyncFn();
+    } catch (err) {
+        console.error(userMessage, err);
+        alert(userMessage);
+        return null;
+    }
+}
+
 async function logAudit(action, details, saleId = null) {
     try {
         await db.auditLogs.add({
@@ -145,7 +157,7 @@ window.exportSalesCSV = async function () {
         sale.timestamp ? new Date(sale.timestamp).toLocaleString() : "",
         sale.serverUser || "",
         sale.orderType || "",
-        (sale.items || []).map(i => `${i.name} x${i.qty}`).join("; "),
+        (sale.items || []).map(i => `${escapeHtml(i.name)} x${i.qty}`).join("; "),
         Number(sale.subtotal || 0).toFixed(2),
         sale.discountPercent || 0,
         Number(sale.discountAmount || 0).toFixed(2),
@@ -244,6 +256,73 @@ db.version(15).stores({
     auditLogs: "++id, timestamp, action, user, saleId"
 });
 
+// Bump version to include staff management stores
+db.version(16).stores({
+    staff: "++id, name, phone, role, status, joinDate",
+    attendance: "++id, staffId, date, status",
+    leaves: "++id, staffId, startDate, endDate, status",
+    salaryPayments: "++id, staffId, month, year, status",
+    advancePayments: "++id, staffId, date, status"
+});
+
+// Bump version to extend suppliers with imageUrl and contact fields
+db.version(17).stores({
+    suppliers: "id, name, phone, email, taxId, website"
+});
+
+// Bump version to add stock-in tracking and supplier payments
+db.version(18).stores({
+    stockIn: "++id, supplierId, ingredient, created",
+    supplierPayments: "++id, supplierId, date, amount, method",
+    supplierLedger: "++id, supplierId, date, referenceNumber, description, runningBalance"
+});
+
+// Index expenses by supplier so where('supplierId') queries work
+db.version(19).stores({
+    expenses: "++id, timestamp, amount, category, description, serverUser, status, supplierId"
+});
+
+// Add auditLogs indexes for faster filtering by action and date range
+db.version(20).stores({
+    auditLogs: "++id, timestamp, action, user, saleId",
+    deliveries: "++id, saleId, status, createdAt, assignedTo",
+    tableOrders: "++id, tableId, status, createdAt"
+});
+
+// Add approvedBy / approvedAt to expenses for approval tracking
+db.version(21).stores({
+    expenses: "++id, timestamp, amount, category, description, serverUser, status, supplierId, approvedBy, approvedAt"
+});
+
+// ----------------------------------------------------
+// Dexie Data Validation Hooks (created timestamps)
+// ----------------------------------------------------
+const nowISO = () => new Date().toISOString();
+
+db.users.hook('creating', function (primKey, obj) {
+    obj.createdAt = obj.createdAt || nowISO();
+    obj.updatedAt = nowISO();
+});
+db.users.hook('updating', function (modifications) {
+    modifications.updatedAt = nowISO();
+});
+
+db.inventory.hook('creating', function (primKey, obj) {
+    obj.createdAt = obj.createdAt || nowISO();
+    obj.updatedAt = nowISO();
+});
+db.inventory.hook('updating', function (modifications) {
+    modifications.updatedAt = nowISO();
+});
+
+db.menu.hook('creating', function (primKey, obj) {
+    obj.createdAt = obj.createdAt || nowISO();
+    obj.updatedAt = nowISO();
+});
+db.menu.hook('updating', function (modifications) {
+    modifications.updatedAt = nowISO();
+});
+
 // ----------------------------------------------------
 // Dexie Real-Time Hooks (Auto Updates UI without reload)
 // ----------------------------------------------------
@@ -284,6 +363,62 @@ db.deliveries?.hook?.('deleting', function () {
     }, 100);
 });
 
+// ----------------------------------------------------
+// Supplier Ledger Hooks
+// ----------------------------------------------------
+// Appends a ledger row on every stock-in / payout, with running balance.
+async function appendLedgerRow(supplierId, row) {
+    const last = await db.supplierLedger.where('supplierId').equals(supplierId).reverse().limit(1).first();
+    const prevBalance = last ? Number(last.runningBalance) || 0 : 0;
+    const runningBalance = prevBalance + (Number(row.totalCost) || 0) - (Number(row.cashPaid) || 0);
+
+    row.supplierId = supplierId;
+    row.date = row.date || new Date().toISOString();
+    row.runningBalance = runningBalance;
+
+    await db.supplierLedger.add(row);
+}
+
+db.stockIn.hook('creating', function (primKey, changes) {
+    setTimeout(async () => {
+        if (!window.__skipLedgerStockIn) {
+            const record = await db.stockIn.get(primKey);
+            if (record) {
+                await appendLedgerRow(record.supplierId, {
+                    description: `Stock in: ${record.ingredient}`,
+                    referenceNumber: `SI-${record.id}`,
+                    qtyIn: record.qty,
+                    unitPrice: record.cost,
+                    totalCost: record.qty * record.cost,
+                    cashPaid: 0
+                });
+                window.renderSupplierLedger?.();
+            }
+        }
+        window.__skipLedgerStockIn = false;
+    }, 50);
+});
+
+db.supplierPayments.hook('creating', function (primKey) {
+    setTimeout(async () => {
+        if (!window.__skipLedgerPayment) {
+            const record = await db.supplierPayments.get(primKey);
+            if (record) {
+                await appendLedgerRow(record.supplierId, {
+                    description: `Payment: ${record.method}`,
+                    referenceNumber: `PY-${record.id}`,
+                    qtyIn: 0,
+                    unitPrice: 0,
+                    totalCost: 0,
+                    cashPaid: record.amount
+                });
+                window.renderSupplierLedgers?.();
+            }
+        }
+        window.__skipLedgerPayment = false;
+    }, 50);
+});
+
 // ------------------------------
 // Global Application State
 // ------------------------------
@@ -308,6 +443,34 @@ let currentRole = null;
 
 let bluetoothDevice = null;
 let printerCharacteristic = null;
+
+// Printer connection state management
+const PRINTER_STATE = { DISCONNECTED: 0, CONNECTING: 1, CONNECTED: 2, ERROR: 3 };
+const PRINTER_CONNECTION_TIMEOUT_MS = 10000;
+let printerConnectionState = PRINTER_STATE.DISCONNECTED;
+
+function setPrinterStatus(state, deviceName) {
+    const statusEl = document.getElementById('printerStatusIndicator');
+    if (statusEl) {
+        const labels = {
+            [PRINTER_STATE.DISCONNECTED]: 'Disconnected',
+            [PRINTER_STATE.CONNECTING]: 'Connecting...',
+            [PRINTER_STATE.CONNECTED]: `Connected${deviceName ? ': ' + deviceName : ''}`,
+            [PRINTER_STATE.ERROR]: 'Error',
+        };
+        statusEl.textContent = labels[state] || 'Unknown';
+        statusEl.className = state === PRINTER_STATE.CONNECTED
+            ? 'text-xs text-emerald-600 font-medium'
+            : state === PRINTER_STATE.CONNECTING
+                ? 'text-xs text-amber-600 font-medium'
+                : 'text-xs text-gray-500';
+    }
+    printerConnectionState = state;
+}
+
+function isPrinterConnected() {
+    return printerConnectionState === PRINTER_STATE.CONNECTED && printerCharacteristic;
+}
 
 // Bulk Selection State
 let selectedSaleIds = new Set();
@@ -910,8 +1073,35 @@ async function loadSuppliersForExpenses() {
 // ====================================================
 window.openSupplierModal = async function () {
     document.getElementById("supplierModal")?.classList.remove("hidden");
+    document.getElementById('supplierListContainer')?.classList.remove('hidden');
+    document.getElementById('supplierFormContainer')?.classList.add('hidden');
+    document.getElementById('supplierDetailContainer')?.classList.add('hidden');
+    document.getElementById('supplierLedgerContainer')?.classList.add('hidden');
     resetSupplierForm();
     await renderSupplierList();
+
+    const ledgerSupplierEl = document.getElementById('ledgerSupplierFilter');
+    const ledgerFromEl = document.getElementById('ledgerDateFrom');
+    const ledgerToEl = document.getElementById('ledgerDateTo');
+    ledgerSupplierEl?.addEventListener('change', () => renderSupplierLedger());
+    ledgerFromEl?.addEventListener('change', () => renderSupplierLedger());
+    ledgerToEl?.addEventListener('change', () => renderSupplierLedger());
+    const imgInput = document.getElementById("supplierImage");
+    if (imgInput) {
+        imgInput.onchange = function () {
+            const file = imgInput.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                const preview = document.getElementById("supplierImagePreview");
+                if (preview) {
+                    preview.src = e.target.result;
+                    preview.classList.remove("hidden");
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+    }
 };
 
 window.closeSupplierModal = function () {
@@ -919,26 +1109,40 @@ window.closeSupplierModal = function () {
 };
 
 window.resetSupplierForm = function () {
-    document.getElementById("editSupplierId").value = "";
-    document.getElementById("supplierName").value = "";
-    document.getElementById("supplierPhone").value = "";
-    document.getElementById("supplierAddress").value = "";
-    document.getElementById("supplierNotes").value = "";
+    const fields = ["editSupplierId","supplierName","supplierPhone","supplierEmail","supplierTaxId","supplierWebsite","supplierAddress","supplierNotes","supplierImage","supplierImagePreview"];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            if (id === "supplierImagePreview") {
+                el.removeAttribute("src");
+                el.classList.add("hidden");
+            } else if (el.type === "file") {
+                el.value = "";
+            } else {
+                el.value = "";
+            }
+        }
+    });
 };
 
 window.saveSupplier = async function () {
     const editId = document.getElementById("editSupplierId").value;
     const name = document.getElementById("supplierName").value.trim();
     const phone = document.getElementById("supplierPhone").value.trim();
+    const email = document.getElementById("supplierEmail").value.trim();
+    const taxId = document.getElementById("supplierTaxId").value.trim();
+    const website = document.getElementById("supplierWebsite").value.trim();
     const address = document.getElementById("supplierAddress").value.trim();
     const notes = document.getElementById("supplierNotes").value.trim();
+    let imageUrl = document.getElementById("supplierImagePreview")?.getAttribute("src") || "";
 
     if (!name) return alert("Supplier name is required.");
 
     const id = editId || "SUP_" + Date.now();
-    await db.suppliers.put({ id, name, phone, address, notes });
+    await db.suppliers.put({ id, name, phone, email, taxId, website, address, notes, imageUrl });
 
     resetSupplierForm();
+    backToSupplierList();
     await renderSupplierList();
     await loadSuppliersForExpenses();
 };
@@ -947,11 +1151,21 @@ window.editSupplier = async function (id) {
     const supplier = await db.suppliers.get(id);
     if (!supplier) return;
 
+    document.getElementById('supplierListContainer')?.classList.add('hidden');
+    document.getElementById('supplierDetailContainer')?.classList.add('hidden');
+    document.getElementById('supplierFormContainer')?.classList.remove('hidden');
+
     document.getElementById("editSupplierId").value = supplier.id;
     document.getElementById("supplierName").value = supplier.name || "";
     document.getElementById("supplierPhone").value = supplier.phone || "";
+    document.getElementById("supplierEmail").value = supplier.email || "";
+    document.getElementById("supplierTaxId").value = supplier.taxId || "";
+    document.getElementById("supplierWebsite").value = supplier.website || "";
     document.getElementById("supplierAddress").value = supplier.address || "";
     document.getElementById("supplierNotes").value = supplier.notes || "";
+    const preview = document.getElementById("supplierImagePreview");
+    preview.src = supplier.imageUrl || "";
+    preview.classList.toggle("hidden", !supplier.imageUrl);
 };
 
 window.deleteSupplier = async function (id) {
@@ -961,39 +1175,311 @@ window.deleteSupplier = async function (id) {
     await loadSuppliersForExpenses();
 };
 
-async function renderSupplierList() {
-    const container = document.getElementById("supplierList");
+window.showSupplierForm = function () {
+    document.getElementById('supplierListContainer')?.classList.add('hidden');
+    document.getElementById('supplierDetailContainer')?.classList.add('hidden');
+    document.getElementById('supplierFormContainer')?.classList.remove('hidden');
+    resetSupplierForm();
+};
+
+window.backToSupplierList = function () {
+    document.getElementById('supplierListContainer')?.classList.remove('hidden');
+    document.getElementById('supplierFormContainer')?.classList.add('hidden');
+    document.getElementById('supplierDetailContainer')?.classList.add('hidden');
+    document.getElementById('supplierLedgerContainer')?.classList.add('hidden');
+};
+
+window.openSupplierDetails = async function (id) {
+    const supplier = await db.suppliers.get(id);
+    if (!supplier) return;
+    const transactions = await db.expenses.where('supplierId').equals(id).reverse().limit(10).toArray();
+    const stockInRecords = await db.stockIn.where('supplierId').equals(id).reverse().limit(10).toArray();
+    const payments = await db.supplierPayments.where('supplierId').equals(id).reverse().limit(10).toArray();
+    const inventoryItems = await db.inventory.toArray();
+
+    const totalSpent = transactions.filter(t => t.status === "APPROVED" || !t.status).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+    const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const balance = totalSpent - totalPaid;
+
+    const detailDiv = document.getElementById('supplierDetailContainer');
+    if (!detailDiv) return;
+
+    let html = `
+        <div class="p-4 bg-gray-50 rounded-lg mb-2">
+            <h3 class="font-bold mb-1 text-lg">${escapeHtml(supplier.name)}</h3>
+            <p class="text-sm">Phone: ${escapeHtml(supplier.phone || '-')}
+               <br/>Email: ${escapeHtml(supplier.email || '-')}
+               <br/>Tax ID: ${escapeHtml(supplier.taxId || '-')}
+               <br/>Website: ${supplier.website ? `<a href="${escapeHtml(supplier.website)}" target="_blank" class="text-blue-600">${escapeHtml(supplier.website)}</a>` : '-'}
+               <br/>Address: ${escapeHtml(supplier.address || '-')}
+               <br/>Notes: ${escapeHtml(supplier.notes || '-')}</p>
+            ${supplier.imageUrl ? `<img src="${supplier.imageUrl}" class="w-16 h-16 object-cover rounded mt-2" />` : ''}
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-4 text-center">
+            <div class="bg-gray-100 rounded p-2">
+                <div class="text-xs text-gray-500">Total Spent</div>
+                <div class="font-bold text-lg">Rs ${formatAmount(totalSpent)}</div>
+            </div>
+            <div class="bg-green-50 rounded p-2">
+                <div class="text-xs text-gray-500">Total Paid</div>
+                <div class="font-bold text-lg text-green-700">Rs ${formatAmount(totalPaid)}</div>
+            </div>
+            <div class="bg-red-50 rounded p-2">
+                <div class="text-xs text-gray-500">Balance Due</div>
+                <div class="font-bold text-lg ${balance <= 0 ? 'text-green-700' : 'text-red-700'}">Rs ${formatAmount(balance)}</div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <h4 class="font-semibold mb-2 text-sm">Add Stock from Supplier</h4>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <select id="stockInIngredient" class="p-1.5 border rounded">
+                    ${inventoryItems.map(i => `<option value="${i.id}">${escapeHtml(i.name)} (${escapeHtml(i.unit || '')})</option>`).join('')}
+                </select>
+                <input type="number" id="stockInQty" step="0.01" min="0" placeholder="Quantity" class="p-1.5 border rounded" />
+            </div>
+            <input type="number" id="stockInCost" step="0.01" min="0" placeholder="Cost per unit (Rs)" class="w-full p-1.5 border rounded mt-1 text-xs" />
+            <button onclick="saveStockIn('${id}')" class="w-full bg-indigo-600 text-white py-1.5 rounded text-xs mt-2">Add Stock</button>
+        </div>
+
+        <div class="mb-4">
+            <h4 class="font-semibold mb-2 text-sm">Add Payment</h4>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+                <input type="number" id="paymentAmount" step="0.01" min="0" placeholder="Amount (Rs)" class="p-1.5 border rounded" />
+                <select id="paymentMethod" class="p-1.5 border rounded">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Card">Card</option>
+                    <option value="Cheque">Cheque</option>
+                </select>
+            </div>
+            <button onclick="saveSupplierPayment('${id}')" class="w-full bg-green-600 text-white py-1.5 rounded text-xs mt-2">Record Payment</button>
+        </div>
+
+        <div class="overflow-y-auto max-h-40 mb-2">
+            <h4 class="font-semibold mb-1 text-xs">Stock Received (Last 10)</h4>
+            <ul class="list-disc list-inside text-xs">
+                ${stockInRecords.map(s => `<li><strong>${new Date(s.created).toLocaleDateString()}</strong> – ${escapeHtml(inventoryItems.find(i => i.id == s.ingredient)?.name || s.ingredient)} – ${Number(s.qty).toFixed(2)} – Rs ${formatAmount(s.cost * s.qty)}</li>`).join('')}
+            </ul>
+        </div>
+
+        <div class="overflow-y-auto max-h-40 mb-2">
+            <h4 class="font-semibold mb-1 text-xs">Payments (Last 10)</h4>
+            <ul class="list-disc list-inside text-xs">
+                ${payments.map(p => `<li><strong>${new Date(p.date).toLocaleDateString()}</strong> – ${escapeHtml(p.method)} – Rs ${formatAmount(p.amount)}</li>`).join('')}
+            </ul>
+        </div>
+
+        <div class="overflow-y-auto max-h-36">
+            <h4 class="font-semibold mb-1 text-xs">Last 10 Transactions</h4>
+            <ul class="list-disc list-inside text-xs">
+                ${transactions.map(t => `<li><strong>${new Date(t.timestamp).toLocaleDateString()}</strong> – ${escapeHtml(t.description)} – Rs ${formatAmount(t.amount)} – ${escapeHtml(t.status || 'APPROVED')}</li>`).join('')}
+            </ul>
+        </div>`;
+
+    html += '<div class="mt-4 flex gap-2"><button onclick="openSupplierLedger(\'' + id + '\')" class="flex-1 bg-indigo-600 text-white py-1.5 rounded text-xs">View Ledger</button><button type="button" onclick="backToSupplierList()" class="flex-1 bg-gray-300 py-1.5 rounded text-xs">Back</button></div>';
+
+    detailDiv.innerHTML = html;
+    document.getElementById('supplierListContainer')?.classList.add('hidden');
+    document.getElementById('supplierFormContainer')?.classList.add('hidden');
+    detailDiv.classList.remove('hidden');
+};
+
+window.openSupplierLedger = async function (id) {
+    const supplier = await db.suppliers.get(id);
+    if (!supplier) return;
+    const container = document.getElementById('supplierLedgerContainer');
     if (!container) return;
 
+    const allSuppliers = await db.suppliers.toArray();
+    const supplierSelect = document.getElementById('ledgerSupplierFilter');
+    if (supplierSelect) {
+        supplierSelect.innerHTML = '<option value="">All Suppliers</option>' +
+            allSuppliers.map(s => `<option value="${s.id}" ${s.id === id ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+    }
+    document.getElementById('ledgerDateFrom').value = '';
+    document.getElementById('ledgerDateTo').value = '';
+
+    await renderSupplierLedger();
+    container.classList.remove('hidden');
+    container.previousElementSibling?.classList.add('hidden');
+    document.getElementById('supplierDetailContainer')?.classList.add('hidden');
+};
+
+window.saveStockIn = async function (supplierId) {
+    const ingredientEl = document.getElementById("stockInIngredient");
+    const qtyEl = document.getElementById("stockInQty");
+    const costEl = document.getElementById("stockInCost");
+
+    if (!ingredientEl || !qtyEl || !costEl) return;
+
+    const ingredient = ingredientEl.value;
+    const qty = parseFloat(qtyEl.value);
+    const cost = parseFloat(costEl.value);
+
+    if (!ingredient || qty <= 0 || cost < 0) {
+        return alert("Enter a valid ingredient, quantity, and cost.");
+    }
+
+    const invItem = await db.inventory.get(ingredient);
+    if (!invItem) return;
+
+    const updatedStock = (Number(invItem.stock) || 0) + qty;
+    await db.inventory.update(ingredient, { stock: updatedStock, cost: cost });
+
+    await db.stockIn.add({
+        supplierId,
+        ingredient,
+        qty,
+        cost,
+        created: new Date().toISOString()
+    });
+
+    ingredientEl.value = "";
+    qtyEl.value = "";
+    costEl.value = "";
+
+    await openSupplierDetails(supplierId);
+};
+
+window.saveSupplierPayment = async function (supplierId) {
+    const amountEl = document.getElementById("paymentAmount");
+    const methodEl = document.getElementById("paymentMethod");
+
+    if (!amountEl || !methodEl) return;
+
+    const amount = parseFloat(amountEl.value);
+    const method = methodEl.value;
+
+    if (amount <= 0) return alert("Enter a valid payment amount.");
+
+    await db.supplierPayments.add({
+        supplierId,
+        amount,
+        method,
+        date: new Date().toISOString()
+    });
+
+    amountEl.value = "";
+    await openSupplierDetails(supplierId);
+};
+
+window.renderSupplierLedgers = async function () {
+    const container = document.getElementById('supplierLedgerContainer');
+    if (!container || container.classList.contains('hidden')) return;
+    await renderSupplierLedger();
+};
+
+window.renderSupplierLedger = async function () {
+    const supplierSelect = document.getElementById('ledgerSupplierFilter');
+    const dateFrom = document.getElementById('ledgerDateFrom')?.value;
+    const dateTo = document.getElementById('ledgerDateTo')?.value;
+    const body = document.getElementById('supplierLedgerBody');
+    if (!body) return;
+
+    let rows = await db.supplierLedger.orderBy('date').reverse().toArray();
+
+    if (supplierSelect) {
+        const selSupplier = supplierSelect.value;
+        if (selSupplier) rows = rows.filter(r => r.supplierId === selSupplier);
+    }
+    if (dateFrom) rows = rows.filter(r => new Date(r.date) >= new Date(dateFrom));
+    if (dateTo) rows = rows.filter(r => new Date(r.date) <= new Date(dateTo));
+
+    const allSuppliers = await db.suppliers.toArray();
+    const totalStock = rows.reduce((sum, r) => sum + (Number(r.totalCost) || 0), 0);
+    const totalPaid = rows.reduce((sum, r) => sum + (Number(r.cashPaid) || 0), 0);
+    const netBalance = totalStock - totalPaid;
+
+    setText('ledgerTotalStock', 'Rs ' + formatAmount(totalStock));
+    setText('ledgerTotalPaid', 'Rs ' + formatAmount(totalPaid));
+    setText('ledgerNetBalance', 'Rs ' + formatAmount(netBalance));
+
+    if (rows.length === 0) {
+        body.innerHTML = `<tr><td colspan="9" class="text-center text-gray-400 py-4">No ledger entries.</td></tr>`;
+        return;
+    }
+
+    body.innerHTML = rows.map(r => {
+        const supplierName = allSuppliers.find(s => s.id === r.supplierId)?.name || r.supplierId;
+        const dateStr = new Date(r.date).toLocaleDateString();
+        return `
+            <tr class="border-t">
+                <td class="p-1.5">${dateStr}</td>
+                <td class="p-1.5">${escapeHtml(supplierName)}</td>
+                <td class="p-1.5">${escapeHtml(r.referenceNumber || '')}</td>
+                <td class="p-1.5">${escapeHtml(r.description || '')}</td>
+                <td class="p-1.5 text-right">${Number(r.qtyIn || 0).toFixed(2)}</td>
+                <td class="p-1.5 text-right">${formatAmount(r.unitPrice || 0)}</td>
+                <td class="p-1.5 text-right">${formatAmount(r.totalCost || 0)}</td>
+                <td class="p-1.5 text-right">${formatAmount(r.cashPaid || 0)}</td>
+                <td class="p-1.5 text-right font-bold ${r.runningBalance >= 0 ? 'text-red-700' : 'text-green-700'}">${formatAmount(r.runningBalance)}</td>
+            </tr>`;
+    }).join('');
+};
+
+window.renderSupplierList = async function () {
+    const container = document.getElementById("supplierList");
+    if (!container) return;
     const suppliers = await db.suppliers.toArray();
     if (suppliers.length === 0) {
         container.innerHTML = `<div class="text-gray-400 text-xs text-center py-4">No suppliers added yet.</div>`;
         return;
     }
-
     const allExpenses = await db.expenses.toArray();
-
+    const allPayments = await db.supplierPayments.toArray();
     container.innerHTML = suppliers.map(s => {
-        const totalSpent = allExpenses
-            .filter(e => e.supplierId === s.id && (e.status === "APPROVED" || !e.status))
-            .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-
+        const totalSpent = allExpenses.filter(e => e.supplierId === s.id && (e.status === "APPROVED" || !e.status)).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+        const totalPaid = allPayments.filter(p => p.supplierId === s.id).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        const balance = totalSpent - totalPaid;
         return `
-        <div class="p-3 bg-white rounded-xl border shadow-sm flex justify-between items-start gap-2">
-            <div>
-                <div class="font-bold text-sm text-gray-800">${escapeHtml(s.name)}</div>
-                <div class="text-[11px] text-gray-500">${escapeHtml(s.phone || '—')} • ${escapeHtml(s.address || '—')}</div>
-                ${s.notes ? `<div class="text-[11px] text-gray-400 mt-0.5">${escapeHtml(s.notes)}</div>` : ''}
-                <div class="text-[11px] text-teal-700 font-bold mt-1">Total Spent: ${formatAmount(totalSpent)}</div>
-            </div>
-            <div class="flex gap-2 shrink-0">
-                <button onclick="editSupplier('${s.id}')" class="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded hover:bg-amber-100">Edit</button>
-                <button onclick="deleteSupplier('${s.id}')" class="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200">Delete</button>
-            </div>
-        </div>
-    `;
+            <div class="p-3 bg-white rounded-xl border shadow-sm flex justify-between items-start gap-2 cursor-pointer" onclick="openSupplierDetails('${s.id}')">
+                <div>
+                    <div class="font-bold text-sm text-gray-800">${escapeHtml(s.name)}</div>
+                    <div class="text-[11px] text-gray-500">${escapeHtml(s.phone || '—')} • ${escapeHtml(s.address || '—')}</div>
+                    ${s.notes ? `<div class="text-[11px] text-gray-400 mt-0.5">${escapeHtml(s.notes)}</div>` : ''}
+                    <div class="text-[11px] text-teal-700 font-bold mt-1">Spent: ${formatAmount(totalSpent)} Paid: ${formatAmount(totalPaid)} Balance: ${formatAmount(balance)}</div>
+                </div>
+                <div class="flex gap-2 shrink-0">
+                    <button type="button" onclick="event.stopPropagation(); editSupplier('${s.id}')" class="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded hover:bg-amber-100">Edit</button>
+                    <button type="button" onclick="event.stopPropagation(); deleteSupplier('${s.id}')" class="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200">Delete</button>
+                </div>
+            </div>`;
     }).join("");
+};
+
+async function computeSupplierFinancials(supplierId) {
+    const expenses = await db.expenses.toArray();
+    const payments = await db.supplierPayments.toArray();
+    const supplierExpenses = expenses.filter(e => e.supplierId === supplierId && (e.status === "APPROVED" || !e.status));
+    const totalAmount = supplierExpenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const totalPaid = payments.filter(p => p.supplierId === supplierId).reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const remaining = totalAmount - totalPaid;
+    const byDay = {};
+    const byMonth = {};
+    supplierExpenses.forEach(e => {
+        const date = new Date(e.timestamp);
+        const dayKey = date.toISOString().split('T')[0];
+        const monthKey = date.getFullYear() + '-' + (date.getMonth()+1).toString().padStart(2,'0');
+        byDay[dayKey] = (byDay[dayKey]||0) + (Number(e.amount)||0);
+        byMonth[monthKey] = (byMonth[monthKey]||0) + (Number(e.amount)||0);
+    });
+    return { totalAmount, totalPaid, remaining, byDay, byMonth };
 }
+
+window.showSupplierStats = async function(id) {
+    const stats = await computeSupplierFinancials(id);
+    let msg = `Supplier Financials:\nTotal Spent: Rs ${stats.totalAmount.toFixed(2)}\nTotal Paid: Rs ${stats.totalPaid.toFixed(2)}\nRemaining Balance: Rs ${stats.remaining.toFixed(2)}\n\nBy Day:`;
+    for (const [day, amt] of Object.entries(stats.byDay)) {
+        msg += `\n  ${day}: Rs ${amt.toFixed(2)}`;
+    }
+    msg += `\n\nBy Month:`;
+    for (const [month, amt] of Object.entries(stats.byMonth)) {
+        msg += `\n  ${month}: Rs ${amt.toFixed(2)}`;
+    }
+    alert(msg);
+};
 
 window.resetExpenseForm = function () {
     document.getElementById("editExpenseId").value = "";
@@ -1050,8 +1536,14 @@ window.saveExpense = async function () {
 // New functions for Owner to Approve/Reject
 window.updateExpenseStatus = async function(id, newStatus) {
     if (currentRole !== "OWNER") return;
-    await db.expenses.update(id, { status: newStatus });
-    await logAudit("EXPENSE_" + newStatus, `Expense #${id} marked ${newStatus}`);
+    const updateData = { status: newStatus };
+    if (newStatus === "APPROVED" || newStatus === "REJECTED") {
+        updateData.approvedBy = currentUser?.username || "Owner";
+        updateData.approvedAt = new Date().toISOString();
+    }
+    await db.expenses.update(id, updateData);
+    await logAudit("EXPENSE_" + newStatus, `Expense #${id} marked ${newStatus} by ${currentUser?.username || "Owner"}`);
+    // Expenses are local-only (no cloud sync yet); cloud sync can be added here when implemented
     await renderExpenseList();
 };
 
@@ -1113,6 +1605,7 @@ window.renderExpenseList = async function() {
                 </div>
                 <div class="text-[10px] text-gray-500 mt-1">
                     ${new Date(exp.timestamp).toLocaleString()} • By: ${escapeHtml(exp.serverUser)}
+                    ${exp.approvedBy ? ` • Approved by: ${escapeHtml(exp.approvedBy)} on ${new Date(exp.approvedAt).toLocaleString()}` : ''}
                 </div>
             </div>
             <div class="flex flex-col items-end gap-1">
@@ -1797,6 +2290,7 @@ window.login = async () => {
         await firebase.auth().signInWithEmailAndPassword(profile.authEmail || usernameAuthEmail(username), password);
     } catch (error) {
         console.error("Firebase Login Error:", error.code, error.message);
+        logAudit("LOGIN_FAILED", `Failed login attempt for '${username}': ${error.code || "unknown error"}`);
         if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
             alert("Incorrect password.");
         } else {
@@ -1808,6 +2302,8 @@ function startSession(user) {
     currentUser = user;
     currentRole = user.role;
     currentWaiter = user.username;
+
+    logAudit("LOGIN", `${user.username} (${user.role}) logged in`);
 
     sessionStorage.setItem("loggedUser", JSON.stringify(user));
 
@@ -1835,6 +2331,11 @@ function applyRoleViews() {
 
 window.logout = async function () {
     if (!confirm("Are you sure you want to log out?")) return;
+
+    const logoutUser = currentUser?.username || "Staff";
+    const logoutRole = currentUser?.role || "unknown";
+    logAudit("LOGOUT", `${logoutUser} (${logoutRole}) logged out`);
+
     currentUser = null;
     currentRole = null;
     sessionStorage.removeItem("loggedUser");
@@ -1867,24 +2368,69 @@ function applyPermissions() {
             element.classList.add("hidden");
         }
     });
+    renderMobileNavigation();
 }
+
+function renderMobileNavigation() {
+    const select = document.getElementById("mobileNavigationSelect");
+    if (!select) return;
+
+    const actions = [...document.querySelectorAll("#mainActionSidebar .sidebar-action")];
+    select.replaceChildren(new Option("Quick navigation...", ""));
+
+    document.querySelectorAll("#mainActionSidebar .sidebar-group").forEach(group => {
+        const groupActions = [...group.querySelectorAll(".sidebar-action")]
+            .filter(action => !action.classList.contains("hidden"));
+        if (!groupActions.length) return;
+
+        const optionGroup = document.createElement("optgroup");
+        optionGroup.label = group.querySelector(".sidebar-heading")?.textContent.trim() || "Navigation";
+
+        groupActions.forEach(action => {
+            const actionIndex = actions.indexOf(action);
+            const label = action.cloneNode(true);
+            label.querySelectorAll(".ml-auto").forEach(badge => badge.remove());
+            optionGroup.append(new Option(label.textContent.trim().replace(/\s+/g, " "), String(actionIndex)));
+        });
+
+        select.append(optionGroup);
+    });
+}
+
+window.navigateMobileSidebar = function (actionIndex) {
+    if (actionIndex === "") return;
+
+    const action = document.querySelectorAll("#mainActionSidebar .sidebar-action")[Number(actionIndex)];
+    if (!action || action.classList.contains("hidden")) return;
+
+    action.click();
+    document.getElementById("mobileNavigationSelect").value = "";
+};
 
 // ====================================================
 // Settings: Owner PIN helpers
 // ====================================================
-async function getOwnerPin() {
-    const s = await db.settings.get("ownerPin");
-    return s ? String(s.value) : "7774";
+async function getOwnerPinHash() {
+    const s = await db.settings.get("ownerPinHash");
+    if (s) return String(s.value);
+    // First-time fallback: return the hash of the legacy default "7774"
+    // so existing installations keep working until the owner changes the PIN.
+    return await hashPin("7774");
 }
 
 async function setOwnerPin(newPin) {
-    await db.settings.put({ key: "ownerPin", value: String(newPin) });
+    const hashed = await hashPin(String(newPin));
+    await db.settings.put({ key: "ownerPinHash", value: hashed });
 }
 
 async function ensureDefaultOwnerPin() {
-    const s = await db.settings.get("ownerPin");
-    if (!s || String(s.value) === "1234") {
-        await db.settings.put({ key: "ownerPin", value: "7774" });
+    const s = await db.settings.get("ownerPinHash");
+    const legacyPin = await db.settings.get("ownerPin");
+    if (!s) {
+        const hashed = await hashPin("7774");
+        await db.settings.put({ key: "ownerPinHash", value: hashed });
+        // Clean up any legacy plaintext entry
+        if (legacyPin) await db.settings.delete("ownerPin");
     }
 }
 
@@ -1976,7 +2522,7 @@ async function renderHeldOrdersList() {
             </div>
 
             <div class="text-xs text-gray-600 bg-white p-2 rounded border border-amber-100">
-                ${escapeHtml(order.items.map(i => `${i.name} x${i.qty}`).join(", "))}
+                ${escapeHtml(order.items.map(i => `${escapeHtml(i.name)} x${i.qty}`).join(", "))}
             </div>
 
             <div class="flex items-center justify-end gap-2 pt-1">
@@ -2074,7 +2620,7 @@ async function pushMenuItemToCloud(menuItem, recipeRows) {
     // Drop oversized images instead of letting the whole doc write fail (which cloud sync would then read back as a delete).
     let payload = menuItem;
     if (menuItem.imageUrl && menuItem.imageUrl.length > MAX_SYNCED_IMAGE_BYTES) {
-        console.warn(`Menu item "${menuItem.name}" image too large to sync (${menuItem.imageUrl.length} bytes); syncing without image.`);
+        console.warn(`Menu item "${escapeHtml(menuItem.name)}" image too large to sync (${menuItem.imageUrl.length} bytes); syncing without image.`);
         const { imageUrl, ...rest } = menuItem;
         payload = rest;
     }
@@ -2128,6 +2674,11 @@ function setupMenuCategoryCloudSync() {
                 await db.menu.delete(change.doc.id);
                 await db.recipes.where("menuItemId").equals(change.doc.id).delete();
             } else {
+                // Echo guard: skip stale echoes of our own writes.
+                const local = await db.menu.get(change.doc.id);
+                const remoteTs = data.updatedAt?.toMillis?.() || (data.updatedAt ? new Date(data.updatedAt).getTime() : 0);
+                const localTs = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+                if (local && remoteTs <= localTs) continue;
                 const { recipes, ...menuItem } = data;
                 await db.menu.put({ ...menuItem, id: change.doc.id });
                 await db.recipes.where("menuItemId").equals(change.doc.id).delete();
@@ -2148,7 +2699,13 @@ function setupMenuCategoryCloudSync() {
             if (change.type === "removed") {
                 await db.categories.delete(change.doc.id);
             } else {
-                await db.categories.put({ ...change.doc.data(), id: change.doc.id });
+                // Echo guard: skip stale echoes of our own writes.
+                const local = await db.categories.get(change.doc.id);
+                const data = change.doc.data();
+                const remoteTs = data.updatedAt?.toMillis?.() || (data.updatedAt ? new Date(data.updatedAt).getTime() : 0);
+                const localTs = local?.updatedAt ? new Date(local.updatedAt).getTime() : 0;
+                if (local && remoteTs <= localTs) continue;
+                await db.categories.put({ ...data, id: change.doc.id });
             }
         }
         if (snapshot.docChanges().length > 0) {
@@ -2481,7 +3038,7 @@ function renderOnlineOrdersList() {
             </div>
 
             <div class="text-xs text-gray-600 bg-white p-2 rounded border border-blue-100">
-                ${escapeHtml((order.items || []).map(i => `${i.name} x${i.qty}`).join(", "))}
+                ${escapeHtml((order.items || []).map(i => `${escapeHtml(i.name)} x${i.qty}`).join(", "))}
             </div>
 
             ${order.customer?.address ? `<div class="text-[11px] text-gray-500">📍 ${escapeHtml(order.customer.address)}</div>` : ""}
@@ -2536,7 +3093,7 @@ window.acceptOnlineOrder = async function (id) {
         const canonicalId = i.menuItemId || i.id;
         const menuItem = canonicalId ? await db.menu.get(canonicalId) : null;
         if (!menuItem) {
-            console.warn(`Online order item "${i.name}" (id ${canonicalId}) not found in local menu; adding without recipe/stock deduction.`);
+            console.warn(`Online order item "${escapeHtml(i.name)}" (id ${canonicalId}) not found in local menu; adding without recipe/stock deduction.`);
         }
         resolvedItems.push({
             id: menuItem ? menuItem.id : `CUSTOM_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -2643,7 +3200,8 @@ window.clearDeliveryDetails = function () {
 // Customer CRM (lookup, history, loyalty stats)
 // ====================================================
 function normalizePhone(phone) {
-    return String(phone || "").trim();
+    const str = String(phone || "").trim();
+    return /^\d{5,15}$/.test(str) ? str : "";
 }
 
 const lookupCartCustomerDebounced = debounce(async (phone) => {
@@ -2787,7 +3345,7 @@ async function syncCustomersFromSales() {
                     await db.customers.put({
                         id: phone,
                         phone: phone,
-                        name: cust.name || (cust.phone ? `Customer ${cust.phone}` : "Customer"),
+                        name: cust.name || (cust.phone ? `Customer ${escapeHtml(cust.phone)}` : "Customer"),
                         totalOrders: 1,
                         totalSpent: Number(sale.total) || 0,
                         loyaltyPoints: Math.floor((Number(sale.total) || 0) / LOYALTY_EARN_RATE),
@@ -2893,6 +3451,7 @@ window.viewCustomerHistory = async function (phone) {
                     </div>
                     <div class="flex items-center gap-2">
                         <div class="font-bold text-emerald-700">${formatAmount(s.total || 0)}</div>
+                        <button type="button" onclick="printSavedReceipt(${Number(s.id)})" class="text-[10px] bg-teal-50 text-teal-700 px-2 py-1 rounded font-bold hover:bg-teal-100">Reprint</button>
                         <button type="button" onclick="downloadReceiptPDF(${Number(s.id)})" class="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-bold hover:bg-indigo-100">PDF</button>
                     </div>
                 </div>
@@ -2902,36 +3461,278 @@ window.viewCustomerHistory = async function (phone) {
 
 
 // ====================================================
+function showAppToast(message, type = "success") {
+    const container = document.getElementById("toastContainer");
+    if (!container) return;
+
+    const toast = document.createElement("div");
+    toast.setAttribute("role", "status");
+    toast.className = "pointer-events-auto rounded-lg border px-4 py-3 text-sm font-semibold shadow-lg";
+    toast.style.backgroundColor = type === "error" ? "#4a252b" : "#17464a";
+    toast.style.borderColor = type === "error" ? "#dc2626" : "#00adb5";
+    toast.style.color = "#eeeeee";
+    toast.textContent = message;
+    container.append(toast);
+    window.setTimeout(() => toast.remove(), 5000);
+}
+
+function buildReceiptPrintDocument(sale) {
+    const orderType = String(sale.orderType || "DINE_IN").toUpperCase();
+    const timestamp = sale.timestamp ? new Date(sale.timestamp) : new Date();
+    const money = value => escapeHtml(formatAmount(Number(value) || 0));
+    const itemRows = (sale.items || []).map(item => `
+        <section class="item">
+            <div class="item-name">${escapeHtml(item.name || "Item")}</div>
+            <div class="item-total"><span>Qty: ${escapeHtml(String(item.qty || 0))}</span><strong>${money((Number(item.price) || 0) * (Number(item.qty) || 0))}</strong></div>
+        </section>
+    `).join("");
+    const payments = (sale.payments || []).map(payment => `
+        <div class="row"><span>${escapeHtml(payment.method || "Payment")}</span><span>${money(payment.amount)}</span></div>
+        ${payment.method === "Cash" && payment.cashGiven != null ? `<div class="row muted"><span>Cash received</span><span>${money(payment.cashGiven)}</span></div>` : ""}
+        ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${money(payment.change)}</span></div>` : ""}
+    `).join("");
+
+    return `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Receipt #${escapeHtml(String(sale.id))}</title>
+    <style>
+        @page { size: 80mm auto; margin: 2mm; }
+        * { box-sizing: border-box; }
+        html, body { width: 76mm; margin: 0; padding: 0; color: #000; background: #fff; }
+        body { font: 10pt/1.3 "Courier New", monospace; }
+        main { width: 76mm; padding: 0 1mm 3mm; }
+        header { text-align: center; padding-bottom: 2mm; border-bottom: 1px dashed #000; }
+        h1 { margin: 0 0 1mm; font-size: 14pt; }
+        p { margin: 0; }
+        .title { margin: 2mm 0; text-align: center; font-weight: bold; }
+        .meta { margin-bottom: 2mm; }
+        .rule { margin: 2mm 0; border-top: 1px dashed #000; }
+        .item { padding: 1.5mm 0; border-bottom: 1px dashed #777; }
+        .item-name { overflow-wrap: anywhere; font-weight: bold; }
+        .item-total, .row { display: flex; justify-content: space-between; gap: 2mm; }
+        .item-total { margin-top: 1mm; }
+        .item-total strong, .row span:last-child { white-space: nowrap; }
+        .totals { padding-top: 2mm; }
+        .row { margin: 1mm 0; }
+        .grand-total { margin-top: 2mm; padding: 2mm 0; border-top: 1px solid #000; border-bottom: 1px solid #000; font-size: 12pt; font-weight: bold; }
+        .muted { font-size: 9pt; }
+        footer { margin-top: 3mm; text-align: center; }
+        @media screen { body { margin: 0 auto; } }
+    </style>
+</head>
+<body>
+<main>
+    <header>
+        <h1>HUNGRY BIRDS RESTAURANT</h1>
+        <p>Ph: 0325-7867774</p>
+        <p>Dubai Park Stop, Main GT Road Lahore</p>
+    </header>
+    <div class="title">ORDER RECEIPT</div>
+    <div class="meta">
+        <div>Order ID: #${escapeHtml(String(sale.id))}</div>
+        <div>Date: ${escapeHtml(timestamp.toLocaleString())}</div>
+        <div>Server: ${escapeHtml(sale.serverUser || "Staff")}</div>
+        <div>Type: ${escapeHtml(orderType)}</div>
+        ${orderType === "DINE_IN" ? "<div>Table: Counter Service</div>" : ""}
+        ${orderType === "DELIVERY" && sale.deliveryInfo ? `
+            <div class="rule"></div>
+            <strong>DELIVERY DETAILS</strong>
+            <div>Name: ${escapeHtml(sale.deliveryInfo.name || "N/A")}</div>
+            <div>Phone: ${escapeHtml(sale.deliveryInfo.phone || "N/A")}</div>
+            <div>Address: ${escapeHtml(sale.deliveryInfo.address || "N/A")}</div>
+        ` : ""}
+    </div>
+    <div class="rule"></div>
+    <strong>ITEMS</strong>
+    ${itemRows}
+    <div class="totals">
+        <div class="row"><span>Subtotal</span><span>${money(sale.subtotal)}</span></div>
+        ${Number(sale.discountAmount) > 0 ? `<div class="row"><span>Discount (${escapeHtml(String(sale.discountPercent || 0))}%)</span><span>-${money(sale.discountAmount)}</span></div>` : ""}
+        ${Number(sale.deliveryCharge) > 0 ? `<div class="row"><span>Delivery charge</span><span>${money(sale.deliveryCharge)}</span></div>` : ""}
+        ${Number(sale.packingCharge) > 0 ? `<div class="row"><span>Packing charge</span><span>${money(sale.packingCharge)}</span></div>` : ""}
+        ${Number(sale.taxAmount) > 0 ? `<div class="row"><span>Tax (${escapeHtml(String(sale.taxPercent || 0))}%)</span><span>${money(sale.taxAmount)}</span></div>` : ""}
+        ${Number(sale.otherCharge) > 0 ? `<div class="row"><span>Other charges</span><span>${money(sale.otherCharge)}</span></div>` : ""}
+        <div class="row grand-total"><span>GRAND TOTAL</span><span>${money(sale.total)}</span></div>
+        ${payments ? `<div class="rule"></div><strong>PAYMENTS</strong>${payments}` : ""}
+        ${Number(sale.totalChange) > 0 ? `<div class="row"><span>Change to return</span><span>${money(sale.totalChange)}</span></div>` : ""}
+    </div>
+    <footer>
+        <p>${orderType === "DELIVERY" ? "Thank you for ordering delivery!" : orderType === "TAKEAWAY" ? "Thank you for choosing takeaway!" : "Thank you for dining with us!"}</p>
+        <p>HungryPOS (Made by Rehan Shafiq)</p>
+    </footer>
+</main>
+</body>
+</html>`;
+}
+
+function printReceiptInBrowser(sale) {
+    const frame = document.createElement("iframe");
+    frame.title = `Receipt #${sale.id}`;
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "1px";
+    frame.style.height = "1px";
+    frame.style.border = "0";
+    frame.style.opacity = "0";
+    frame.setAttribute("aria-hidden", "true");
+
+    frame.onload = () => {
+        const printWindow = frame.contentWindow;
+        if (!frame.isConnected || !printWindow) return;
+        printWindow.addEventListener("afterprint", () => frame.remove(), { once: true });
+        window.setTimeout(() => {
+            try {
+                if (!frame.isConnected) return;
+                printWindow.focus();
+                printWindow.print();
+            } catch (error) {
+                console.error("Browser receipt print failed:", error);
+                frame.remove();
+                showAppToast("Could not open the receipt print dialog.", "error");
+            }
+        }, 100);
+    };
+    document.body.append(frame);
+    frame.srcdoc = buildReceiptPrintDocument(sale);
+    window.setTimeout(() => frame.remove(), 60000);
+}
+
+window.printSavedReceipt = async function (saleId) {
+    try {
+        const sale = await db.sales.get(Number(saleId));
+        if (!sale) {
+            alert("Sale record not found.");
+            return;
+        }
+        if (printerCharacteristic) {
+            try {
+                await printReceipt(
+                    sale.id,
+                    sale.items || [],
+                    Number(sale.subtotal) || 0,
+                    Number(sale.discountPercent) || 0,
+                    Number(sale.total) || 0,
+                    sale.deliveryInfo || null,
+                    sale.payments || [],
+                    Number(sale.totalChange) || 0,
+                    sale.orderType || "DINE_IN",
+                    Number(sale.deliveryCharge) || 0,
+                    Number(sale.packingCharge) || 0,
+                    Number(sale.taxPercent) || 0,
+                    Number(sale.taxAmount) || 0,
+                    Number(sale.otherCharge) || 0,
+                    sale.timestamp,
+                    sale.serverUser || "Staff"
+                );
+                return;
+            } catch (error) {
+                console.error("Direct receipt reprint failed; using browser print:", error);
+            }
+        }
+        printReceiptInBrowser(sale);
+    } catch (error) {
+        console.error("Could not load receipt for printing:", error);
+        alert("Could not load this receipt for printing. Please try again.");
+    }
+};
+
 window.connectPrinter = async function () {
+    if (!window.isSecureContext) {
+        alert("Bluetooth printing requires a secure page (HTTPS or localhost). This page is not a secure origin. The browser's 80 mm print option can still use an installed thermal printer.");
+        return;
+    }
+    if (!navigator.bluetooth) {
+        alert("Web Bluetooth is unavailable or disabled in this browser. Enable Bluetooth access in a supported browser, or use the browser print dialog with your 80 mm thermal printer.");
+        return;
+    }
+
+    setPrinterStatus(PRINTER_STATE.CONNECTING);
+    const statusBtn = document.getElementById('connectPrinterBtn');
+    if (statusBtn) statusBtn.disabled = true;
+
     try {
         bluetoothDevice = await navigator.bluetooth.requestDevice({
             acceptAllDevices: true,
             optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-41a5-8b53-07423c5a2253']
         });
+
+        // Handle disconnection events
+        bluetoothDevice.addEventListener('gattserverdisconnected', handlePrinterDisconnect);
+
         const server = await bluetoothDevice.gatt.connect();
         const services = await server.getPrimaryServices();
 
         for (const service of services) {
             const characteristics = await service.getCharacteristics();
-            if (characteristics.length > 0) {
-                printerCharacteristic = characteristics[0];
+            const writableCharacteristic = characteristics.find(characteristic =>
+                characteristic.properties.write || characteristic.properties.writeWithoutResponse
+            );
+            if (writableCharacteristic) {
+                printerCharacteristic = writableCharacteristic;
                 break;
             }
         }
-        alert("Printer Connected: " + (bluetoothDevice.name || "Unknown"));
+        if (!printerCharacteristic) {
+            throw new Error("The selected device does not expose a writable printer characteristic.");
+        }
+
+        const deviceName = bluetoothDevice.name || "Unknown";
+        setPrinterStatus(PRINTER_STATE.CONNECTED, deviceName);
+        alert("Printer Connected: " + deviceName);
     } catch (e) {
         console.error("Printer Connection Error:", e);
-        alert("Failed to connect printer: " + (e.message || e));
+        setPrinterStatus(PRINTER_STATE.ERROR);
+        const errorMessage = String(e.message || e);
+        if (/globally disabled|disabled by (?:the )?browser policy/i.test(errorMessage)) {
+            alert("Web Bluetooth is disabled by the browser or device policy and cannot be enabled by this page. Sales and reprints will use the browser's 80 mm print dialog.");
+        } else {
+            alert(e.name === "NotFoundError"
+                ? "No printer was selected. You can still print receipts through the browser's 80 mm print option."
+                : `Failed to connect printer: ${errorMessage}`);
+        }
+    } finally {
+        if (statusBtn) statusBtn.disabled = false;
     }
 };
 
+function handlePrinterDisconnect() {
+    const wasConnected = printerConnectionState === PRINTER_STATE.CONNECTED;
+    setPrinterStatus(PRINTER_STATE.DISCONNECTED);
+    printerCharacteristic = null;
+    if (wasConnected) {
+        console.warn("Printer disconnected unexpectedly.");
+        // Could show a toast notification here
+    }
+}
+
+window.disconnectPrinter = function () {
+    if (bluetoothDevice && bluetoothDevice.gatt && bluetoothDevice.gatt.connected) {
+        bluetoothDevice.gatt.disconnect();
+    }
+    bluetoothDevice?.removeEventListener('gattserverdisconnected', handlePrinterDisconnect);
+    bluetoothDevice = null;
+    printerCharacteristic = null;
+    setPrinterStatus(PRINTER_STATE.DISCONNECTED);
+};
+
 // Helper: write Uint8Array to printer in chunks
+// Returns a Promise that resolves when all chunks are written.
+// Throws a descriptive error if the printer is disconnected mid-write.
 async function writeToPrinter(uint8Array) {
-    if (!printerCharacteristic) throw new Error("Printer not connected");
+    if (!isPrinterConnected()) throw new Error("Printer not connected");
     const CHUNK = 20;
     for (let i = 0; i < uint8Array.length; i += CHUNK) {
         const slice = uint8Array.slice(i, i + CHUNK);
-        await printerCharacteristic.writeValue(slice);
+        try {
+            await printerCharacteristic.writeValue(slice);
+        } catch (e) {
+            setPrinterStatus(PRINTER_STATE.ERROR);
+            throw new Error("Printer connection lost during write. Please reconnect.");
+        }
         // small delay can help older printers - but keep short
         await new Promise(res => setTimeout(res, 20));
     }
@@ -2939,7 +3740,7 @@ async function writeToPrinter(uint8Array) {
 
 // Print KDS ticket (kitchen) - compact order for cooks
 async function printKDS(saleId, items, meta = {}) {
-    if (!printerCharacteristic) {
+    if (!isPrinterConnected()) {
         console.warn("No printer connected for KDS.");
         return;
     }
@@ -2987,8 +3788,8 @@ async function printKDS(saleId, items, meta = {}) {
     }
 }
 
-async function printReceipt(saleId, cartItems, subtotal, discountPercent, total, deliveryInfo = null, payments = [], totalChange = 0, orderType = currentOrderType, deliveryCharge = 0, packingCharge = 0, taxPercent = 0, taxAmount = 0, otherCharge = 0) {
-    if (!printerCharacteristic) {
+async function printReceipt(saleId, cartItems, subtotal, discountPercent, total, deliveryInfo = null, payments = [], totalChange = 0, orderType = currentOrderType, deliveryCharge = 0, packingCharge = 0, taxPercent = 0, taxAmount = 0, otherCharge = 0, timestamp = new Date().toISOString(), serverUser = currentUser?.username || "Staff") {
+    if (!isPrinterConnected()) {
         console.warn("No printer connected.");
         return;
     }
@@ -3006,7 +3807,7 @@ async function printReceipt(saleId, cartItems, subtotal, discountPercent, total,
     text += "\x1D!\x00\x1BE\x000325-7867774\nDubai Park Stop, Main GT Road Lahore\n";
     text += divider;
     text += "\x1BE\x01ORDER RECEIPT\n\x1BE\x00";
-    text += `Order ID: #${saleId}\nDate: ${new Date().toLocaleString()}\nServer: ${currentUser?.username || "Staff"}\nType: ${normalizedOrderType}\n`;
+    text += `Order ID: #${saleId}\nDate: ${new Date(timestamp).toLocaleString()}\nServer: ${serverUser}\nType: ${normalizedOrderType}\n`;
 
     if (normalizedOrderType === "DINE_IN") {
         text += "Table: Counter Service\n";
@@ -3015,7 +3816,7 @@ async function printReceipt(saleId, cartItems, subtotal, discountPercent, total,
     if (normalizedOrderType === "DELIVERY" && deliveryInfo) {
         text += divider;
         text += "\x1BE\x01DELIVERY DETAILS\n\x1BE\x00";
-        text += `Name: ${deliveryInfo.name || "N/A"}\nPhone: ${deliveryInfo.phone || "N/A"}\nAddress: ${deliveryInfo.address || "N/A"}\n`;
+        text += `Name: ${deliveryInfo.name || "N/A"}\nPhone: ${escapeHtml(deliveryInfo.phone) || "N/A"}\nAddress: ${escapeHtml(deliveryInfo.address) || "N/A"}\n`;
     }
 
     text += divider;
@@ -3071,6 +3872,7 @@ async function printReceipt(saleId, cartItems, subtotal, discountPercent, total,
         console.log("Customer receipt printed for order", saleId);
     } catch (e) {
         console.error("Receipt print error:", e);
+        throw e;
     }
 }
 
@@ -3095,9 +3897,9 @@ window.submitStockPin = async function () {
     const pinInput = document.getElementById("stockPinInput");
     const enteredPin = pinInput?.value.trim();
 
-    const ownerPin = await getOwnerPin();
+    const ownerPinHash = await getOwnerPinHash();
 
-    if (enteredPin === ownerPin) {
+    if (await validateAuthorizationPin(enteredPin, ownerPinHash)) {
         document.getElementById("stockPinModal")?.classList.add("hidden");
         document.getElementById("stockLockedState")?.classList.add("hidden");
         document.getElementById("stockUnlockedState")?.classList.remove("hidden");
@@ -3136,18 +3938,28 @@ window.addNewInventoryItem = async function () {
     const unitEl = document.getElementById("newItemUnit");
     const costEl = document.getElementById("newItemCost");
 
+    const stockNum = parseFloat(stockEl?.value);
+    const costNum = parseFloat(costEl?.value || 0);
     if (!nameEl?.value || !stockEl?.value) return alert("Enter item name and stock quantity.");
+    if (isNaN(stockNum) || stockNum < 0) return alert("Stock quantity must be a non-negative number.");
+    if (isNaN(costNum) || costNum < 0) return alert("Cost must be a non-negative number.");
 
     const id = "INV_" + Date.now();
     const newItem = {
         id,
         name: nameEl.value.trim(),
-        stock: parseFloat(stockEl.value),
+        stock: stockNum,
         unit: unitEl?.value.trim() || "pcs",
-        cost: parseFloat(costEl?.value || 0) || 0
+        cost: costNum
     };
-    await db.inventory.put(newItem);
-    await pushInventoryItemToCloud(newItem).catch(() => alert("Saved locally, but cloud sync failed. Other browsers will update once the connection is back."));
+    try {
+        await db.inventory.put(newItem);
+        await pushInventoryItemToCloud(newItem).catch(() => alert("Saved locally, but cloud sync failed. Other browsers will update once the connection is back."));
+    } catch (err) {
+        console.error("Add inventory error:", err);
+        alert("Failed to save inventory item. Please try again.");
+        return;
+    }
 
     nameEl.value = "";
     stockEl.value = "";
@@ -3224,6 +4036,7 @@ window.quickAdjustStock = async function (id, delta) {
 
     const updatedStock = Math.max(0, (Number(item.stock) || 0) + delta);
     await db.inventory.update(id, { stock: updatedStock });
+    logAudit("STOCK_ADJUST", `${delta > 0 ? "Added" : "Removed"} ${Math.abs(delta)} units of "${item.name}" (now ${updatedStock})`);
     pushInventoryItemToCloud(await db.inventory.get(id)).catch(e => console.warn("Stock sync failed:", e));
     await renderInventoryList();
     await renderLowStockAlert();
@@ -3297,8 +4110,17 @@ window.saveFullModalIngredient = async function (id) {
 
 window.deleteInventoryItem = async function (id) {
     if (!confirm("Delete this inventory item?")) return;
+
+    // Referential integrity: warn if any recipes reference this inventory item.
+    const usingRecipes = await db.recipes.where("inventoryId").equals(id).count();
+    if (usingRecipes > 0) {
+        if (!confirm(`${usingRecipes} recipe(s) reference this item. Delete anyway? (Recipes will be preserved but orphaned.)`)) {
+            return;
+        }
+    }
+
     await db.inventory.delete(id);
-    await deleteInventoryItemFromCloud(id);
+    await deleteInventoryItemFromCloud(id).catch(() => {});
     await renderModalInventoryList();
     await renderInventoryList();
     await renderLowStockAlert();
@@ -3538,7 +4360,9 @@ window.saveFoodItem = async function () {
         const catEl = document.getElementById("foodCategorySelect");
         const preview = document.getElementById("foodImagePreview");
 
+        const priceNum = parseFloat(priceEl?.value);
         if (!nameEl?.value || !priceEl?.value || !catEl?.value) return alert("Fill in dish details.");
+        if (isNaN(priceNum) || priceNum <= 0) return alert("Price must be a positive number.");
 
         const foodId = idEl.value || "MENU_" + Date.now();
         const imageUrl = preview?.dataset.imageUrl || preview?.src || "";
@@ -3552,7 +4376,7 @@ window.saveFoodItem = async function () {
         await db.menu.put({
             id: foodId,
             name: nameEl.value.trim(),
-            price: parseFloat(priceEl.value),
+            price: priceNum,
             categoryId: catEl.value,
             imageUrl: imageUrl,
             modifierGroups: collectModifierGroupsFromForm()
@@ -3562,7 +4386,7 @@ window.saveFoodItem = async function () {
         for (const r of recipeRows) {
             await db.recipes.add({ menuItemId: foodId, inventoryId: r.inventoryId, qtyRequired: r.qtyRequired });
         }
-        pushMenuItemToCloud({ id: foodId, name: nameEl.value.trim(), price: parseFloat(priceEl.value), categoryId: catEl.value, imageUrl, modifierGroups: collectModifierGroupsFromForm() }, recipeRows)
+        pushMenuItemToCloud({ id: foodId, name: nameEl.value.trim(), price: priceNum, categoryId: catEl.value, imageUrl, modifierGroups: collectModifierGroupsFromForm() }, recipeRows)
             .catch(e => {
                 console.warn("Cloud menu sync failed (non-blocking):", e);
                 alert(`"${nameEl.value.trim()}" saved locally, but could not sync to the cloud (${e.message || "unknown error"}). Other devices may not see this change.`);
@@ -3633,7 +4457,7 @@ window.changeMenuItemPrice = async function (menuId) {
     const menuItem = await db.menu.get(menuId);
     if (!menuItem) return;
 
-    const newPriceRaw = window.prompt(`Update price for "${menuItem.name}"`, String(menuItem.price || 0));
+    const newPriceRaw = window.prompt(`Update price for "${escapeHtml(menuItem.name)}"`, String(menuItem.price || 0));
     if (newPriceRaw === null) return;
 
     const newPrice = Number(newPriceRaw);
@@ -3712,6 +4536,15 @@ window.loadFoodForEdit = async function (menuId) {
 
 window.deleteFoodItem = async function (id) {
     if (!confirm("Delete food item?")) return;
+
+    // Referential integrity: warn about existing sales using this item.
+    const salesCount = await db.sales.filter(s =>
+        (s.items || []).some(i => i.menuItemId === id)
+    ).count();
+    if (salesCount > 0) {
+        alert(`${salesCount} past sale(s) reference this item. They will remain but show as historical.`);
+    }
+
     await db.menu.delete(id);
     await db.recipes.where("menuItemId").equals(id).delete();
     deleteMenuItemFromCloud(id).catch(e => console.warn("Cloud menu delete sync failed (non-blocking):", e));
@@ -3932,7 +4765,7 @@ async function openModifierModal(menuId) {
     if (!menuItem) return;
 
     pendingModifierMenuId = menuId;
-    setText("modifierModalTitle", `Customize: ${menuItem.name}`);
+    setText("modifierModalTitle", `Customize: ${escapeHtml(menuItem.name)}`);
 
     const container = document.getElementById("modifierGroupsContainer");
     if (!container) return;
@@ -4012,10 +4845,10 @@ window.confirmAddModifiedItem = async function () {
         return;
     }
 
-    const modifierKey = selectedModifiers.map(m => `${m.group}:${m.name}`).sort().join('|');
+    const modifierKey = selectedModifiers.map(m => `${m.group}:${escapeHtml(m.name)}`).sort().join('|');
     const cartId = modifierKey ? `${menuItem.id}::${modifierKey}` : menuItem.id;
     const displayName = selectedModifiers.length > 0
-        ? `${menuItem.name} (${selectedModifiers.map(m => m.name).join(', ')})`
+        ? `${escapeHtml(menuItem.name)} (${selectedModifiers.map(m => m.name).join(', ')})`
         : menuItem.name;
 
     const existing = cart.find(item => item.id === cartId);
@@ -4220,7 +5053,7 @@ window.changeCartItemPrice = function (id) {
     const item = cart.find(i => i.id === id);
     if (!item) return;
 
-    const rawValue = window.prompt(`Set the price for "${item.name}"`, String(item.price || 0));
+    const rawValue = window.prompt(`Set the price for "${escapeHtml(item.name)}"`, String(item.price || 0));
     if (rawValue === null) return;
 
     const newPrice = Number(rawValue);
@@ -4487,7 +5320,7 @@ async function completeSaleWithPayments(saleData) {
             for (const cartItem of saleRecord.items) {
                 const recipes = await db.recipes.where("menuItemId").equals(cartItem.menuItemId || cartItem.id).toArray();
                 if (recipes.length === 0 && cartItem.menuItemId) {
-                    console.warn(`No recipe configured for menu item "${cartItem.name}" (${cartItem.menuItemId}); stock will not be deducted for it.`);
+                    console.warn(`No recipe configured for menu item "${escapeHtml(cartItem.name)}" (${cartItem.menuItemId}); stock will not be deducted for it.`);
                 }
                 for (const recipe of recipes) {
                     const ingredient = await db.inventory.get(recipe.inventoryId);
@@ -4541,33 +5374,35 @@ async function completeSaleWithPayments(saleData) {
         try {
             await upsertCustomerRecord(crmCustomer, saleData.total, saleData.loyaltyRedeemPoints || 0);
             if (saleData.loyaltyRedeemPoints > 0) {
-                await logAudit("LOYALTY_REDEEM", `Redeemed ${saleData.loyaltyRedeemPoints} points (${formatAmount(saleData.loyaltyDiscount || 0)}) for ${crmCustomer.phone} on sale #${savedSaleId}`);
+                await logAudit("LOYALTY_REDEEM", `Redeemed ${saleData.loyaltyRedeemPoints} points (${formatAmount(saleData.loyaltyDiscount || 0)}) for ${escapeHtml(crmCustomer.phone)} on sale #${savedSaleId}`);
             }
         } catch (e) {
             console.warn("Failed to update customer record:", e);
         }
     }
 
-    // Print KDS ticket first (kitchen), then customer receipt.
-    // Both calls are non-blocking to sale completion, but we await them to ensure printing is attempted.
+    // Prefer the connected ESC/POS printer, then fall back to the browser print dialog.
     try {
         if (printerCharacteristic) {
             await printKDS(savedSaleId, saleData.items, { server: saleData.serverUser, table: saleData.table, notes: saleData.notes });
-            await printReceipt(savedSaleId, saleData.items, saleData.subtotal, saleData.discountPercent, saleData.total, saleData.deliveryInfo, saleData.payments || [], saleData.totalChange || 0, saleData.orderType, saleData.deliveryCharge || 0, saleData.packingCharge || 0, saleData.taxPercent || 0, saleData.taxAmount || 0, saleData.otherCharge || 0);
+            await printReceipt(savedSaleId, saleData.items, saleData.subtotal, saleData.discountPercent, saleData.total, saleData.deliveryInfo, saleData.payments || [], saleData.totalChange || 0, saleData.orderType, saleData.deliveryCharge || 0, saleData.packingCharge || 0, saleData.taxPercent || 0, saleData.taxAmount || 0, saleData.otherCharge || 0, saleData.timestamp, saleData.serverUser);
         } else {
-            console.warn("Printer not connected - skipping receipts.");
+            printReceiptInBrowser({ ...saleData, id: savedSaleId });
         }
     } catch (e) {
         console.error("Printing flow error:", e);
+        showAppToast("Direct printer failed. Opening the 80 mm browser receipt instead.", "error");
+        printReceiptInBrowser({ ...saleData, id: savedSaleId });
     }
 
-    alert(`Order Processed Successfully by ${currentUser?.username || 'Staff'}!`);
+    showAppToast(`Order #${savedSaleId} processed successfully.`);
 
     clearCheckoutCharges();
 
     clearDeliveryDetails();
     clearCartCustomer();
     renderCart();
+    await renderRecentSales();
     if (document.getElementById("stockUnlockedState") && !document.getElementById("stockUnlockedState").classList.contains("hidden")) {
         renderInventoryList();
     }
@@ -4733,7 +5568,7 @@ async function deleteDelivery(id) {
 async function viewDelivery(id) {
     const d = await db.deliveries.get(id);
     if (!d) return alert("Delivery not found.");
-    let msg = `Delivery #${d.id}\nCustomer: ${d.customerName || '—'}\nPhone: ${d.customerPhone || '—'}\nAddress: ${d.customerAddress || '—'}\nAssigned to: ${d.assignedTo || '—'}\nStatus: ${d.status}\nCreated: ${new Date(d.createdAt).toLocaleString()}`;
+    let msg = `Delivery #${d.id}\nCustomer: ${escapeHtml(d.customerName) || '—'}\nPhone: ${d.customerPhone || '—'}\nAddress: ${d.customerAddress || '—'}\nAssigned to: ${d.assignedTo || '—'}\nStatus: ${escapeHtml(d.status)}\nCreated: ${new Date(d.createdAt).toLocaleString()}`;
     if (d.completedAt) msg += `\nCompleted At: ${new Date(d.completedAt).toLocaleString()}`;
     alert(msg);
 }
@@ -4745,13 +5580,13 @@ async function verifyStock() {
     for (const cartItem of cart) {
         const recipes = await db.recipes.where("menuItemId").equals(cartItem.menuItemId || cartItem.id).toArray();
         if (recipes.length === 0 && cartItem.menuItemId) {
-            console.warn(`No recipe configured for menu item "${cartItem.name}" (${cartItem.menuItemId}); stock will not be deducted for it.`);
+            console.warn(`No recipe configured for menu item "${escapeHtml(cartItem.name)}" (${cartItem.menuItemId}); stock will not be deducted for it.`);
         }
         for (const recipe of recipes) {
             const ingredient = await db.inventory.get(recipe.inventoryId);
             if (!ingredient) continue;
             if ((Number(ingredient.stock) || 0) < (recipe.qtyRequired * cartItem.qty)) {
-                alert(`${ingredient.name} is out of stock or insufficient quantity.`);
+                alert(`${escapeHtml(ingredient.name)} is out of stock or insufficient quantity.`);
                 return false;
             }
         }
@@ -4855,6 +5690,7 @@ async function renderReceiptSearchResults(query, requestVersion) {
                     <div class="text-gray-700 text-[11px]">👤 <strong>${escapeHtml(customerName)}</strong> <span class="text-gray-500">(${escapeHtml(customerPhone)})</span></div>
                     <div class="flex flex-wrap items-center justify-end gap-1.5 border-t border-gray-100 pt-1.5">
                         <button type="button" onclick="downloadReceiptPDF(${Number(sale.id)})" class="rounded bg-indigo-50 px-2 py-1 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100">📄 PDF</button>
+                        <button type="button" onclick="printSavedReceipt(${Number(sale.id)})" class="rounded bg-teal-50 px-2 py-1 text-[10px] font-bold text-teal-700 hover:bg-teal-100">🖨️ Reprint</button>
                         <button type="button" onclick="shareReceipt(${Number(sale.id)})" class="rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100">📲 Share</button>
                         <button type="button" onclick="editSale(${Number(sale.id)})" class="rounded bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700 hover:bg-amber-100">✏️ Edit</button>
                         ${(currentRole === 'OWNER' || currentRole === 'MANAGER') && sale.refundStatus !== 'FULL' ? `
@@ -4948,6 +5784,9 @@ window.renderRecentSales = async function () {
                 </div>
 
                 <div class="flex items-center justify-end gap-1.5 pt-1 border-t border-gray-200">
+                    <button onclick="printSavedReceipt(${Number(sale.id)})" title="Reprint 80 mm receipt" class="text-[10px] bg-teal-50 text-teal-700 hover:bg-teal-100 font-bold px-2 py-1 rounded flex items-center gap-1 transition">
+                        🖨️ Reprint
+                    </button>
                     <button onclick="downloadReceiptPDF(${sale.id})" title="Download Receipt PDF" class="text-[10px] bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold px-2 py-1 rounded flex items-center gap-1 transition">
                         📄 PDF
                     </button>
@@ -5075,7 +5914,7 @@ async function performDeleteSelectedSales(saleIds = Array.from(selectedSaleIds))
     }
 
     alert(`${idsToDelete.length} order(s) deleted successfully!`);
-};
+}
 
 window.downloadReceiptPDF = async function (saleId) {
     const sale = await db.sales.get(saleId);
@@ -5172,14 +6011,14 @@ window.shareReceipt = async function (saleId) {
     text += `*Phone:* 0325-7867774\n`;
     text += `*Order ID:* #${sale.id}\n`;
     text += `*Date:* ${new Date(sale.timestamp).toLocaleString()}\n`;
-    text += `*Order Type:* ${sale.orderType}\n`;
+    text += `*Order Type:* ${escapeHtml(sale.orderType)}\n`;
     if (sale.deliveryInfo?.address) {
-        text += `*Address:* ${sale.deliveryInfo.address}\n`;
+        text += `*Address:* ${escapeHtml(sale.deliveryInfo.address)}\n`;
     }
     text += `--------------------------------\n`;
 
     sale.items.forEach(i => {
-        text += `• ${i.name} x${i.qty} = Rs ${(i.price * i.qty).toFixed(2)}\n`;
+        text += `• ${escapeHtml(i.name)} x${i.qty} = Rs ${(i.price * i.qty).toFixed(2)}\n`;
     });
 
     text += `--------------------------------\n`;
@@ -5322,9 +6161,9 @@ window.submitOwnerAuth = async function () {
     const pinInput = document.getElementById("ownerAuthPinInput");
     const enteredPin = pinInput?.value.trim();
 
-    const ownerPin = await getOwnerPin();
+    const ownerPinHash = await getOwnerPinHash();
 
-    if (enteredPin === ownerPin) {
+    if (await validateAuthorizationPin(enteredPin, ownerPinHash)) {
         document.getElementById("ownerAuthModal")?.classList.add("hidden");
         pinInput.value = "";
         document.getElementById("ownerAuthError")?.classList.add("hidden");
@@ -5400,17 +6239,18 @@ window.changeOwnerPin = async function () {
     }
 
     let validPassword = false;
+    const hashedCurrentPassword = await hashPin(currentPassword);
     try {
         if (typeof bcrypt !== 'undefined' && currentUser.password && (currentUser.password.startsWith("$2a$") || currentUser.password.startsWith("$2b$"))) {
             validPassword = bcrypt.compareSync(currentPassword, currentUser.password);
         } else if (typeof bcrypt !== 'undefined' && currentUser.password) {
             validPassword = bcrypt.compareSync(currentPassword, currentUser.password);
         } else {
-            validPassword = currentUser.password === currentPassword;
+            validPassword = currentUser.password === hashedCurrentPassword;
         }
     } catch (e) {
         console.warn("Error verifying owner password:", e);
-        validPassword = currentUser.password === currentPassword;
+        validPassword = currentUser.password === hashedCurrentPassword;
     }
 
     if (!validPassword) {
@@ -5455,20 +6295,25 @@ async function performDeleteSale(saleId) {
         return;
     }
 
-    const sale = await db.sales.get(saleId);
-    if (sale) {
-        if (confirm("Would you like to return raw ingredients back into inventory?")) {
-            await restoreInventory(sale.items);
+    try {
+        const sale = await db.sales.get(saleId);
+        if (sale) {
+            if (confirm("Would you like to return raw ingredients back into inventory?")) {
+                await restoreInventory(sale.items);
+            }
+            await db.sales.delete(saleId);
+            selectedSaleIds.delete(saleId);
+            await logAudit("SALE_DELETE", `Order #${saleId} deleted (Rs ${Number(sale.total || 0).toFixed(2)})`, saleId);
         }
-        await db.sales.delete(saleId);
-        selectedSaleIds.delete(saleId);
-        await logAudit("SALE_DELETE", `Order #${saleId} deleted (Rs ${Number(sale.total || 0).toFixed(2)})`, saleId);
-    }
 
-    if (document.getElementById("stockUnlockedState") && !document.getElementById("stockUnlockedState").classList.contains("hidden")) {
-        renderInventoryList();
+        if (document.getElementById("stockUnlockedState") && !document.getElementById("stockUnlockedState").classList.contains("hidden")) {
+            renderInventoryList();
+        }
+    } catch (err) {
+        console.error("Delete sale error:", err);
+        alert("Failed to delete order. Please try again.");
     }
-};
+}
 
 // ====================================================
 // Refunds (partial or full, against completed sales)
@@ -5538,6 +6383,16 @@ window.confirmRefund = async function () {
     const sale = await db.sales.get(saleId);
     if (!sale) return alert("Sale record not found.");
 
+    // Require owner PIN verification for all refunds.
+    const enteredPin = document.getElementById("refundPinInput")?.value.trim() || "";
+    const ownerPinHash = await getOwnerPinHash();
+    const isAuthorized = await validateAuthorizationPin(enteredPin, ownerPinHash);
+    if (!isAuthorized) {
+        await logAudit("REFUND_ATTEMPT", `Failed refund attempt on Order #${saleId} — incorrect PIN`, saleId);
+        return alert("Incorrect Owner PIN. Refund not authorized.");
+    }
+    await logAudit("REFUND_AUTHORIZED", `Refund authorized on Order #${saleId}`, saleId);
+
     const reason = document.getElementById("refundReasonInput")?.value.trim() || "";
     if (!reason) return alert("Please enter a reason for this refund.");
 
@@ -5547,7 +6402,8 @@ window.confirmRefund = async function () {
     document.querySelectorAll("#refundItemsContainer .refund-item-row").forEach(row => {
         const idx = Number(row.dataset.idx);
         const qty = Number(row.querySelector(".refund-qty-input")?.value) || 0;
-        if (qty > 0) {
+        const remainingQty = Math.max(0, Number(item.qty) - Number(item.refundedQty || 0));
+        if (qty > 0 && qty <= remainingQty) {
             const item = sale.items[idx];
             refundItems.push({ id: item.id, menuItemId: item.menuItemId, name: item.name, price: item.price, qty });
             refundTotal += (Number(item.price) || 0) * qty;
@@ -5678,4 +6534,463 @@ function setText(id, value) {
     if (el) el.innerText = value;
 }
 
-console.log("Hungry Birds POS v3.6 (delivery & KDS printing added) Initialized.");
+// ====================================================
+// Staff Management Module
+// ====================================================
+const STAFF_TABS = ["employees", "attendance", "leaves", "payroll"];
+let staffActiveTab = "employees";
+
+window.openStaffManagementModal = async function () {
+    if (currentRole !== "OWNER" && currentRole !== "MANAGER") {
+        alert("Access Denied: Owner or Manager role required.");
+        return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const attDate = document.getElementById("attendanceDate");
+    if (attDate && !attDate.value) attDate.value = today;
+    const advDate = document.getElementById("advanceDate");
+    if (advDate && !advDate.value) advDate.value = today;
+    const pMonth = document.getElementById("payrollMonth");
+    if (pMonth && !pMonth.value) pMonth.value = today.slice(0, 7);
+    const joinDate = document.getElementById("staffJoinDate");
+    if (joinDate && !joinDate.value) joinDate.value = today;
+
+    document.getElementById("staffManagementModal")?.classList.remove("hidden");
+    switchStaffTab(staffActiveTab || "employees");
+};
+
+window.closeStaffManagementModal = function () {
+    document.getElementById("staffManagementModal")?.classList.add("hidden");
+    resetStaffForm();
+};
+
+window.switchStaffTab = function (tab) {
+    staffActiveTab = tab;
+    STAFF_TABS.forEach(t => {
+        document.getElementById(`staffPanel-${t}`)?.classList.toggle("hidden", t !== tab);
+        const btn = document.getElementById(`staffTab-${t}`);
+        if (btn) {
+            btn.className = t === tab
+                ? "px-4 py-2 rounded-xl text-xs font-bold bg-white text-cyan-800 shadow-sm ring-1 ring-gray-200 transition"
+                : "px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition";
+        }
+    });
+
+    if (tab === "employees") renderStaffList();
+    if (tab === "attendance") renderAttendanceList();
+    if (tab === "leaves") { populateStaffSelects(); renderLeaveList(); }
+    if (tab === "payroll") { populateStaffSelects(); renderPayrollList(); renderAdvanceList(); renderSalaryHistory(); }
+};
+
+// ------------------------------
+// Employees
+// ------------------------------
+window.resetStaffForm = function () {
+    const title = document.getElementById("staffFormTitle");
+    if (title) title.textContent = "Add New Employee";
+    ["editStaffId", "staffName", "staffPhone", "staffMonthlySalary"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    const role = document.getElementById("staffRole");
+    if (role) role.value = "WAITER";
+    const status = document.getElementById("staffStatus");
+    if (status) status.value = "ACTIVE";
+};
+
+window.saveStaff = async function () {
+    const editId = document.getElementById("editStaffId")?.value || "";
+    const name = document.getElementById("staffName")?.value.trim() || "";
+    const phone = document.getElementById("staffPhone")?.value.trim() || "";
+    const role = document.getElementById("staffRole")?.value || "WAITER";
+    const monthlySalary = Number(document.getElementById("staffMonthlySalary")?.value) || 0;
+    const joinDate = document.getElementById("staffJoinDate")?.value || new Date().toISOString().slice(0, 10);
+    const status = document.getElementById("staffStatus")?.value || "ACTIVE";
+
+    if (!name) return alert("Staff name is required.");
+    if (monthlySalary < 0) return alert("Salary cannot be negative.");
+
+    if (editId) {
+        await db.staff.update(Number(editId), { name, phone, role, monthlySalary, joinDate, status });
+        logAudit("STAFF_UPDATED", `Updated staff member: ${name} (${role})`);
+    } else {
+        await db.staff.add({ name, phone, role, monthlySalary, joinDate, status, createdAt: new Date().toISOString() });
+        logAudit("STAFF_ADDED", `Added staff member: ${name} (${role}), salary ${monthlySalary}`);
+    }
+
+    resetStaffForm();
+    await renderStaffList();
+};
+
+window.editStaff = async function (id) {
+    const s = await db.staff.get(Number(id));
+    if (!s) return;
+    document.getElementById("editStaffId").value = s.id;
+    document.getElementById("staffName").value = s.name || "";
+    document.getElementById("staffPhone").value = s.phone || "";
+    document.getElementById("staffRole").value = s.role || "WAITER";
+    document.getElementById("staffMonthlySalary").value = s.monthlySalary || "";
+    document.getElementById("staffJoinDate").value = s.joinDate || "";
+    document.getElementById("staffStatus").value = s.status || "ACTIVE";
+    const title = document.getElementById("staffFormTitle");
+    if (title) title.textContent = `Edit Employee: ${s.name}`;
+};
+
+window.deleteStaff = async function (id) {
+    if (!confirm("Delete this staff member? Their attendance, leave and payroll history will be kept.")) return;
+    const s = await db.staff.get(Number(id));
+    await db.staff.delete(Number(id));
+    logAudit("STAFF_DELETED", `Deleted staff member: ${s?.name || id}`);
+    await renderStaffList();
+};
+
+window.renderStaffList = async function () {
+    const container = document.getElementById("staffList");
+    if (!container) return;
+    const staff = (await db.staff.toArray()).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+
+    if (staff.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-6 border border-dashed border-gray-200 rounded-xl">No staff members yet. Add your first employee above.</div>`;
+        return;
+    }
+
+    container.innerHTML = staff.map(s => `
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold text-gray-800 text-sm">${escapeHtml(s.name)}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${s.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}">${escapeHtml(s.status || "ACTIVE")}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">${escapeHtml(s.role || "")}</span>
+                </div>
+                <div class="text-[11px] text-gray-500 mt-1">📞 ${escapeHtml(s.phone || "—")} &nbsp;•&nbsp; Joined ${escapeHtml(s.joinDate || "—")} &nbsp;•&nbsp; Salary <span class="font-bold text-gray-700">${formatAmount(s.monthlySalary || 0)}</span></div>
+            </div>
+            <div class="flex gap-1.5 shrink-0">
+                <button onclick="editStaff(${Number(s.id)})" class="rounded-lg bg-amber-50 px-3 py-1.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100 transition">✏️ Edit</button>
+                <button onclick="deleteStaff(${Number(s.id)})" class="rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">🗑️ Delete</button>
+            </div>
+        </div>`).join("");
+};
+
+// ------------------------------
+// Attendance
+// ------------------------------
+window.renderAttendanceList = async function () {
+    const container = document.getElementById("staffAttendanceList");
+    const dateInput = document.getElementById("attendanceDate");
+    if (!container || !dateInput) return;
+    const date = dateInput.value;
+
+    if (!date) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-6 border border-dashed border-gray-200 rounded-xl">Pick a date to mark attendance.</div>`;
+        return;
+    }
+
+    const staff = (await db.staff.toArray()).filter(s => s.status === "ACTIVE");
+    const records = await db.attendance.where("date").equals(date).toArray();
+    const byStaff = {};
+    records.forEach(r => { byStaff[r.staffId] = r; });
+
+    if (staff.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-6 border border-dashed border-gray-200 rounded-xl">No active staff members. Add employees first.</div>`;
+        return;
+    }
+
+    const btn = (s, status, label, activeCls) => {
+        const current = byStaff[s.id]?.status || null;
+        return `<button onclick="markAttendance(${Number(s.id)}, '${status}')" class="px-3 py-1.5 rounded-lg text-[10px] font-bold transition ${current === status ? activeCls : "bg-gray-50 text-gray-500 hover:bg-gray-100"}">${label}</button>`;
+    };
+
+    container.innerHTML = staff.map(s => `
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-3.5 flex flex-col sm:flex-row sm:items-center gap-2">
+            <div class="flex-1 min-w-0">
+                <span class="font-bold text-sm text-gray-800">${escapeHtml(s.name)}</span>
+                <span class="text-[10px] text-gray-400 font-bold ml-1">${escapeHtml(s.role || "")}</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+                ${btn(s, "PRESENT", "✅ Present", "bg-emerald-500 text-white shadow-sm")}
+                ${btn(s, "ABSENT", "❌ Absent", "bg-red-500 text-white shadow-sm")}
+                ${btn(s, "LATE", "⏰ Late", "bg-amber-500 text-white shadow-sm")}
+                ${btn(s, "HALF_DAY", "🌗 Half Day", "bg-blue-500 text-white shadow-sm")}
+            </div>
+        </div>`).join("");
+
+    const marked = records.filter(r => staff.some(s => s.id === r.staffId));
+    setText("attendanceSummary", `${marked.length}/${staff.length} marked for ${date}`);
+};
+
+window.markAttendance = async function (staffId, status) {
+    const date = document.getElementById("attendanceDate")?.value;
+    if (!date) return alert("Please pick a date first.");
+
+    const existing = await db.attendance.where("staffId").equals(Number(staffId))
+        .and(a => a.date === date).first();
+
+    if (existing) {
+        await db.attendance.update(existing.id, { status, markedBy: currentUser?.username || "Staff", timestamp: new Date().toISOString() });
+    } else {
+        await db.attendance.add({ staffId: Number(staffId), date, status, markedBy: currentUser?.username || "Staff", timestamp: new Date().toISOString() });
+    }
+
+    const s = await db.staff.get(Number(staffId));
+    logAudit("ATTENDANCE_MARKED", `${s?.name || staffId} marked ${status} on ${date}`);
+    await renderAttendanceList();
+};
+
+// ------------------------------
+// Leaves
+// ------------------------------
+async function populateStaffSelects() {
+    const staff = (await db.staff.toArray()).filter(s => s.status === "ACTIVE");
+    const options = '<option value="">-- Select staff --</option>' +
+        staff.map(s => `<option value="${s.id}">${escapeHtml(s.name)} (${escapeHtml(s.role || "")})</option>`).join("");
+    ["leaveStaffId", "advanceStaffId"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = options;
+    });
+}
+
+window.submitLeaveRequest = async function () {
+    const staffId = Number(document.getElementById("leaveStaffId")?.value) || null;
+    const startDate = document.getElementById("leaveStartDate")?.value || "";
+    const endDate = document.getElementById("leaveEndDate")?.value || "";
+    const type = document.getElementById("leaveType")?.value || "CASUAL";
+    const reason = document.getElementById("leaveReason")?.value.trim() || "";
+
+    if (!staffId) return alert("Please select a staff member.");
+    if (!startDate || !endDate) return alert("Please select start and end dates.");
+    if (endDate < startDate) return alert("End date cannot be before start date.");
+
+    await db.leaves.add({ staffId, startDate, endDate, type, reason, status: "PENDING", requestedAt: new Date().toISOString() });
+    const s = await db.staff.get(staffId);
+    logAudit("LEAVE_REQUESTED", `Leave requested for ${s?.name || staffId}: ${type} from ${startDate} to ${endDate}`);
+
+    ["leaveStartDate", "leaveEndDate", "leaveReason"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    await renderLeaveList();
+};
+
+window.renderLeaveList = async function () {
+    const container = document.getElementById("leaveList");
+    if (!container) return;
+    const leaves = (await db.leaves.toArray()).sort((a, b) => String(b.requestedAt || "").localeCompare(String(a.requestedAt || "")));
+    const staff = await db.staff.toArray();
+    const nameOf = id => staff.find(s => s.id === id)?.name || `Staff #${id}`;
+
+    if (leaves.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-6 border border-dashed border-gray-200 rounded-xl">No leave requests yet.</div>`;
+        return;
+    }
+
+    const badge = status => status === "APPROVED"
+        ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">APPROVED</span>'
+        : status === "REJECTED"
+            ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">REJECTED</span>'
+            : '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">PENDING</span>';
+
+    container.innerHTML = leaves.map(l => `
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold text-gray-800 text-sm">${escapeHtml(nameOf(l.staffId))}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">${escapeHtml(l.type || "CASUAL")}</span>
+                    ${badge(l.status)}
+                </div>
+                <div class="text-[11px] text-gray-500 mt-1">${escapeHtml(l.startDate || "")} → ${escapeHtml(l.endDate || "")}${l.reason ? ` &nbsp;•&nbsp; ${escapeHtml(l.reason)}` : ""}</div>
+            </div>
+            ${l.status === "PENDING" ? `
+            <div class="flex gap-1.5 shrink-0">
+                <button onclick="updateLeaveStatus(${Number(l.id)}, 'APPROVED')" class="rounded-lg bg-emerald-50 px-3 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition">✔ Approve</button>
+                <button onclick="updateLeaveStatus(${Number(l.id)}, 'REJECTED')" class="rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">✖ Reject</button>
+            </div>` : ""}
+        </div>`).join("");
+};
+
+window.updateLeaveStatus = async function (leaveId, status) {
+    const leave = await db.leaves.get(Number(leaveId));
+    if (!leave) return;
+    await db.leaves.update(Number(leaveId), { status, decidedBy: currentUser?.username || "Staff", decidedAt: new Date().toISOString() });
+    const s = await db.staff.get(leave.staffId);
+    logAudit(`LEAVE_${status}`, `Leave ${status.toLowerCase()} for ${s?.name || leave.staffId} (${leave.startDate} → ${leave.endDate})`);
+    await renderLeaveList();
+};
+
+// ------------------------------
+// Payroll & Advances
+// ------------------------------
+function getSelectedPayrollPeriod() {
+    const raw = document.getElementById("payrollMonth")?.value || "";
+    const [year, month] = raw.split("-").map(Number);
+    return { year, month, monthStr: raw };
+}
+
+async function getPendingAdvances(staffId, year, month, monthStr) {
+    return db.advancePayments.where("staffId").equals(Number(staffId))
+        .and(a => a.status === "PENDING" && String(a.date || "").startsWith(monthStr))
+        .toArray();
+}
+
+window.renderPayrollList = async function () {
+    const container = document.getElementById("payrollList");
+    if (!container) return;
+    const { year, month, monthStr } = getSelectedPayrollPeriod();
+    if (!year || !month) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-6 border border-dashed border-gray-200 rounded-xl">Pick a month to run payroll.</div>`;
+        return;
+    }
+
+    const staff = (await db.staff.toArray()).filter(s => s.status === "ACTIVE");
+    if (staff.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-6 border border-dashed border-gray-200 rounded-xl">No active staff members. Add employees first.</div>`;
+        return;
+    }
+
+    const paid = await db.salaryPayments.where("month").equals(month)
+        .and(p => p.year === year && p.status === "PAID").toArray();
+    const paidIds = new Set(paid.map(p => p.staffId));
+
+    const rows = await Promise.all(staff.map(async s => {
+        const pending = await getPendingAdvances(s.id, year, month, monthStr);
+        const advancesTotal = pending.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+        const net = (Number(s.monthlySalary) || 0) - advancesTotal;
+        return `
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold text-gray-800 text-sm">${escapeHtml(s.name)}</span>
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-700">${escapeHtml(s.role || "")}</span>
+                    ${paidIds.has(s.id) ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">✔ PAID</span>' : ""}
+                </div>
+                <div class="text-[11px] text-gray-500 mt-1">
+                    Base <span class="font-bold text-gray-700">${formatAmount(s.monthlySalary || 0)}</span>
+                    &nbsp;−&nbsp; Advances <span class="font-bold ${advancesTotal > 0 ? "text-red-600" : "text-gray-700"}">${formatAmount(advancesTotal)}</span>
+                    &nbsp;=&nbsp; Net <span class="font-bold text-emerald-700">${formatAmount(net)}</span>
+                </div>
+            </div>
+            ${paidIds.has(s.id)
+                ? `<span class="text-[10px] font-bold text-gray-400 shrink-0">Already paid</span>`
+                : `<button onclick="paySalary(${Number(s.id)})" class="shrink-0 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 text-white px-4 py-2 text-[10px] font-black hover:from-emerald-600 hover:to-emerald-700 transition shadow-sm">💵 Pay Salary</button>`}
+        </div>`;
+    }));
+
+    container.innerHTML = rows.join("");
+};
+
+window.paySalary = async function (staffId) {
+    const { year, month, monthStr } = getSelectedPayrollPeriod();
+    if (!year || !month) return alert("Please pick a payroll month first.");
+
+    const s = await db.staff.get(Number(staffId));
+    if (!s) return;
+
+    const already = await db.salaryPayments.where("staffId").equals(Number(staffId))
+        .and(p => p.month === month && p.year === year && p.status === "PAID").first();
+    if (already) return alert(`Salary for ${s.name} is already paid for ${monthStr}.`);
+
+    const pending = await getPendingAdvances(staffId, year, month, monthStr);
+    const advancesTotal = pending.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+    const baseSalary = Number(s.monthlySalary) || 0;
+    const net = baseSalary - advancesTotal;
+
+    if (!confirm(`Pay salary to ${s.name} for ${monthStr}?\n\nBase: ${formatAmount(baseSalary)}\nAdvances deducted: ${formatAmount(advancesTotal)}\nNet payable: ${formatAmount(net)}`)) return;
+
+    await db.salaryPayments.add({
+        staffId: Number(staffId),
+        month, year,
+        baseSalary,
+        advancesDeducted: advancesTotal,
+        netPaid: net,
+        status: "PAID",
+        paidAt: new Date().toISOString(),
+        paidBy: currentUser?.username || "Staff"
+    });
+
+    for (const adv of pending) {
+        await db.advancePayments.update(adv.id, { status: "SETTLED", settledInPayroll: monthStr });
+    }
+
+    logAudit("SALARY_PAID", `Paid ${formatAmount(net)} to ${s.name} for ${monthStr} (base ${formatAmount(baseSalary)}, advances ${formatAmount(advancesTotal)})`);
+    await renderPayrollList();
+    await renderAdvanceList();
+    await renderSalaryHistory();
+};
+
+window.recordAdvancePayment = async function () {
+    const staffId = Number(document.getElementById("advanceStaffId")?.value) || null;
+    const amount = Number(document.getElementById("advanceAmount")?.value) || 0;
+    const date = document.getElementById("advanceDate")?.value || new Date().toISOString().slice(0, 10);
+    const note = document.getElementById("advanceNote")?.value.trim() || "";
+
+    if (!staffId) return alert("Please select a staff member.");
+    if (amount <= 0) return alert("Please enter a valid advance amount.");
+
+    await db.advancePayments.add({ staffId, amount, date, note, status: "PENDING", createdAt: new Date().toISOString() });
+    const s = await db.staff.get(staffId);
+    logAudit("ADVANCE_GIVEN", `Advance of ${formatAmount(amount)} given to ${s?.name || staffId} on ${date}`);
+
+    ["advanceAmount", "advanceNote"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    await renderAdvanceList();
+    await renderPayrollList();
+};
+
+window.renderAdvanceList = async function () {
+    const container = document.getElementById("advanceList");
+    if (!container) return;
+    const advances = (await db.advancePayments.toArray()).sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const staff = await db.staff.toArray();
+    const nameOf = id => staff.find(s => s.id === id)?.name || `Staff #${id}`;
+
+    if (advances.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-4 border border-dashed border-gray-200 rounded-xl">No advances recorded.</div>`;
+        return;
+    }
+
+    container.innerHTML = advances.map(a => `
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
+            <div class="flex-1 min-w-0">
+                <span class="font-bold text-xs text-gray-800">${escapeHtml(nameOf(a.staffId))}</span>
+                <span class="text-[11px] font-bold text-red-600 ml-2">${formatAmount(a.amount || 0)}</span>
+                <div class="text-[10px] text-gray-400 mt-0.5">${escapeHtml(a.date || "")}${a.note ? ` • ${escapeHtml(a.note)}` : ""}</div>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${a.status === "SETTLED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}">${escapeHtml(a.status || "PENDING")}</span>
+            <button onclick="deleteAdvance(${Number(a.id)})" class="shrink-0 rounded-lg bg-red-50 px-2 py-1 text-[10px] font-bold text-red-600 hover:bg-red-100 transition">🗑️</button>
+        </div>`).join("");
+};
+
+window.deleteAdvance = async function (id) {
+    if (!confirm("Delete this advance record?")) return;
+    await db.advancePayments.delete(Number(id));
+    logAudit("ADVANCE_DELETED", `Deleted advance record #${id}`);
+    await renderAdvanceList();
+    await renderPayrollList();
+};
+
+window.renderSalaryHistory = async function () {
+    const container = document.getElementById("salaryHistoryList");
+    if (!container) return;
+    const payments = (await db.salaryPayments.toArray()).sort((a, b) => String(b.paidAt || "").localeCompare(String(a.paidAt || ""))).slice(0, 30);
+    const staff = await db.staff.toArray();
+    const nameOf = id => staff.find(s => s.id === id)?.name || `Staff #${id}`;
+
+    if (payments.length === 0) {
+        container.innerHTML = `<div class="text-center text-xs text-gray-400 py-4 border border-dashed border-gray-200 rounded-xl">No salary payments recorded yet.</div>`;
+        return;
+    }
+
+    container.innerHTML = payments.map(p => `
+        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
+            <div class="flex-1 min-w-0">
+                <span class="font-bold text-xs text-gray-800">${escapeHtml(nameOf(p.staffId))}</span>
+                <span class="text-[11px] font-bold text-emerald-700 ml-2">${formatAmount(p.netPaid || 0)}</span>
+                <div class="text-[10px] text-gray-400 mt-0.5">${p.year}-${String(p.month).padStart(2, "0")} • Base ${formatAmount(p.baseSalary || 0)} − Advances ${formatAmount(p.advancesDeducted || 0)} • By ${escapeHtml(p.paidBy || "Staff")}</div>
+            </div>
+            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 shrink-0">${escapeHtml(p.status || "PAID")}</span>
+        </div>`).join("");
+};
+
+console.log("Hungry Birds POS v3.7 (staff management added) Initialized.");

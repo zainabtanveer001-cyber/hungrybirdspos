@@ -8,18 +8,21 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Arial Narrow', system-ui, sans-serif; }
 
         :root {
-            --ui-bg: #111827;
-            --ui-panel: #1b2432;
-            --ui-panel-raised: #232e3d;
-            --ui-border: #344154;
-            --ui-text: #e5eaf1;
-            --ui-muted: #9caabd;
-            --ui-accent: #7dd3c7;
+            --ui-bg: #222831;
+            --ui-panel: #303640;
+            --ui-panel-raised: #393f4a;
+            --ui-border: #4a535e;
+            --ui-text: #eeeeee;
+            --ui-muted: #b8c2cc;
+            --ui-accent: #00adb5;
+            --ui-accent-soft: #17464a;
+            --ui-success: #16a34a;
+            --ui-warning: #d97706;
+            --ui-danger: #dc2626;
         }
 
         #posScreen {
@@ -31,6 +34,7 @@
         #loginScreen,
         #autoLockOverlay {
             color-scheme: dark;
+            color: var(--ui-text);
         }
 
         #loginScreen > div,
@@ -45,6 +49,10 @@
         #autoLockOverlay .text-gray-900,
         #autoLockOverlay .text-gray-500 {
             color: var(--ui-text) !important;
+        }
+
+        #loginScreen .text-indigo-600 {
+            color: #55d6d9 !important;
         }
 
         #loginScreen input,
@@ -62,6 +70,7 @@
 
         [id$="Modal"] {
             color-scheme: dark;
+            color: var(--ui-text);
         }
 
         #posScreen .bg-white,
@@ -73,10 +82,14 @@
         #posScreen .bg-gray-50\/50,
         #posScreen .bg-gray-50\/80,
         #posScreen .bg-gray-100,
+        #posScreen .bg-gray-200,
+        #posScreen .bg-gray-300,
         [id$="Modal"] .bg-gray-50,
         [id$="Modal"] .bg-gray-50\/50,
         [id$="Modal"] .bg-gray-50\/80,
-        [id$="Modal"] .bg-gray-100 {
+        [id$="Modal"] .bg-gray-100,
+        [id$="Modal"] .bg-gray-200,
+        [id$="Modal"] .bg-gray-300 {
             background-color: var(--ui-panel-raised) !important;
         }
 
@@ -249,6 +262,29 @@
         @media (max-width: 640px) {
             #mainActionSidebar {
                 top: 96px;
+                padding: 8px 12px;
+            }
+
+            #mainActionSidebar .sidebar-groups {
+                display: none;
+            }
+
+            #mainActionSidebar .mobile-navigation-select {
+                display: block;
+                width: 100%;
+                min-height: 44px;
+                padding: 8px 36px 8px 12px;
+                border: 1px solid var(--ui-border);
+                border-radius: 8px;
+                color: var(--ui-text);
+                background-color: var(--ui-panel);
+                font-size: 14px;
+            }
+
+            #mainActionSidebar .mobile-navigation-select optgroup,
+            #mainActionSidebar .mobile-navigation-select option {
+                color: var(--ui-text);
+                background-color: var(--ui-panel);
             }
         }
 
@@ -349,6 +385,527 @@
             outline: 2px solid #3b82f6;
             outline-offset: 2px;
         }
+
+        /* ── Noir Teal POS system ── */
+        #posScreen,
+        #loginScreen,
+        [id$="Modal"] {
+            font-family: 'Arial Narrow', system-ui, sans-serif;
+        }
+
+        #posScreen {
+            min-height: 100vh;
+            background: var(--ui-bg);
+            color: var(--ui-text);
+        }
+
+        #posScreen .font-black,
+        #posScreen .font-extrabold,
+        [id$="Modal"] .font-black,
+        [id$="Modal"] .font-extrabold {
+            font-weight: 700;
+        }
+
+        #posScreen .tracking-widest,
+        [id$="Modal"] .tracking-widest {
+            letter-spacing: .04em;
+        }
+
+        .app-topbar {
+            min-height: 64px;
+            background: #1d232c !important;
+            border-color: var(--ui-border) !important;
+            box-shadow: 0 1px 0 rgb(0 0 0 / 16%);
+        }
+
+        #mainActionSidebar {
+            background: #1d232c !important;
+            border-color: var(--ui-border) !important;
+        }
+
+        #mainActionSidebar .sidebar-heading {
+            color: #9eabb8;
+        }
+
+        #mainActionSidebar .sidebar-footer {
+            border-color: var(--ui-border);
+            color: #9eabb8;
+        }
+
+        .sidebar-action {
+            min-height: 40px;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            color: #d6dde4;
+            font-size: 13px;
+            transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+        }
+
+        .sidebar-action:hover {
+            transform: none;
+            color: #fff;
+            background: var(--ui-accent-soft);
+            border-color: rgb(0 173 181 / 28%);
+        }
+
+        .mobile-navigation-select {
+            display: none;
+        }
+
+        #mainPosView {
+            min-width: 0;
+            padding: 24px;
+            gap: 16px;
+            background: var(--ui-bg);
+        }
+
+        #posScreen .bg-white,
+        [id$="Modal"] .bg-white {
+            background-color: var(--ui-panel) !important;
+        }
+
+        #posScreen .bg-gray-50,
+        #posScreen .bg-gray-50\/50,
+        #posScreen .bg-gray-50\/80,
+        #posScreen .bg-gray-100,
+        [id$="Modal"] .bg-gray-50,
+        [id$="Modal"] .bg-gray-50\/50,
+        [id$="Modal"] .bg-gray-50\/80,
+        [id$="Modal"] .bg-gray-100 {
+            background-color: #272d36 !important;
+        }
+
+        #posScreen .bg-white\/50,
+        #posScreen .bg-white\/60,
+        [id$="Modal"] .bg-white\/50,
+        [id$="Modal"] .bg-white\/60 {
+            background-color: #3a424d !important;
+        }
+
+        #posScreen .bg-gradient-to-br,
+        [id$="Modal"] .bg-gradient-to-br {
+            background: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .bg-gradient-to-r:not(button),
+        [id$="Modal"] .bg-gradient-to-r:not(button) {
+            background: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .bg-green-100,
+        #posScreen .bg-emerald-100,
+        #posScreen .bg-teal-100,
+        #posScreen .bg-red-100,
+        #posScreen .bg-rose-100,
+        #posScreen .bg-orange-100,
+        [id$="Modal"] .bg-green-100,
+        [id$="Modal"] .bg-emerald-100,
+        [id$="Modal"] .bg-teal-100,
+        [id$="Modal"] .bg-red-100,
+        [id$="Modal"] .bg-rose-100,
+        [id$="Modal"] .bg-orange-100 {
+            background: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .bg-indigo-50,
+        #posScreen .bg-indigo-100,
+        #posScreen .bg-purple-50,
+        #posScreen .bg-purple-100,
+        #posScreen .bg-blue-50,
+        #posScreen .bg-blue-100,
+        #posScreen .bg-amber-50,
+        #posScreen .bg-amber-100,
+        #posScreen .bg-green-50,
+        #posScreen .bg-emerald-50,
+        #posScreen .bg-teal-50,
+        #posScreen .bg-red-50,
+        #posScreen .bg-rose-50,
+        #posScreen .bg-orange-50,
+        #posScreen .bg-cyan-50,
+        [id$="Modal"] .bg-indigo-50,
+        [id$="Modal"] .bg-indigo-100,
+        [id$="Modal"] .bg-purple-50,
+        [id$="Modal"] .bg-purple-100,
+        [id$="Modal"] .bg-blue-50,
+        [id$="Modal"] .bg-blue-100,
+        [id$="Modal"] .bg-amber-50,
+        [id$="Modal"] .bg-amber-100,
+        [id$="Modal"] .bg-green-50,
+        [id$="Modal"] .bg-emerald-50,
+        [id$="Modal"] .bg-teal-50,
+        [id$="Modal"] .bg-red-50,
+        [id$="Modal"] .bg-rose-50,
+        [id$="Modal"] .bg-orange-50 {
+            background-color: #35404a !important;
+        }
+
+        [id$="Modal"] .bg-cyan-50 {
+            background-color: #35404a !important;
+        }
+
+        #posScreen [class~="bg-gray-200/50"],
+        [id$="Modal"] [class~="bg-gray-200/50"],
+        #posScreen [class~="bg-amber-50/60"],
+        #posScreen [class~="bg-amber-50/80"],
+        #posScreen [class~="bg-blue-50/50"],
+        #posScreen [class~="bg-blue-50/60"],
+        #posScreen [class~="bg-blue-50/80"],
+        #posScreen [class~="bg-emerald-50/80"],
+        #posScreen [class~="bg-indigo-50/60"],
+        #posScreen [class~="bg-red-50/50"],
+        [id$="Modal"] [class~="bg-amber-50/60"],
+        [id$="Modal"] [class~="bg-amber-50/80"],
+        [id$="Modal"] [class~="bg-blue-50/50"],
+        [id$="Modal"] [class~="bg-blue-50/60"],
+        [id$="Modal"] [class~="bg-blue-50/80"],
+        [id$="Modal"] [class~="bg-emerald-50/80"],
+        [id$="Modal"] [class~="bg-indigo-50/60"],
+        [id$="Modal"] [class~="bg-red-50/50"] {
+            background-color: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .bg-amber-200,
+        #posScreen .bg-blue-200,
+        #posScreen .bg-cyan-100,
+        #posScreen .bg-emerald-200,
+        #posScreen .bg-green-200,
+        #posScreen .bg-indigo-200,
+        #posScreen .bg-orange-200,
+        #posScreen .bg-purple-200,
+        #posScreen .bg-red-200,
+        #posScreen .bg-rose-200,
+        #posScreen .bg-teal-200,
+        #posScreen .bg-yellow-100,
+        [id$="Modal"] .bg-amber-200,
+        [id$="Modal"] .bg-blue-200,
+        [id$="Modal"] .bg-cyan-100,
+        [id$="Modal"] .bg-emerald-200,
+        [id$="Modal"] .bg-green-200,
+        [id$="Modal"] .bg-indigo-200,
+        [id$="Modal"] .bg-orange-200,
+        [id$="Modal"] .bg-purple-200,
+        [id$="Modal"] .bg-red-200,
+        [id$="Modal"] .bg-rose-200,
+        [id$="Modal"] .bg-teal-200,
+        [id$="Modal"] .bg-yellow-100 {
+            background-color: var(--ui-panel-raised) !important;
+        }
+
+        #posScreen .text-gray-900,
+        #posScreen .text-gray-800,
+        #posScreen .text-gray-700,
+        [id$="Modal"] .text-gray-900,
+        [id$="Modal"] .text-gray-800,
+        [id$="Modal"] .text-gray-700 {
+            color: var(--ui-text) !important;
+        }
+
+        #posScreen .text-gray-600,
+        #posScreen .text-gray-500,
+        #posScreen .text-gray-400,
+        [id$="Modal"] .text-gray-600,
+        [id$="Modal"] .text-gray-500,
+        [id$="Modal"] .text-gray-400 {
+            color: var(--ui-muted) !important;
+        }
+
+        #posScreen .text-indigo-900,
+        #posScreen .text-indigo-800,
+        #posScreen .text-purple-900,
+        #posScreen .text-purple-800,
+        #posScreen .text-blue-900,
+        #posScreen .text-blue-800,
+        #posScreen .text-amber-900,
+        #posScreen .text-amber-800,
+        #posScreen .text-teal-900,
+        #posScreen .text-teal-800,
+        #posScreen .text-green-900,
+        #posScreen .text-green-800,
+        #posScreen .text-emerald-900,
+        #posScreen .text-emerald-800,
+        #posScreen .text-red-900,
+        #posScreen .text-red-800,
+        #posScreen .text-rose-900,
+        #posScreen .text-rose-800,
+        #posScreen .text-amber-950,
+        #posScreen .text-cyan-900,
+        #posScreen .text-cyan-800,
+        #posScreen .text-slate-950,
+        #posScreen .text-yellow-900,
+        #posScreen .text-yellow-800,
+        [id$="Modal"] .text-indigo-900,
+        [id$="Modal"] .text-indigo-800,
+        [id$="Modal"] .text-purple-900,
+        [id$="Modal"] .text-purple-800,
+        [id$="Modal"] .text-blue-900,
+        [id$="Modal"] .text-blue-800,
+        [id$="Modal"] .text-amber-900,
+        [id$="Modal"] .text-amber-800,
+        [id$="Modal"] .text-teal-900,
+        [id$="Modal"] .text-teal-800,
+        [id$="Modal"] .text-green-900,
+        [id$="Modal"] .text-green-800,
+        [id$="Modal"] .text-emerald-900,
+        [id$="Modal"] .text-emerald-800,
+        [id$="Modal"] .text-red-900,
+        [id$="Modal"] .text-red-800,
+        [id$="Modal"] .text-rose-900,
+        [id$="Modal"] .text-rose-800,
+        [id$="Modal"] .text-amber-950,
+        [id$="Modal"] .text-cyan-900,
+        [id$="Modal"] .text-cyan-800,
+        [id$="Modal"] .text-slate-950,
+        [id$="Modal"] .text-yellow-900,
+        [id$="Modal"] .text-yellow-800 {
+            color: #e2e8ed !important;
+        }
+
+        #posScreen [class~="text-indigo-800/80"],
+        [id$="Modal"] [class~="text-indigo-800/80"] {
+            color: #c7d2fe !important;
+        }
+
+        #posScreen .text-indigo-700,
+        #posScreen .text-indigo-600,
+        [id$="Modal"] .text-indigo-700,
+        [id$="Modal"] .text-indigo-600 {
+            color: #a5b4fc !important;
+        }
+
+        #posScreen .text-purple-700,
+        #posScreen .text-purple-600,
+        [id$="Modal"] .text-purple-700,
+        [id$="Modal"] .text-purple-600 {
+            color: #c4b5fd !important;
+        }
+
+        #posScreen .text-blue-700,
+        #posScreen .text-blue-600,
+        [id$="Modal"] .text-blue-700,
+        [id$="Modal"] .text-blue-600 {
+            color: #93c5fd !important;
+        }
+
+        #posScreen .text-amber-700,
+        #posScreen .text-amber-600,
+        [id$="Modal"] .text-amber-700,
+        [id$="Modal"] .text-amber-600 {
+            color: #fcd34d !important;
+        }
+
+        #posScreen .text-green-700,
+        #posScreen .text-green-600,
+        #posScreen .text-emerald-700,
+        #posScreen .text-emerald-600,
+        #posScreen .text-teal-700,
+        #posScreen .text-teal-600,
+        [id$="Modal"] .text-green-700,
+        [id$="Modal"] .text-green-600,
+        [id$="Modal"] .text-emerald-700,
+        [id$="Modal"] .text-emerald-600,
+        [id$="Modal"] .text-teal-700,
+        [id$="Modal"] .text-teal-600 {
+            color: #6ee7b7 !important;
+        }
+
+        #posScreen .text-red-700,
+        #posScreen .text-red-600,
+        #posScreen .text-rose-700,
+        #posScreen .text-rose-600,
+        [id$="Modal"] .text-red-700,
+        [id$="Modal"] .text-red-600,
+        [id$="Modal"] .text-rose-700,
+        [id$="Modal"] .text-rose-600 {
+            color: #fca5a5 !important;
+        }
+
+        #posScreen button.bg-indigo-600,
+        #loginScreen button.bg-indigo-600,
+        #autoLockOverlay button.bg-indigo-600,
+        [id$="Modal"] button.bg-indigo-600 {
+            background-color: var(--ui-accent) !important;
+            border-color: var(--ui-accent) !important;
+        }
+
+        #posScreen button.bg-indigo-600:hover,
+        #loginScreen button.bg-indigo-600:hover,
+        #autoLockOverlay button.bg-indigo-600:hover,
+        [id$="Modal"] button.bg-indigo-600:hover {
+            background-color: #008b92 !important;
+        }
+
+        #posScreen .border-gray-100,
+        #posScreen .border-gray-200,
+        #posScreen .border-gray-300,
+        [id$="Modal"] .border-gray-100,
+        [id$="Modal"] .border-gray-200,
+        [id$="Modal"] .border-gray-300 {
+            border-color: var(--ui-border) !important;
+        }
+
+        #posScreen input:not([type="checkbox"]),
+        #posScreen select,
+        #posScreen textarea,
+        [id$="Modal"] input:not([type="checkbox"]),
+        [id$="Modal"] select,
+        [id$="Modal"] textarea {
+            color: var(--ui-text);
+            background-color: #222831;
+            border-color: var(--ui-border);
+            border-radius: 8px;
+            box-shadow: none;
+        }
+
+        #posScreen input::placeholder,
+        [id$="Modal"] input::placeholder {
+            color: #9eabb8;
+        }
+
+        #posScreen .rounded-xl,
+        #posScreen .rounded-2xl,
+        #posScreen .rounded-3xl,
+        [id$="Modal"] .rounded-xl,
+        [id$="Modal"] .rounded-2xl,
+        [id$="Modal"] .rounded-3xl {
+            border-radius: 8px;
+        }
+
+        #posScreen .rounded-3xl,
+        [id$="Modal"] .rounded-3xl {
+            border-radius: 12px;
+        }
+
+        #posScreen .shadow-sm,
+        #posScreen .shadow-md,
+        #posScreen .shadow-lg,
+        [id$="Modal"] .shadow-sm,
+        [id$="Modal"] .shadow-md,
+        [id$="Modal"] .shadow-lg {
+            box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+        }
+
+        #posScreen button:focus-visible,
+        #posScreen input:focus-visible,
+        #posScreen select:focus-visible,
+        [id$="Modal"] button:focus-visible,
+        [id$="Modal"] input:focus-visible,
+        [id$="Modal"] select:focus-visible {
+            outline: 2px solid var(--ui-accent);
+            outline-offset: 2px;
+        }
+
+        #categoryFilterBar button {
+            flex: 0 0 auto;
+        }
+
+        #categoryFilterBar button[aria-pressed="true"] {
+            color: #fff !important;
+            background: var(--ui-accent) !important;
+            border-color: var(--ui-accent) !important;
+        }
+
+        #categoryFilterBar button[aria-pressed="false"]:hover {
+            color: #fff !important;
+            background: var(--ui-accent-soft) !important;
+            border-color: var(--ui-accent) !important;
+        }
+
+        #posScreen button[class*="from-indigo-"],
+        #posScreen button[class*="from-purple-"],
+        #posScreen button[class*="from-blue-"],
+        #loginScreen button[class*="from-indigo-"],
+        #loginScreen button[class*="from-purple-"],
+        #loginScreen button[class*="from-blue-"],
+        #autoLockOverlay button[class*="from-indigo-"],
+        #autoLockOverlay button[class*="from-purple-"],
+        #autoLockOverlay button[class*="from-blue-"],
+        [id$="Modal"] button[class*="from-indigo-"],
+        [id$="Modal"] button[class*="from-purple-"],
+        [id$="Modal"] button[class*="from-blue-"] {
+            background-image: none !important;
+            background-color: var(--ui-accent) !important;
+        }
+
+        #posScreen button[class*="from-indigo-"]:hover,
+        #posScreen button[class*="from-purple-"]:hover,
+        #posScreen button[class*="from-blue-"]:hover,
+        #loginScreen button[class*="from-indigo-"]:hover,
+        #loginScreen button[class*="from-purple-"]:hover,
+        #loginScreen button[class*="from-blue-"]:hover,
+        #autoLockOverlay button[class*="from-indigo-"]:hover,
+        #autoLockOverlay button[class*="from-purple-"]:hover,
+        #autoLockOverlay button[class*="from-blue-"]:hover,
+        [id$="Modal"] button[class*="from-indigo-"]:hover,
+        [id$="Modal"] button[class*="from-purple-"]:hover,
+        [id$="Modal"] button[class*="from-blue-"]:hover {
+            background-color: #008b92 !important;
+        }
+
+        .menu-item-card {
+            min-height: 148px;
+            border-color: var(--ui-border);
+            background: var(--ui-panel);
+            transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+        }
+
+        .menu-item-card:hover {
+            border-color: var(--ui-accent);
+            box-shadow: 0 8px 20px rgb(0 0 0 / 20%);
+            transform: translateY(-1px);
+        }
+
+        #cartTotal,
+        #pnlNetProfit {
+            color: #55d6bc !important;
+        }
+
+        .custom-scrollbar {
+            scrollbar-color: #65717e #272d36;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #272d36;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #65717e;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #8794a1;
+        }
+
+        @media (max-width: 1023px) {
+            #mainPosView {
+                padding: 16px;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #mainPosView {
+                padding: 12px;
+                gap: 12px;
+            }
+
+            #mainActionSidebar {
+                background: #1d232c !important;
+            }
+
+            #mainActionSidebar .sidebar-action {
+                min-height: 44px;
+                border: 1px solid var(--ui-border);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #posScreen *,
+            [id$="Modal"] * {
+                scroll-behavior: auto !important;
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }
+        }
     </style>
 
     <!-- PDF Generation Libraries -->
@@ -361,6 +918,11 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-functions-compat.js"></script>
 
+
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://www.gstatic.com https://www.googleapis.com https://firebaseapp.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com; img-src 'self' data: https://; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self' sw.js">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="SAMEORIGIN">
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
 </head>
 
 <body class="bg-gray-100 font-sans antialiased text-gray-800">
@@ -483,8 +1045,15 @@
                     <button data-role="OWNER,MANAGER" type="button" onclick="protectedOpenInventoryModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
                         <span class="w-6 text-center">📦</span> Inventory
                     </button>
-                    <button data-role="OWNER,MANAGER" type="button" onclick="openExpenseModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                    
+                        <button data-role="OWNER,MANAGER" type="button" onclick="openSupplierModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                            <span class="w-6 text-center">🏭</span> Suppliers
+                        </button>
+
                         <span class="w-6 text-center">💸</span> Expenses
+                    </button>
+                    <button data-role="OWNER,MANAGER" type="button" onclick="openStaffManagementModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                        <span class="w-6 text-center">👨‍💼</span> Staff management
                     </button>
                     <button data-role="OWNER" type="button" onclick="openShiftOpeningModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
                         <span class="w-6 text-center">💵</span> Opening cash
@@ -494,6 +1063,7 @@
                     </button>
                     <button id="connectPrinterBtn" type="button" onclick="connectPrinter()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
                         <span class="w-6 text-center">🖨️</span> Connect printer
+                        <span id="printerStatusIndicator" class="text-xs text-gray-500 font-medium">Disconnected</span>
                     </button>
                     <button data-role="OWNER" type="button" onclick="openAuditLogModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
                         <span class="w-6 text-center">🕵️</span> Activity log
@@ -503,6 +1073,9 @@
                     </button>
                 </div>
             </nav>
+            <select id="mobileNavigationSelect" class="mobile-navigation-select" aria-label="Quick navigation" onchange="navigateMobileSidebar(this.value)">
+                <option value="">Quick navigation...</option>
+            </select>
             <div class="sidebar-footer mx-3 mt-6 border-t border-slate-700 pt-4 text-[11px] leading-relaxed text-slate-400">
                 <span class="block font-semibold text-slate-300">Hungry Birds POS</span>
                 <span>Signed in as <span id="sidebarUserName" class="font-semibold text-slate-200">Staff</span></span>
@@ -1095,6 +1668,88 @@
       </div>
     </div>
 
+    <!-- SUPPLIER MODAL -->
+    <div id="supplierModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[60] p-4 transition-all duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-md max-h-[85vh] overflow-y-auto p-6 shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 flex flex-col transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-black text-gray-800">Supplier</h2>
+                <button onclick="closeSupplierModal()" class="text-gray-600 hover:text-gray-800 text-2xl font-bold">&times;</button>
+            </div>
+            
+            <div id="supplierListContainer" class="space-y-2">
+                <div id="supplierList" class="space-y-2"></div>
+                <button type="button" onclick="showSupplierForm()" class="w-full bg-indigo-600 text-white py-2 rounded mt-2">Add Supplier</button>
+            </div>
+            <div id="supplierFormContainer" class="hidden space-y-4 mt-4">
+                <input id="editSupplierId" type="hidden" />
+                <input id="supplierName" type="text" placeholder="Name" class="w-full p-2 border rounded" required />
+                <input id="supplierPhone" type="text" placeholder="Phone" class="w-full p-2 border rounded" />
+                <input id="supplierEmail" type="email" placeholder="Email" class="w-full p-2 border rounded" />
+                <input id="supplierTaxId" type="text" placeholder="Tax ID / VAT" class="w-full p-2 border rounded" />
+                <input id="supplierWebsite" type="url" placeholder="Website" class="w-full p-2 border rounded" />
+                <input id="supplierAddress" type="text" placeholder="Address" class="w-full p-2 border rounded" />
+                <textarea id="supplierNotes" placeholder="Notes" class="w-full p-2 border rounded"></textarea>
+                <input id="supplierImage" type="file" accept="image/*" class="w-full" />
+                <img id="supplierImagePreview" class="hidden w-16 h-16 object-cover rounded mt-2" />
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="resetSupplierForm()" class="px-4 py-2 bg-gray-200 rounded">Reset</button>
+                    <button type="button" onclick="saveSupplier()" class="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+                    <button type="button" onclick="backToSupplierList()" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
+                </div>
+            </div>
+            <div id="supplierDetailContainer" class="hidden" style="max-height:60vh; overflow-y:auto;">
+                <!-- details injected via JS -->
+                <button type="button" onclick="backToSupplierList()" class="px-4 py-2 bg-gray-300 rounded">Back</button>
+            </div>
+            <!-- Supplier Ledger tab -->
+            <div id="supplierLedgerContainer" class="hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="font-bold text-sm">Supplier Ledger</h3>
+                    <button onclick="backToSupplierList()" class="text-xs bg-gray-300 px-2 py-1 rounded">Back</button>
+                </div>
+                <div class="grid grid-cols-3 gap-2 text-center mb-3 text-xs">
+                    <div class="bg-gray-100 rounded p-2">
+                        <div class="text-gray-500">Total Stock Purchased</div>
+                        <div id="ledgerTotalStock" class="font-bold">Rs 0.00</div>
+                    </div>
+                    <div class="bg-gray-100 rounded p-2">
+                        <div class="text-gray-500">Total Cash Paid</div>
+                        <div id="ledgerTotalPaid" class="font-bold">Rs 0.00</div>
+                    </div>
+                    <div class="bg-gray-100 rounded p-2">
+                        <div class="text-gray-500">Net Balance Owed</div>
+                        <div id="ledgerNetBalance" class="font-bold text-indigo-700">Rs 0.00</div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
+                    <select id="ledgerSupplierFilter" class="p-1.5 border rounded">
+                        <option value="">All Suppliers</option>
+                    </select>
+                    <input type="date" id="ledgerDateFrom" class="p-1.5 border rounded" />
+                    <input type="date" id="ledgerDateTo" class="p-1.5 border rounded" />
+                </div>
+                <div class="overflow-x-auto max-h-64">
+                    <table class="w-full border-collapse text-xs">
+                        <thead class="bg-gray-800 text-white">
+                            <tr>
+                                <th class="p-1.5 text-left">Date</th>
+                                <th class="p-1.5 text-left">Supplier</th>
+                                <th class="p-1.5 text-left">Ref#</th>
+                                <th class="p-1.5 text-left">Description</th>
+                                <th class="p-1.5 text-right">Qty In</th>
+                                <th class="p-1.5 text-right">Unit Price</th>
+                                <th class="p-1.5 text-right">Total Cost</th>
+                                <th class="p-1.5 text-right">Cash Paid</th>
+                                <th class="p-1.5 text-right">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="supplierLedgerBody" class="bg-white">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- STOCK ACCESS MODAL -->
     <div id="stockPinModal" class="hidden fixed inset-0 bg-gray-900/60 backdrop-blur-md flex justify-center items-center z-[60] p-4 transition-all duration-300">
         <div class="bg-white rounded-3xl p-6 w-full max-w-xs shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 space-y-4 text-center transform transition-all">
@@ -1380,6 +2035,10 @@
                     <label class="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">Refund Reason</label>
                     <input id="refundReasonInput" type="text" placeholder="e.g. Customer complaint, wrong order" class="w-full p-3 border-0 ring-1 ring-gray-200 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
                 </div>
+                <div>
+                    <label class="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1.5">Owner PIN (required for refund)</label>
+                    <input id="refundPinInput" type="password" placeholder="Enter your Owner PIN" class="w-full p-3 border-0 ring-1 ring-gray-200 rounded-2xl text-xs font-medium focus:ring-2 focus:ring-rose-500 bg-gray-50/50 focus:bg-white focus:outline-none transition-all shadow-inner" />
+                </div>
             </div>
             <div class="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-between items-center gap-3">
                 <div class="text-xs font-black uppercase tracking-wider text-gray-600">Refund Total: <span id="refundModalTotal" class="text-base font-black text-rose-600">Rs 0.00</span></div>
@@ -1466,6 +2125,133 @@
             </div>
             <div class="p-4 bg-gray-50/80 border-t border-gray-100 text-right">
                 <button onclick="closeCustomerModal()" class="bg-white ring-1 ring-gray-200 text-gray-700 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- STAFF MANAGEMENT MODAL -->
+    <div id="staffManagementModal" class="hidden fixed inset-0 bg-gray-900/70 backdrop-blur-md flex justify-center items-center z-50 p-4 transition-all">
+        <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div class="p-5 bg-gradient-to-r from-cyan-700 to-blue-800 text-white flex justify-between items-center shadow-inner">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">👨‍💼</span>
+                    <div>
+                        <h3 class="text-sm font-black tracking-widest uppercase">Staff Management</h3>
+                        <p class="text-[11px] text-cyan-200/80 font-medium">Employees, attendance, leaves &amp; payroll</p>
+                    </div>
+                </div>
+                <button onclick="closeStaffManagementModal()" class="text-cyan-200 hover:text-white font-bold text-2xl transition leading-none">&times;</button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="px-5 pt-4 pb-3 bg-gray-50/50 border-b border-gray-100 flex flex-wrap gap-2">
+                <button id="staffTab-employees" onclick="switchStaffTab('employees')" class="px-4 py-2 rounded-xl text-xs font-bold bg-white text-cyan-800 shadow-sm ring-1 ring-gray-200 transition">👥 Employees</button>
+                <button id="staffTab-attendance" onclick="switchStaffTab('attendance')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">🗓️ Attendance</button>
+                <button id="staffTab-leaves" onclick="switchStaffTab('leaves')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">🌴 Leaves</button>
+                <button id="staffTab-payroll" onclick="switchStaffTab('payroll')" class="px-4 py-2 rounded-xl text-xs font-bold text-gray-500 hover:text-cyan-700 hover:bg-white/70 transition">💰 Payroll &amp; Advances</button>
+            </div>
+
+            <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
+                <!-- EMPLOYEES PANEL -->
+                <div id="staffPanel-employees" class="space-y-5">
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                        <h4 id="staffFormTitle" class="text-xs font-black text-gray-500 uppercase tracking-widest">Add New Employee</h4>
+                        <input id="editStaffId" type="hidden" />
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <input id="staffName" type="text" placeholder="Full name" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                            <input id="staffPhone" type="tel" placeholder="Phone (e.g. 0300-1234567)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                            <select id="staffRole" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow">
+                                <option value="MANAGER">Manager</option>
+                                <option value="CASHIER">Cashier</option>
+                                <option value="WAITER" selected>Waiter</option>
+                                <option value="CHEF">Chef</option>
+                                <option value="CLEANER">Cleaner</option>
+                                <option value="OTHER">Other</option>
+                            </select>
+                            <input id="staffMonthlySalary" type="number" step="0.01" min="0" placeholder="Monthly salary (Rs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow font-bold text-cyan-800" />
+                            <input id="staffJoinDate" type="date" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                            <select id="staffStatus" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow">
+                                <option value="ACTIVE" selected>Active</option>
+                                <option value="INACTIVE">Inactive</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-2 pt-2">
+                            <button onclick="saveStaff()" class="flex-1 bg-gradient-to-r from-cyan-600 to-blue-700 text-white text-xs font-black py-3 rounded-xl hover:from-cyan-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Save Employee</button>
+                            <button onclick="resetStaffForm()" class="bg-gray-100 text-gray-600 text-xs font-bold px-5 py-3 rounded-xl hover:bg-gray-200 transition">Reset</button>
+                        </div>
+                    </div>
+                    <div id="staffList" class="space-y-2"></div>
+                </div>
+
+                <!-- ATTENDANCE PANEL -->
+                <div id="staffPanel-attendance" class="hidden space-y-4">
+                    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label class="text-xs font-black text-gray-500 uppercase tracking-widest">Date</label>
+                        <input id="attendanceDate" type="date" onchange="renderAttendanceList()" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                        <span id="attendanceSummary" class="sm:ml-auto text-[11px] font-bold text-cyan-800 bg-cyan-50 px-3 py-1.5 rounded-xl border border-cyan-100"></span>
+                    </div>
+                    <div id="staffAttendanceList" class="space-y-2"></div>
+                </div>
+
+                <!-- LEAVES PANEL -->
+                <div id="staffPanel-leaves" class="hidden space-y-5">
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                        <h4 class="text-xs font-black text-gray-500 uppercase tracking-widest">Request Leave</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <select id="leaveStaffId" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow">
+                                <option value="">-- Select staff --</option>
+                            </select>
+                            <input id="leaveStartDate" type="date" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                            <input id="leaveEndDate" type="date" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                            <select id="leaveType" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow">
+                                <option value="SICK">Sick</option>
+                                <option value="CASUAL" selected>Casual</option>
+                                <option value="ANNUAL">Annual</option>
+                                <option value="EMERGENCY">Emergency</option>
+                            </select>
+                            <input id="leaveReason" type="text" placeholder="Reason (optional)" class="sm:col-span-2 p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                        </div>
+                        <button onclick="submitLeaveRequest()" class="w-full bg-gradient-to-r from-cyan-600 to-blue-700 text-white text-xs font-black py-3 rounded-xl hover:from-cyan-700 hover:to-blue-800 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Submit Leave Request</button>
+                    </div>
+                    <div id="leaveList" class="space-y-2"></div>
+                </div>
+
+                <!-- PAYROLL & ADVANCES PANEL -->
+                <div id="staffPanel-payroll" class="hidden space-y-5">
+                    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center gap-3">
+                        <label class="text-xs font-black text-gray-500 uppercase tracking-widest">Payroll Month</label>
+                        <input id="payrollMonth" type="month" onchange="renderPayrollList()" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                    </div>
+
+                    <div id="payrollList" class="space-y-2"></div>
+
+                    <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                        <h4 class="text-xs font-black text-gray-500 uppercase tracking-widest">Record Advance Payment</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <select id="advanceStaffId" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow">
+                                <option value="">-- Select staff --</option>
+                            </select>
+                            <input id="advanceAmount" type="number" step="0.01" min="0" placeholder="Amount (Rs)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow font-bold text-red-600" />
+                            <input id="advanceDate" type="date" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                            <input id="advanceNote" type="text" placeholder="Note (optional)" class="p-2.5 border-0 ring-1 ring-gray-200 rounded-xl text-xs bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-shadow" />
+                        </div>
+                        <button onclick="recordAdvancePayment()" class="w-full bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-black py-3 rounded-xl hover:from-amber-600 hover:to-orange-700 transition-all shadow-md hover:shadow-lg active:scale-[0.98]">Record Advance</button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-xs font-black text-gray-500 uppercase tracking-widest px-1">Advances</h4>
+                        <div id="advanceList" class="space-y-2 max-h-52 overflow-y-auto pr-1 custom-scrollbar"></div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <h4 class="text-xs font-black text-gray-500 uppercase tracking-widest px-1">Salary Payment History</h4>
+                        <div id="salaryHistoryList" class="space-y-2 max-h-52 overflow-y-auto pr-1 custom-scrollbar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 bg-gray-50/80 border-t border-gray-100 justify-end flex">
+                <button onclick="closeStaffManagementModal()" class="bg-white ring-1 ring-gray-200 text-gray-800 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-50 hover:shadow-sm transition">Close</button>
             </div>
         </div>
     </div>

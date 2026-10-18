@@ -1,15 +1,18 @@
 // Service worker for Hungry Birds POS — offline-first app shell caching.
-// Bump this on every release so old cached app shells get purged automatically.
-const CACHE_NAME = "hb-pos-cache-v7";
+
+const APP_VERSION = "3.7.0";
+const CACHE_NAME = `hb-pos-cache-v${APP_VERSION}`;
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./app.js",
   "./manifest.json",
-  "./icon.svg"
+  "./icon.svg",
+  "./netlify.toml"
 ];
 
+// Pre-cache the app shell and take control immediately.
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
@@ -17,10 +20,15 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+// Remove old caches on activation.
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      Promise.all(
+        keys
+          .filter((key) => key.startsWith("hb-pos-cache-") && key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
+      )
     )
   );
   self.clients.claim();
@@ -33,18 +41,24 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
 
   // Never intercept Firebase / Firestore / Auth traffic — must always hit the network.
-  if (url.hostname.includes("firebase") || url.hostname.includes("googleapis") || url.hostname.includes("gstatic.com") && url.pathname.includes("firebasejs")) {
+  if (
+    url.hostname.includes("firebase") ||
+    url.hostname.includes("googleapis") ||
+    (url.hostname.includes("gstatic.com") && url.pathname.includes("firebasejs"))
+  ) {
     return;
   }
 
   if (url.origin === self.location.origin) {
     // App shell: network-first so new deploys show immediately; fall back to cache when offline.
     event.respondWith(
-      fetch(request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-        return response;
-      }).catch(() => caches.match(request))
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("./index.html")))
     );
     return;
   }

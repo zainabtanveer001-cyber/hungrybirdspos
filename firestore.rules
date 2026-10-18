@@ -87,5 +87,67 @@ service cloud.firestore {
 
             allow delete: if isAdmin();
         }
+
+        // POS-only collections: synced from local Dexie via echo-guarded onSnapshot.
+        // Only staff can read/write (sales, inventory, recipes, etc.).
+        match /suppliers/{supplierId} {
+            allow read, write: if isStaff();
+        }
+
+        match /stockIn/{stockInId} {
+            allow read, write: if isStaff();
+        }
+
+        match /supplierPayments/{paymentId} {
+            allow read, write: if isStaff();
+        }
+
+        match /supplierLedger/{ledgerId} {
+            allow read, write: if isStaff();
+        }
+
+        match /expenses/{expenseId} {
+            allow read, write: if isStaff();
+        }
+
+        match /deliveries/{deliveryId} {
+            allow read, write: if isStaff();
+        }
+
+        match /staff/{staffId} {
+            allow read, write: if isStaff();
+        }
+
+        match /attendance/{attendanceId} {
+            allow read, write: if isStaff();
+        }
+
+        match /leaves/{leaveId} {
+            allow read, write: if isStaff();
+        }
+
+        match /salaryPayments/{paymentId} {
+            allow read, write: if isStaff();
+        }
+
+        match /advancePayments/{advanceId} {
+            allow read, write: if isStaff();
+        }
+
+        match /auditLogs/{logId} {
+            allow read, write: if isStaff();
+        }
+
+        match /heldOrders/{orderId} {
+            allow read, write: if isStaff();
+        }
+
+        match /tableOrders/{orderId} {
+            allow read, write: if isStaff();
+        }
+
+        match /recipes/{recipeId} {
+            allow read, write: if isStaff();
+        }
     }
 }
