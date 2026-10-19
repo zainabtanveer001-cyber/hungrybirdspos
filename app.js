@@ -4192,18 +4192,16 @@ async function renderModalInventoryList(searchText) {
         return;
     }
     container.innerHTML = items.map(item => `
-        <div class="p-3 bg-white rounded-xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items:center gap-2">
-            <div class="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-2 w-full">
-                <input id="editName_${item.id}" type="text" value="${escapeHtml(item.name)}" class="p-1.5 border rounded text-xs font-semibold text-gray-800 bg-white">
-                <div class="flex items-center gap-1">
-                    <input id="editStock_${item.id}" type="number" step="0.01" value="${Number(item.stock)}" class="p-1.5 border rounded text-xs font-bold text-gray-800 bg-white w-full">
-                </div>
-                <input id="editUnit_${item.id}" type="text" value="${escapeHtml(item.unit || '')}" placeholder="Unit (kg, pcs)" class="p-1.5 border rounded text-xs bg-white">
-                <input id="editCost_${item.id}" type="number" step="0.01" value="${Number(item.cost || 0).toFixed(2)}" placeholder="Cost per Unit" class="p-1.5 border rounded text-xs bg-white">
+        <div class="p-3 bg-white rounded-xl border shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 overflow-x-auto">
+            <div class="flex-1 min-w-0 grid grid-cols-4 gap-2 w-full sm:w-auto">
+                <input id="editName_${item.id}" type="text" value="${escapeHtml(item.name)}" class="p-1.5 border rounded text-xs font-semibold text-gray-800 bg-white w-full min-w-0">
+                <input id="editStock_${item.id}" type="number" step="0.01" value="${Number(item.stock)}" class="p-1.5 border rounded text-xs font-bold text-gray-800 bg-white w-full min-w-0">
+                <input id="editUnit_${item.id}" type="text" value="${escapeHtml(item.unit || '')}" placeholder="Unit" class="p-1.5 border rounded text-xs bg-white w-full min-w-0">
+                <input id="editCost_${item.id}" type="number" step="0.01" value="${Number(item.cost || 0).toFixed(2)}" placeholder="Cost" class="p-1.5 border rounded text-xs bg-white w-full min-w-0">
             </div>
-            <div class="flex gap-2 w-full sm:w-auto justify-end">
-                <button onclick="saveFullModalIngredient('${item.id}')" class="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-emerald-700 transition">Save</button>
-                <button onclick="deleteInventoryItem('${item.id}')" class="bg-red-100 text-red-600 text-xs font-bold px-2 py-1.5 rounded hover:bg-red-200 transition">Delete</button>
+            <div class="flex gap-2 flex-shrink-0">
+                <button onclick="saveFullModalIngredient('${item.id}')" class="bg-emerald-600 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-emerald-700 transition whitespace-nowrap">Save</button>
+                <button onclick="deleteInventoryItem('${item.id}')" class="bg-red-100 text-red-600 text-xs font-bold px-2 py-1.5 rounded hover:bg-red-200 transition whitespace-nowrap">Delete</button>
             </div>
         </div>
     `).join("");
