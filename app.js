@@ -787,12 +787,12 @@ function renderAnalyticsLineChart(buckets, period) {
         const y = padding.top + index * plotHeight / 3;
         const amount = scaleMax * (1 - index / 3);
         const label = amount >= 1000 ? `Rs ${(amount / 1000).toFixed(1)}k` : `Rs ${Math.round(amount)}`;
-        return `<g><line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#344154" stroke-dasharray="3 5"/><text x="${padding.left - 8}" y="${y + 4}" fill="#9caabd" text-anchor="end" font-size="10">${label}</text></g>`;
+        return `<g><line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="#cbd5e1" stroke-dasharray="3 5"/><text x="${padding.left - 8}" y="${y + 4}" fill="#64748b" text-anchor="end" font-size="10">${label}</text></g>`;
     }).join("");
     const labelInterval = period === "month" ? 5 : period === "day" ? 3 : 1;
     const labels = points.map((point, index) => {
         if (index % labelInterval !== 0 && index !== points.length - 1) return "";
-        return `<text x="${point.x}" y="${height - 8}" fill="#9caabd" text-anchor="middle" font-size="10">${escapeHtml(point.bucket.label)}</text>`;
+        return `<text x="${point.x}" y="${height - 8}" fill="#64748b" text-anchor="middle" font-size="10">${escapeHtml(point.bucket.label)}</text>`;
     }).join("");
     const dots = points.map(point => `<circle cx="${point.x}" cy="${point.y}" r="3.5" fill="#7dd3c7"><title>${escapeHtml(point.bucket.label)}: ${escapeHtml(formatAmount(point.bucket.amount))}</title></circle>`).join("");
 
@@ -906,11 +906,11 @@ function renderAnalyticsRankings(containerId, entries, metricKey, metricLabel, d
             <div class="mb-1.5 flex items-center justify-between gap-3">
                 <div class="flex min-w-0 items-center gap-2">
                     <span class="w-5 text-[11px] font-semibold text-gray-500">${index + 1}.</span>
-                    <span class="truncate text-sm font-semibold text-gray-100" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
+                    <span class="truncate text-sm font-semibold text-gray-800" title="${escapeHtml(entry.name)}">${escapeHtml(entry.name)}</span>
                 </div>
-                <span class="shrink-0 text-xs font-semibold text-teal-300">${escapeHtml(metricLabel(value))}</span>
+                <span class="shrink-0 text-xs font-semibold text-teal-600">${escapeHtml(metricLabel(value))}</span>
             </div>
-            <div class="ml-7 h-1.5 overflow-hidden rounded-full bg-slate-700"><div class="h-full rounded-full bg-teal-300" style="width:${width}%"></div></div>
+            <div class="ml-7 h-1.5 overflow-hidden rounded-full bg-slate-200"><div class="h-full rounded-full bg-teal-600" style="width:${width}%"></div></div>
             <p class="ml-7 mt-1 text-[11px] text-gray-500">${escapeHtml(detailLabel(entry))}</p>
         </div>`;
     }).join("");
@@ -4680,7 +4680,7 @@ function renderMenuGroups(grouped, searchText = "") {
                 <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                     ${group.items.map(item => `
                         <button type="button" title="Add ${escapeHtml(item.name)} to the order" class="menu-item-card w-full text-left rounded-2xl shadow-sm border overflow-hidden cursor-pointer transition-all focus-visible:ring-2 focus-visible:ring-blue-300" onclick="handleMenuItemClick('${escapeHtml(item.id)}')">
-                            ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" class="w-full h-24 object-cover border-b border-gray-700" />` : `<div class="h-24 bg-gray-300 flex items-center justify-center text-3xl">Menu</div>`}
+                            ${item.imageUrl ? `<img src="${escapeHtml(item.imageUrl)}" alt="" loading="lazy" class="w-full h-24 object-cover border-b border-gray-200" />` : `<div class="h-24 bg-gray-300 flex items-center justify-center text-3xl">Menu</div>`}
                             <div class="p-3">
                                 <h3 class="font-semibold text-sm sm:text-base text-gray-800 leading-snug line-clamp-2 min-h-10">${escapeHtml(item.name)}</h3>
                                 <p class="text-blue-700 font-bold text-sm mt-2">${formatAmount(item.price)}</p>
