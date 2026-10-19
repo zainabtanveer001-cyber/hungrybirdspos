@@ -260,25 +260,9 @@
         #staffManagementModal .modal-header-gradient { border-left: 4px solid #06b6d4; }
         #supplierModal .modal-header-gradient { border-left: 4px solid #2563eb; }
 
-        /* Modal close button text */
-        [id$="Modal"] button.text-white\/60,
-        [id$="Modal"] button.text-cyan-200\/80,
-        [id$="Modal"] button.text-indigo-200\/80,
-        [id$="Modal"] button.text-purple-200\/80,
-        [id$="Modal"] button.text-blue-100\/80,
-        [id$="Modal"] button.text-emerald-200\/80,
-        [id$="Modal"] button.text-amber-100\/80 {
-            color: var(--ui-muted) !important;
-        }
-        [id$="Modal"] button.text-white\/60:hover,
-        [id$="Modal"] button.text-cyan-200\/80:hover,
-        [id$="Modal"] button.text-indigo-200\/80:hover,
-        [id$="Modal"] button.text-purple-200\/80:hover,
-        [id$="Modal"] button.text-blue-100\/80:hover,
-        [id$="Modal"] button.text-emerald-200\/80:hover,
-        [id$="Modal"] button.text-amber-100\/80:hover {
-            color: var(--ui-text) !important;
-        }
+        /* Modal close buttons: ensure light theme text */
+        [id$="Modal"] button[class*="text-gray-600"] { color: var(--ui-muted) !important; }
+        [id$="Modal"] button[class*="text-gray-600"]:hover { color: var(--ui-text) !important; }
 
         [id$="Modal"] .bg-white\/10,
         [id$="Modal"] .bg-indigo-50\/60,
@@ -771,7 +755,7 @@
         <div class="bg-white rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
             <div class="modal-header-gradient px-5 py-4 flex justify-between items-center">
                 <div class="flex items-center gap-3">
-                    <span class="w-11 h-11 rounded-2xl bg-teal-300/10 border border-teal-200/10 flex items-center justify-center text-xl"></span>
+                    <span class="w-11 h-11 rounded-2xl bg-blue-100 border border-blue-200 flex items-center justify-center text-xl"></span>
                     <div>
                         <h3 class="text-base font-bold tracking-tight">Sales analytics</h3>
                         <p class="text-xs text-gray-600 mt-1">Performance overview · owner view</p>
@@ -784,7 +768,7 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     <article class="bg-white p-4 rounded-2xl border border-gray-100">
                         <p class="text-xs font-semibold text-gray-500">Today</p>
-                        <p id="analyticsTodaySales" class="mt-2 text-2xl font-bold text-emerald-300">Rs 0.00</p>
+                        <p id="analyticsTodaySales" class="mt-2 text-2xl font-bold text-emerald-600">Rs 0.00</p>
                         <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
                             <span id="analyticsTodayCount">0 orders today</span>
                             <span id="analyticsTodayDiscounts">Discounts: Rs 0.00</span>
@@ -792,7 +776,7 @@
                     </article>
                     <article class="bg-white p-4 rounded-2xl border border-gray-100">
                         <p class="text-xs font-semibold text-gray-500">This week</p>
-                        <p id="analyticsWeekSales" class="mt-2 text-2xl font-bold text-sky-300">Rs 0.00</p>
+                        <p id="analyticsWeekSales" class="mt-2 text-2xl font-bold text-blue-600">Rs 0.00</p>
                         <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
                             <span id="analyticsWeekCount">0 orders this week</span>
                             <span id="analyticsWeekDiscounts">Discounts: Rs 0.00</span>
@@ -800,7 +784,7 @@
                     </article>
                     <article class="bg-white p-4 rounded-2xl border border-gray-100">
                         <p class="text-xs font-semibold text-gray-500">This month</p>
-                        <p id="analyticsMonthSales" class="mt-2 text-2xl font-bold text-violet-300">Rs 0.00</p>
+                        <p id="analyticsMonthSales" class="mt-2 text-2xl font-bold text-purple-600">Rs 0.00</p>
                         <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
                             <span id="analyticsMonthCount">0 orders this month</span>
                             <span id="analyticsMonthDiscounts">Discounts: Rs 0.00</span>
@@ -808,7 +792,7 @@
                     </article>
                     <article class="bg-white p-4 rounded-2xl border border-gray-100">
                         <p class="text-xs font-semibold text-gray-500">All-time revenue</p>
-                        <p id="analyticsOverallSales" class="mt-2 text-2xl font-bold text-amber-300">Rs 0.00</p>
+                        <p id="analyticsOverallSales" class="mt-2 text-2xl font-bold text-amber-600">Rs 0.00</p>
                         <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400">
                             <span id="analyticsOverallCount">0 overall orders recorded</span>
                             <span id="analyticsOverallDiscounts">Total discounts: Rs 0.00</span>
