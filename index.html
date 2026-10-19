@@ -345,7 +345,7 @@
 
 </head>
 
-<body class="bg-gray-100 font-sans antialiased text-gray-800 bg-slate-50">
+<body class="bg-gray-100 font-sans antialiased text-gray-800">
 
     <!-- Toast Notification Container -->
     <div id="toastContainer" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
@@ -395,7 +395,7 @@
                    class="border p-3 rounded-xl w-full mb-3 text-center"
                    placeholder="Enter your password"
                    onkeydown="if(event.key==='Enter') unlockPOS()" />
-            <button onclick="unlockPOS()" class="w-full bg-indigo-600 text-white p-3 rounded-xl font-bold">Unlock POS</button>
+            <button onclick="unlockPOS()" class="w-full bg-blue-600 text-white p-3 rounded-xl font-bold">Unlock POS</button>
             <button onclick="logout()" class="w-full mt-2 text-xs text-red-600 font-bold p-2">Sign out</button>
             <p id="unlockMessage" class="text-xs text-red-600 mt-3 font-bold"></p>
         </div>
@@ -405,32 +405,32 @@
     <div id="posScreen" class="hidden min-h-screen flex flex-col">
 
         <!-- TOP BAR / EMPLOYEE HEADER -->
-        <header class="app-topbar bg-slate-900 text-white p-2 sm:p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 sticky top-0 z-40 border-b">
+        <header class="app-topbar bg-white text-gray-800 p-2 sm:p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 sticky top-0 z-40 border-b">
             <div class="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 <h1 class="text-lg sm:text-xl font-black tracking-tight flex items-center gap-1.5 sm:gap-2 drop-shadow-sm">
                     <span class="text-xl sm:text-2xl text-indigo-600 font-black">HB</span> <span class="text-gray-900 hidden sm:inline font-black">Hungry Birds</span>
                 </h1>
-                <span id="roleBadge" class="text-[9px] sm:text-[10px] px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-white/10 border border-white/20 font-bold uppercase tracking-widest text-indigo-100  shadow-inner"></span>
+                <span id="roleBadge" class="text-[9px] sm:text-[10px] px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-blue-50 border border-blue-200 font-bold uppercase tracking-widest text-blue-700 shadow-inner"></span>
             </div>
             <div class="flex items-center gap-1.5 sm:gap-3 text-xs sm:text-sm flex-wrap justify-end w-full sm:w-auto">
-                <div class="hidden lg:flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5">
+                <div class="hidden lg:flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
                     <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span class="text-indigo-200 text-xs">Welcome, <strong id="loggedUserName" class="text-white font-bold ml-1"></strong></span>
+                    <span class="text-gray-600 text-xs">Welcome, <strong id="loggedUserName" class="text-gray-800 font-bold ml-1"></strong></span>
                 </div>
-                <button onclick="logout()" class="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-md">
+                <button onclick="logout()" class="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 shadow-sm hover:shadow-md">
                     Logout
                 </button>
             </div>
         </header>
 
-        <aside id="mainActionSidebar" class="bg-[#182130] border-r border-slate-700/70 px-3 py-3 lg:py-5">
+        <aside id="mainActionSidebar" class="bg-white border-r border-gray-200 px-3 py-3 lg:py-5">
             <div class="sidebar-heading px-3 mb-4">
-                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">Workspace</p>
-                <p class="mt-1 text-sm font-semibold text-slate-100">Quick access</p>
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Workspace</p>
+                <p class="mt-1 text-sm font-semibold text-gray-700">Quick access</p>
             </div>
             <nav class="sidebar-groups lg:block" aria-label="Main navigation">
                 <div class="sidebar-group mb-4">
-                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Orders</p>
+                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Orders</p>
                     <button type="button" onclick="document.getElementById('menuSearch').focus()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-semibold flex items-center gap-3">
                         <span class="w-6 text-center"></span> Counter & menu
                     </button>
@@ -451,7 +451,7 @@
                 </div>
 
                 <div class="sidebar-group mb-4">
-                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Insights</p>
+                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Insights</p>
                     <button data-role="OWNER" type="button" onclick="openSalesAnalyticsModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
                         <span class="w-6 text-center"></span> Sales analytics
                     </button>
@@ -461,7 +461,7 @@
                 </div>
 
                 <div class="sidebar-group mb-4">
-                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Operations</p>
+                    <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Operations</p>
                     <button data-role="OWNER,MANAGER" type="button" onclick="protectedOpenInventoryModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
                         <span class="w-6 text-center"></span> Inventory
                     </button>
@@ -496,9 +496,9 @@
             <select id="mobileNavigationSelect" class="mobile-navigation-select" aria-label="Quick navigation" onchange="navigateMobileSidebar(this.value)">
                 <option value="">Quick navigation...</option>
             </select>
-            <div class="sidebar-footer mx-3 mt-6 border-t border-slate-700 pt-4 text-[11px] leading-relaxed text-slate-400">
-                <span class="block font-semibold text-slate-300">Hungry Birds POS</span>
-                <span>Signed in as <span id="sidebarUserName" class="font-semibold text-slate-200">Staff</span></span>
+            <div class="sidebar-footer mx-3 mt-6 border-t border-gray-200 pt-4 text-[11px] leading-relaxed text-gray-500">
+                <span class="block font-semibold text-gray-600">Hungry Birds POS</span>
+                <span>Signed in as <span id="sidebarUserName" class="font-semibold text-gray-600">Staff</span></span>
             </div>
         </aside>
 
@@ -557,7 +557,7 @@
                         </h3>
 
                         <div class="flex bg-gray-50/80 p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-gray-200 text-[10px] sm:text-xs font-bold gap-0.5 sm:gap-1 shadow-inner backdrop-blur-sm">
-                            <button id="btnDineIn" onclick="setOrderType('DINE_IN')" class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-indigo-600 text-white shadow-sm transition-all duration-300 whitespace-nowrap">
+                            <button id="btnDineIn" onclick="setOrderType('DINE_IN')" class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-blue-600 text-white shadow-sm transition-all duration-300 whitespace-nowrap">
                                  <span class="hidden sm:inline">Dine In</span>
                             </button>
                             <button id="btnTakeaway" onclick="setOrderType('TAKEAWAY')" class="px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-gray-600 hover:bg-white hover:shadow-sm hover:text-indigo-600 transition-all duration-300 whitespace-nowrap">
@@ -573,7 +573,7 @@
                     <div id="deliveryInfoBox" class="hidden mb-3 sm:mb-5 p-3 sm:p-4 bg-blue-50 border border-blue-200 border border-blue-200/60 rounded-2xl space-y-2 sm:space-y-3 text-sm relative z-10 shadow-inner">
                         <div class="font-bold text-blue-900 flex justify-between items-center border-b border-blue-200/50 pb-2 text-xs sm:text-sm">
                             <span class="flex items-center gap-1.5"> Delivery Info <span class="text-[9px] sm:text-[10px] bg-red-100 text-red-700 px-1.5 sm:px-2 py-0.5 rounded-full uppercase tracking-wider ml-2">Min Order: Rs 500</span></span>
-                            <button onclick="clearDeliveryDetails()" class="text-blue-400 hover:text-red-500 transition-colors text-[10px] sm:text-xs uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg border border-transparent hover:border-red-200">Clear</button>
+                            <button onclick="clearDeliveryDetails()" class="text-blue-600 hover:text-red-500 transition-colors text-[10px] sm:text-xs uppercase tracking-wider bg-gray-100 px-2 py-1 rounded-lg border border-gray-200 hover:border-red-200">Clear</button>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                             <input id="deliveryCustomerName" type="text" placeholder="Customer Name" class="w-full p-2 sm:p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow shadow-sm" />
@@ -587,7 +587,7 @@
                     <div id="cartCustomerBox" class="mb-3 sm:mb-5 p-3 sm:p-4 bg-purple-50 border border-purple-200 border border-purple-200/60 rounded-2xl space-y-2 sm:space-y-3 text-sm relative z-10 shadow-inner">
                         <div class="flex justify-between items-center font-bold text-purple-900 border-b border-purple-200/50 pb-2 text-xs sm:text-sm">
                             <span class="flex items-center gap-1.5"> Customer / Loyalty Program</span>
-                            <button type="button" onclick="clearCartCustomer()" class="text-purple-400 hover:text-red-500 transition-colors text-[10px] sm:text-xs uppercase tracking-wider bg-white/50 px-2 py-1 rounded-lg border border-transparent hover:border-red-200">Clear</button>
+                            <button type="button" onclick="clearCartCustomer()" class="text-purple-600 hover:text-red-500 transition-colors text-[10px] sm:text-xs uppercase tracking-wider bg-gray-100 px-2 py-1 rounded-lg border border-gray-200 hover:border-red-200">Clear</button>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                             <input id="cartCustomerPhone" type="text" placeholder="Phone Number" oninput="lookupCartCustomer(this.value)" class="w-full p-2 sm:p-2.5 border-0 ring-1 ring-purple-200 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 transition-shadow shadow-sm" />
@@ -668,7 +668,7 @@
                     <div id="stockLockedState" class="text-center py-6 sm:py-8 border border-dashed border-gray-300 rounded-2xl bg-gray-50/50 space-y-2 sm:space-y-3 relative z-10">
                         <div class="text-3xl sm:text-4xl drop-shadow-sm"></div>
                         <p class="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-widest">Stock Protected</p>
-                        <button onclick="promptStockPin()" class="bg-gray-800 text-white px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-gray-900 transition shadow-sm mt-2">
+                        <button onclick="promptStockPin()" class="bg-gray-200 text-gray-800 px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold hover:bg-gray-300 transition shadow-sm mt-2">
                             Authenticate to View
                         </button>
                     </div>
@@ -710,7 +710,7 @@
                             <input type="checkbox" id="selectAllSalesCheckbox" onchange="toggleSelectAllSales(this.checked)" class="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5 sm:w-4 sm:h-4 border-gray-300">
                             <span class="text-[10px] sm:text-sm">Select All</span>
                         </label>
-                        <button id="bulkDeleteBtn" onclick="deleteSelectedSales()" data-role="OWNER,MANAGER" class="hidden text-[10px] sm:text-xs bg-red-600/10 text-red-700 font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl hover:bg-red-600 hover:text-white transition-all shadow-sm flex items-center gap-1">
+                        <button id="bulkDeleteBtn" onclick="deleteSelectedSales()" data-role="OWNER,MANAGER" class="hidden text-[10px] sm:text-xs bg-red-600/10 text-red-700 font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg sm:rounded-xl hover:bg-red-600 hover:text-gray-800 transition-all shadow-sm flex items-center gap-1">
                              Void (<span id="selectedSalesCount">0</span>)
                         </button>
                     </div>
@@ -729,7 +729,7 @@
                 <span class="text-xl"></span>
                 <h3 class="text-sm font-black tracking-widest uppercase text-indigo-50">Profit & Loss</h3>
             </div>
-            <button onclick="closePnlModal()" class="text-white/60 hover:text-white font-bold text-2xl transition relative z-10 leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            <button onclick="closePnlModal()" class="text-gray-400 hover:text-gray-700 font-bold text-2xl transition relative z-10 leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
 
         <div class="p-6 space-y-5 bg-gray-50/50 flex-1">
@@ -768,16 +768,16 @@
 
     <!-- OWNER SALES ANALYTICS MODAL -->
     <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-3 sm:p-5 transition-all">
-        <div class="bg-white rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-slate-700">
+        <div class="bg-white rounded-3xl w-full max-w-6xl max-h-[94vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
             <div class="modal-header-gradient px-5 py-4 flex justify-between items-center">
                 <div class="flex items-center gap-3">
                     <span class="w-11 h-11 rounded-2xl bg-teal-300/10 border border-teal-200/10 flex items-center justify-center text-xl"></span>
                     <div>
                         <h3 class="text-base font-bold tracking-tight">Sales analytics</h3>
-                        <p class="text-xs text-slate-300 mt-1">Performance overview · owner view</p>
+                        <p class="text-xs text-gray-600 mt-1">Performance overview · owner view</p>
                     </div>
                 </div>
-                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 text-lg font-bold modal-header-text transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold modal-header-text transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-4 sm:p-7 space-y-6 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -823,9 +823,9 @@
                             <p id="analyticsChartCaption" class="text-xs text-gray-500 mt-1">Daily revenue this week</p>
                         </div>
                         <div class="flex gap-1 rounded-xl bg-gray-50 p-1" role="group" aria-label="Sales chart period">
-                            <button type="button" data-analytics-period="day" onclick="renderSalesAnalyticsPeriod('day')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">Day</button>
-                            <button type="button" data-analytics-period="week" onclick="renderSalesAnalyticsPeriod('week')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">Week</button>
-                            <button type="button" data-analytics-period="month" onclick="renderSalesAnalyticsPeriod('month')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-white">Month</button>
+                            <button type="button" data-analytics-period="day" onclick="renderSalesAnalyticsPeriod('day')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-gray-800">Day</button>
+                            <button type="button" data-analytics-period="week" onclick="renderSalesAnalyticsPeriod('week')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-gray-800">Week</button>
+                            <button type="button" data-analytics-period="month" onclick="renderSalesAnalyticsPeriod('month')" class="analytics-period px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 hover:text-gray-800">Month</button>
                         </div>
                     </div>
                     <div id="analyticsSalesChart" class="analytics-chart min-h-[240px] p-2 sm:p-4" role="img" aria-label="Sales chart"></div>
@@ -869,7 +869,7 @@
                 <span class="text-xl"></span>
                 <h3 class="text-sm font-black tracking-widest uppercase">Expense Management</h3>
             </div>
-            <button onclick="closeExpenseModal()" class="text-teal-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            <button onclick="closeExpenseModal()" class="text-teal-600 hover:text-teal-800 font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
 
         <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -957,7 +957,7 @@
                     <span class="text-xl"></span>
                     <h3 class="text-sm font-black tracking-widest uppercase">Held Orders</h3>
                 </div>
-                <button onclick="closeHeldOrdersModal()" class="text-orange-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeHeldOrdersModal()" class="text-orange-600 hover:text-orange-800 font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
@@ -981,7 +981,7 @@
                     <span class="text-xl"></span>
                     <h3 class="text-sm font-black tracking-widest uppercase">Opening Cash</h3>
                 </div>
-                <button onclick="closeShiftOpeningModal()" class="text-emerald-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeShiftOpeningModal()" class="text-green-600 hover:text-green-800 font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-8 space-y-5 bg-gray-50/50">
@@ -1010,11 +1010,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Shift Closing Summary</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">Shift Closing Summary</h3>
                         <p class="text-[11px] text-gray-500 font-medium">Reconcile cash drawer & final shift metrics</p>
                     </div>
                 </div>
-                <button onclick="closeShiftReportModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeShiftReportModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50" id="shiftReportContent"></div>
@@ -1040,13 +1040,13 @@
       <div class="bg-white rounded-2xl sm:rounded-3xl w-full max-w-md max-h-[85vh] flex flex-col shadow-[0_25px_70px_rgba(0,0,0,0.3)] border border-gray-100 overflow-hidden transform transition-all">
         <div class="modal-header-gradient p-4 sm:p-5 flex justify-between items-center">
           <div class="flex items-center gap-2 sm:gap-3">
-            <div class="w-8 sm:w-10 h-8 sm:h-10 rounded-xl sm:rounded-2xl bg-white/10  flex items-center justify-center text-base sm:text-lg border border-white/10 shadow-inner"></div>
+            <div class="w-8 sm:w-10 h-8 sm:h-10 rounded-xl sm:rounded-2xl bg-gray-100 flex items-center justify-center text-base sm:text-lg border border-gray-200 shadow-inner"></div>
             <div>
-              <h3 class="text-xs sm:text-sm font-black tracking-wider uppercase text-white">Complete Payment</h3>
+              <h3 class="text-xs sm:text-sm font-black tracking-wider uppercase text-gray-800">Complete Payment</h3>
               <p class="text-[10px] sm:text-[11px] text-gray-500 font-medium">Split or multi-tender settlement</p>
             </div>
           </div>
-          <button onclick="closePaymentModal()" class="w-7 sm:w-8 h-7 sm:h-8 rounded-lg sm:rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-lg sm:text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+          <button onclick="closePaymentModal()" class="w-7 sm:w-8 h-7 sm:h-8 rounded-lg sm:rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-lg sm:text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
         </div>
 
         <div class="p-4 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
@@ -1098,7 +1098,7 @@
             
             <div id="supplierListContainer" class="space-y-2">
                 <div id="supplierList" class="space-y-2"></div>
-                <button type="button" onclick="showSupplierForm()" class="w-full bg-indigo-600 text-white py-2 rounded mt-2">Add Supplier</button>
+                <button type="button" onclick="showSupplierForm()" class="w-full bg-blue-600 text-white py-2 rounded mt-2">Add Supplier</button>
             </div>
             <div id="supplierFormContainer" class="hidden space-y-4 mt-4">
                 <input id="editSupplierId" type="hidden" />
@@ -1113,7 +1113,7 @@
                 <img id="supplierImagePreview" class="hidden w-16 h-16 object-cover rounded mt-2" />
                 <div class="flex justify-end gap-2">
                     <button type="button" onclick="resetSupplierForm()" class="px-4 py-2 bg-gray-200 rounded">Reset</button>
-                    <button type="button" onclick="saveSupplier()" class="px-4 py-2 bg-indigo-600 text-white rounded">Save</button>
+                    <button type="button" onclick="saveSupplier()" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
                     <button type="button" onclick="backToSupplierList()" class="px-4 py-2 bg-gray-300 rounded">Cancel</button>
                 </div>
             </div>
@@ -1150,7 +1150,7 @@
                 </div>
                 <div class="overflow-x-auto max-h-64">
                     <table class="w-full border-collapse text-xs">
-                        <thead class="bg-gray-800 text-white">
+                        <thead class="bg-gray-200 text-gray-800">
                             <tr>
                                 <th class="p-1.5 text-left">Date</th>
                                 <th class="p-1.5 text-left">Supplier</th>
@@ -1211,11 +1211,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Raw Ingredients & Inventory</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">Raw Ingredients & Inventory</h3>
                         <p class="text-[11px] text-gray-500 font-medium">Manage master ingredients, units & stock levels</p>
                     </div>
                 </div>
-                <button onclick="closeInventoryModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeInventoryModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
@@ -1246,11 +1246,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Owner Admin Panel</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">Owner Admin Panel</h3>
                         <p class="text-[11px] text-gray-500 font-medium">Categories, Recipes, Modifiers & Staff Permissions</p>
                     </div>
                 </div>
-                <button onclick="closeOwnerAdminModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeOwnerAdminModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="p-6 space-y-5 overflow-y-auto flex-1 bg-gray-50/50">
@@ -1369,11 +1369,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Delivery Orders Tracker</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">Delivery Orders Tracker</h3>
                         <p class="text-[11px] text-gray-500 font-medium">Real-time dispatcher & courier management</p>
                     </div>
                 </div>
-                <button onclick="closeDeliveryManagementModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeDeliveryManagementModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <div class="flex-1 overflow-y-auto p-6 bg-gray-50/50">
@@ -1419,11 +1419,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 id="modifierModalTitle" class="text-sm font-black tracking-wider uppercase text-white">Customize Item</h3>
-                        <p class="text-[11px] text-indigo-100/80 font-medium">Select variations & add-on choices</p>
+                        <h3 id="modifierModalTitle" class="text-sm font-black tracking-wider uppercase text-gray-800">Customize Item</h3>
+                        <p class="text-[11px] text-gray-600 font-medium">Select variations & add-on choices</p>
                     </div>
                 </div>
-                <button onclick="closeModifierModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeModifierModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div id="modifierGroupsContainer" class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50"></div>
             <div class="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-between items-center gap-3">
@@ -1443,11 +1443,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 id="refundModalTitle" class="text-sm font-black tracking-wider uppercase text-white">Refund Order</h3>
+                        <h3 id="refundModalTitle" class="text-sm font-black tracking-wider uppercase text-gray-800">Refund Order</h3>
                         <p class="text-[11px] text-rose-100/80 font-medium">Process full or itemized returns</p>
                     </div>
                 </div>
-                <button onclick="closeRefundModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeRefundModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="refundItemsContainer" class="space-y-2.5"></div>
@@ -1477,11 +1477,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">System Audit Log</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">System Audit Log</h3>
                         <p class="text-[11px] text-gray-300 font-medium">Activity logs, cashier actions & security events</p>
                     </div>
                 </div>
-                <button onclick="closeAuditLogModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeAuditLogModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="auditLogList" class="space-y-2 text-xs"></div>
@@ -1499,11 +1499,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Website & Online Orders</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">Website & Online Orders</h3>
                         <p class="text-[11px] text-gray-500 font-medium">Incoming direct consumer online orders</p>
                     </div>
                 </div>
-                <button onclick="closeOnlineOrdersModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeOnlineOrdersModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-3 overflow-y-auto flex-1 bg-gray-50/50">
                 <div id="onlineOrdersList" class="space-y-3"></div>
@@ -1521,11 +1521,11 @@
                 <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-base font-black text-gray-600 rounded-lg w-10 h-10 shadow-sm"></div>
                     <div>
-                        <h3 class="text-sm font-black tracking-wider uppercase text-white">Customer CRM & History</h3>
+                        <h3 class="text-sm font-black tracking-wider uppercase text-gray-800">Customer CRM & History</h3>
                         <p class="text-[11px] text-gray-500 font-medium">Customer database, loyalty points & order history</p>
                     </div>
                 </div>
-                <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xl flex items-center justify-center transition-all leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
             <div class="p-6 space-y-4 overflow-y-auto flex-1 bg-gray-50/50">
                 <!-- List View -->
@@ -1560,7 +1560,7 @@
                         <p class="text-[11px] text-gray-500 font-medium">Employees, attendance, leaves &amp; payroll</p>
                     </div>
                 </div>
-                <button onclick="closeStaffManagementModal()" class="text-cyan-200 hover:text-white font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button onclick="closeStaffManagementModal()" class="text-cyan-600 hover:text-cyan-800 font-bold text-2xl transition leading-none"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
             </div>
 
             <!-- Tabs -->

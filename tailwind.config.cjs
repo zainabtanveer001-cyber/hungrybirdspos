@@ -10,7 +10,7 @@
  *   • Rounded corners: 8px (rounded-lg)
  */
 module.exports = {
-  content: ["./hungrybirdspos/**/*.js", "./hungrybirdspos/**/*.html"],
+  content: ["./index.html", "./app.js", "./hungrybirdspos/**/*.js", "./hungrybirdspos/**/*.html"],
   theme: {
     extend: {
       colors: {

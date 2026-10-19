@@ -11,7 +11,7 @@
     "lint:fix": "eslint --fix hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
     "format": "prettier --write hungrybirdspos/",
     "type-check": "tsc --noEmit 2>&1 || true",
-    "build:css": "tailwindcss-cli -i ./hungrybirdspos/src/input.css -o ./hungrybirdspos/tailwind.css --minify"
+    "build:css": "tailwindcss-cli -i ./hungrybirdspos/src/input.css -o ./tailwind.css --minify"
   },
   "repository": {
     "type": "git",
