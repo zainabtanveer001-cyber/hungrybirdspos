@@ -27,10 +27,57 @@
 
         #posScreen,
         #loginScreen,
-        #autoLockOverlay,
-        [id$="Modal"] {
+        #autoLockOverlay {
             background: var(--ui-bg);
             color: var(--ui-text);
+        }
+
+        /* Modal Overlay & Dialog System */
+        [id$="Modal"] {
+            background: rgba(15, 23, 42, 0.45) !important;
+            backdrop-filter: blur(4px);
+            color: var(--ui-text);
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 1.5rem 1rem !important;
+            overflow-y: auto !important;
+            box-sizing: border-box !important;
+        }
+
+        [id$="Modal"].hidden {
+            display: none !important;
+        }
+
+        /* Modal Dialog Window */
+        [id$="Modal"] > div {
+            max-height: 80vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            overflow: hidden !important;
+            margin: auto !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Modal Header: fixed at top, never shrinks, close button always visible */
+        .modal-header-gradient,
+        [id$="Modal"] > div > div:first-child {
+            flex-shrink: 0 !important;
+        }
+
+        /* Modal Footer: fixed at bottom, never shrinks */
+        [id$="Modal"] > div > div.border-t,
+        [id$="Modal"] > div > div:last-child:not(:first-child) {
+            flex-shrink: 0 !important;
+        }
+
+        /* Modal Scrollable Body: scrolls cleanly without cutting off header */
+        [id$="Modal"] .overflow-y-auto {
+            flex: 1 1 auto !important;
+            min-height: 0 !important;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
         }
 
         #posScreen .bg-white,
@@ -787,20 +834,22 @@
 </div>
 
     <!-- OWNER SALES ANALYTICS MODAL -->
-    <div id="salesAnalyticsModal" class="hidden fixed inset-0 bg-gray-50/80  flex justify-center items-center z-50 p-3 sm:p-5 transition-all">
-        <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
-            <div class="modal-header-gradient px-5 py-4 flex justify-between items-center">
+    <div id="salesAnalyticsModal" onclick="if(event.target === this) closeSalesAnalyticsModal()" class="hidden fixed inset-0 z-50 transition-all">
+        <div class="bg-white rounded-3xl w-full max-w-3xl flex flex-col shadow-2xl overflow-hidden border border-gray-200" style="max-height: 80vh;">
+            <div class="modal-header-gradient px-5 py-4 flex justify-between items-center flex-shrink-0">
                 <div class="flex items-center gap-3">
-                    <span class="w-11 h-11 rounded-2xl bg-blue-100 border border-blue-200 flex items-center justify-center text-xl"></span>
+                    <span class="w-10 h-10 rounded-2xl bg-blue-100 border border-blue-200 flex items-center justify-center text-xl"></span>
                     <div>
-                        <h3 class="text-base font-bold tracking-tight">Sales analytics</h3>
-                        <p class="text-xs text-gray-600 mt-1">Performance overview · owner view</p>
+                        <h3 class="text-base font-bold tracking-tight text-gray-900">Sales analytics</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Performance overview · owner view</p>
                     </div>
                 </div>
-                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold modal-header-text transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                <button type="button" aria-label="Close sales analytics" onclick="closeSalesAnalyticsModal()" class="w-10 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 font-bold modal-header-text transition flex items-center justify-center shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
             </div>
 
-            <div class="p-4 sm:p-7 space-y-6 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar">
+            <div class="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1 bg-gray-50/50 custom-scrollbar" style="min-height: 0;">
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     <article class="bg-white p-4 rounded-2xl border border-gray-100">
                         <p class="text-xs font-semibold text-gray-500">Today</p>
