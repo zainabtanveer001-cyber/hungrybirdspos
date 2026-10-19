@@ -316,9 +316,14 @@
             #mainPosView { padding: 12px; gap: 12px; }
             #mainActionSidebar { top: 96px; padding: 8px 12px; }
             #mainActionSidebar .sidebar-groups { display: none; }
-            #mainActionSidebar .mobile-navigation-select { display: block; width: 100%; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text); background: var(--ui-panel); background-image: url("data:image/svg"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem; }
+            #mainActionSidebar .mobile-navigation-select { display: block; width: 100%; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text); background: var(--ui-panel); font-size: 14px; }
         }
         .mobile-navigation-select { display: none; }
+        #mainActionSidebar .mobile-navigation-select optgroup,
+        #mainActionSidebar .mobile-navigation-select option {
+            color: var(--ui-text);
+            background-color: var(--ui-panel);
+        }
         @media (prefers-reduced-motion: reduce) {
             #posScreen *, [id$="Modal"] * {
                 scroll-behavior: auto !important;
