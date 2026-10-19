@@ -304,8 +304,21 @@
             box-shadow: 0 1px 3px rgb(0 0 0 / 4%) !important;
         }
 
-        @media (max-width: 1023px) { #mainPosView { padding: 16px; } }
-        @media (max-width: 640px) { #mainPosView { padding: 12px; gap: 12px; } }
+        @media (min-width: 1024px) {
+            #mainActionSidebar { position: fixed; z-index: 35; left: 0; top: 74px; bottom: 0; width: 232px; overflow-y: auto; }
+            #mainPosView { margin-left: 232px; }
+        }
+        @media (max-width: 1023px) {
+            #mainActionSidebar { position: sticky; top: 60px; z-index: 35; }
+            #mainPosView { padding: 16px; }
+        }
+        @media (max-width: 640px) {
+            #mainPosView { padding: 12px; gap: 12px; }
+            #mainActionSidebar { top: 96px; padding: 8px 12px; }
+            #mainActionSidebar .sidebar-groups { display: none; }
+            #mainActionSidebar .mobile-navigation-select { display: block; width: 100%; min-height: 44px; padding: 8px 36px 8px 12px; border: 1px solid var(--ui-border); border-radius: 8px; color: var(--ui-text); background: var(--ui-panel); background-image: url("data:image/svg"); background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 1rem; }
+        }
+        .mobile-navigation-select { display: none; }
         @media (prefers-reduced-motion: reduce) {
             #posScreen *, [id$="Modal"] * {
                 scroll-behavior: auto !important;
@@ -407,7 +420,7 @@
             </div>
         </header>
 
-        <aside id="mainActionSidebar" class="bg-white border-r border-gray-200 px-3 py-3 lg:py-5">
+        <aside id="mainActionSidebar" class="bg-white border-r border-gray-200 px-3 py-3 lg:py-5 lg:w-64 lg:flex-shrink-0">
             <div class="sidebar-heading px-3 mb-4">
                 <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Workspace</p>
                 <p class="mt-1 text-sm font-semibold text-gray-700">Quick access</p>
