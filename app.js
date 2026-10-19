@@ -3480,6 +3480,10 @@ function buildReceiptPrintDocument(sale) {
     const orderType = String(sale.orderType || "DINE_IN").toUpperCase();
     const timestamp = sale.timestamp ? new Date(sale.timestamp) : new Date();
     const money = value => escapeHtml(formatAmount(Number(value) || 0));
+    const settings = window.printerSettings || DEFAULT_PRINTER_SETTINGS;
+    const fontSizeClass = getReceiptFontSizeClass(settings.receiptFontSize);
+    const showLogo = settings.receiptLogo !== false;
+
     const itemRows = (sale.items || []).map(item => `
         <section class="item">
             <div class="item-name">${escapeHtml(item.name || "Item")}</div>
@@ -3491,6 +3495,8 @@ function buildReceiptPrintDocument(sale) {
         ${payment.method === "Cash" && payment.cashGiven != null ? `<div class="row muted"><span>Cash received</span><span>${money(payment.cashGiven)}</span></div>` : ""}
         ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${money(payment.change)}</span></div>` : ""}
     `).join("");
+
+    const logoImg = showLogo ? `<img src="${escapeHtml(settings.receiptLogoPath)}" alt="Hungry Birds" class="receipt-logo" />` : '<h1>HUNGRY BIRDS RESTAURANT</h1>';
 
     return `<!doctype html>
 <html lang="en">
@@ -3520,13 +3526,14 @@ function buildReceiptPrintDocument(sale) {
         .grand-total { margin-top: 2mm; padding: 2mm 0; border-top: 1px solid #000; border-bottom: 1px solid #000; font-size: 12pt; font-weight: bold; }
         .muted { font-size: 9pt; }
         footer { margin-top: 3mm; text-align: center; }
+        .receipt-logo { max-width: 50mm; max-height: 8mm; width: auto; height: auto; object-fit: contain; margin: 0 auto 1mm; display: block; }
         @media screen { body { margin: 0 auto; } }
     </style>
 </head>
 <body>
 <main>
     <header>
-        <h1>HUNGRY BIRDS RESTAURANT</h1>
+        ${logoImg}
         <p>Ph: 0325-7867774</p>
         <p>Dubai Park Stop, Main GT Road Lahore</p>
     </header>
@@ -3718,6 +3725,91 @@ window.disconnectPrinter = function () {
     printerCharacteristic = null;
     setPrinterStatus(PRINTER_STATE.DISCONNECTED);
 };
+
+// ====================================================
+// Printer Settings Modal
+// ====================================================
+const PRINTER_SETTINGS_KEY = 'printerSettings';
+const DEFAULT_PRINTER_SETTINGS = { receiptFontSize: 'normal', receiptLogo: true, receiptLogoPath: 'assets/logo.png' };
+
+function loadPrinterSettings() {
+    try {
+        const raw = localStorage.getItem(PRINTER_SETTINGS_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            return { ...DEFAULT_PRINTER_SETTINGS, ...parsed };
+        }
+    } catch (e) { console.warn('Failed to load printer settings:', e); }
+    return { ...DEFAULT_PRINTER_SETTINGS };
+}
+
+function savePrinterSettingsToStorage(settings) {
+    try { localStorage.setItem(PRINTER_SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { console.warn('Failed to save printer settings:', e); }
+}
+
+window.printerSettings = loadPrinterSettings();
+
+function getReceiptFontSizeClass(size) {
+    switch (size) {
+        case 'small': return 'text-[8px]';
+        case 'large': return 'text-[12px]';
+        case 'normal':
+        default: return 'text-[10px]';
+    }
+}
+
+window.openPrinterSettingsModal = function () {
+    updatePrinterConnectionStatusUI();
+    const modal = document.getElementById('printerSettingsModal');
+    if (!modal) return;
+
+    const s = window.printerSettings;
+    const fontSizeSelect = document.getElementById('printerReceiptFontSize');
+    if (fontSizeSelect) fontSizeSelect.value = s.receiptFontSize || 'normal';
+    const logoCheckbox = document.getElementById('printerReceiptLogo');
+    if (logoCheckbox) logoCheckbox.checked = s.receiptLogo !== false;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+};
+
+window.closePrinterSettingsModal = function () {
+    const modal = document.getElementById('printerSettingsModal');
+    if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+};
+
+window.savePrinterSettings = function () {
+    const fontSizeSelect = document.getElementById('printerReceiptFontSize');
+    const logoCheckbox = document.getElementById('printerReceiptLogo');
+    const settings = {
+        receiptFontSize: fontSizeSelect ? fontSizeSelect.value : 'normal',
+        receiptLogo: logoCheckbox ? logoCheckbox.checked : true,
+        receiptLogoPath: DEFAULT_PRINTER_SETTINGS.receiptLogoPath,
+    };
+    window.printerSettings = settings;
+    savePrinterSettingsToStorage(settings);
+    showAppToast('Printer settings saved', 'info');
+    closePrinterSettingsModal();
+};
+
+function updatePrinterConnectionStatusUI() {
+    const icon = document.getElementById('printerConnectionStatusIcon');
+    const text = document.getElementById('printerConnectionStatusText');
+    if (!icon || !text) return;
+    const statusText = document.getElementById('printerStatusIndicator');
+    const status = printerConnectionState;
+    let color = '#9ca3af';
+    let label = 'Not connected';
+    if (status === PRINTER_STATE.CONNECTED) { color = '#10b981'; label = 'Connected'; }
+    else if (status === PRINTER_STATE.CONNECTING) { color = '#f59e0b'; label = 'Connecting...'; }
+    else if (status === PRINTER_STATE.ERROR) { color = '#ef4444'; label = 'Error'; }
+    icon.style.backgroundColor = color;
+    text.textContent = label;
+    if (statusText) statusText.textContent = label;
+}
+
+// Re-export connect/disconnect so the modal's connect button still works
+window.connectPrinter = window.connectPrinter;
 
 // Helper: write Uint8Array to printer in chunks
 // Returns a Promise that resolves when all chunks are written.
