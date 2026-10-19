@@ -3808,6 +3808,41 @@ function updatePrinterConnectionStatusUI() {
     if (statusText) statusText.textContent = label;
 }
 
+// ====================================================
+// Sidebar Collapse
+// ====================================================
+window.toggleSidebar = function () {
+    const sidebar = document.getElementById('mainActionSidebar');
+    const mainView = document.getElementById('mainPosView');
+    if (!sidebar) return;
+
+    const isCollapsed = sidebar.classList.toggle('sidebar-collapsed');
+    if (mainView) mainView.classList.toggle('sidebar-collapsed', isCollapsed);
+
+    // Rotate the hamburger icon
+    const icon = document.getElementById('sidebarCollapseIcon');
+    if (icon) {
+        icon.style.transform = isCollapsed ? 'rotate(90deg)' : 'rotate(0deg)';
+    }
+
+    // Persist preference
+    try { localStorage.setItem('sidebarCollapsed', isCollapsed ? '1' : '0'); } catch (e) {}
+};
+
+// Restore sidebar state on load
+document.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('sidebarCollapsed');
+    if (saved === '1') {
+        const sidebar = document.getElementById('mainActionSidebar');
+        const mainView = document.getElementById('mainPosView');
+        if (sidebar) sidebar.classList.add('sidebar-collapsed');
+        if (mainView) mainView.classList.add('sidebar-collapsed');
+        const icon = document.getElementById('sidebarCollapseIcon');
+        if (icon) icon.style.transform = 'rotate(90deg)';
+    }
+    updatePrinterConnectionStatusUI();
+});
+
 // Re-export connect/disconnect so the modal's connect button still works
 window.connectPrinter = window.connectPrinter;
 

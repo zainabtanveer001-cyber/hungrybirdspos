@@ -305,8 +305,18 @@
         }
 
         @media (min-width: 1024px) {
-            #mainActionSidebar { position: fixed; z-index: 35; left: 0; top: 74px; bottom: 0; width: 232px; overflow-y: auto; }
-            #mainPosView { margin-left: 232px; }
+            #mainActionSidebar { position: fixed; z-index: 35; left: 0; top: 74px; bottom: 0; width: 232px; overflow-y: auto; transition: width 200ms ease, padding 200ms ease; }
+            #mainPosView { margin-left: 232px; transition: margin-left 200ms ease; }
+            #mainActionSidebar.sidebar-collapsed { width: 64px; padding: 8px; }
+            #mainActionSidebar.sidebar-collapsed .sidebar-heading > p,
+            #mainActionSidebar.sidebar-collapsed .sidebar-footer,
+            #mainActionSidebar.sidebar-collapsed .sidebar-heading p,
+            #mainActionSidebar.sidebar-collapsed .mobile-navigation-select { display: none; }
+            #mainActionSidebar.sidebar-collapsed .sidebar-action .sidebar-label { display: none; }
+            #mainActionSidebar.sidebar-collapsed .sidebar-action .sidebar-icon { display: inline-flex; margin-right: 0; }
+            #mainActionSidebar.sidebar-collapsed .sidebar-badge { display: none; }
+            #mainActionSidebar.sidebar-collapsed #sidebarCollapseBtn { display: inline-flex; }
+            #mainPosView.sidebar-collapsed { margin-left: 64px; }
         }
         @media (max-width: 1023px) {
             #mainActionSidebar { position: sticky; top: 60px; z-index: 35; }
@@ -427,73 +437,80 @@
         </header>
 
         <aside id="mainActionSidebar" class="bg-white border-r border-gray-200 px-3 py-3 lg:py-5 lg:w-64 lg:flex-shrink-0">
-            <div class="sidebar-heading px-3 mb-4">
-                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Workspace</p>
-                <p class="mt-1 text-sm font-semibold text-gray-700">Quick access</p>
+            <div class="sidebar-heading px-3 mb-4 flex justify-between items-center">
+                <div class="sidebar-label">
+                    <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Workspace</p>
+                    <p class="mt-1 text-sm font-semibold text-gray-700">Quick access</p>
+                </div>
+                <button id="sidebarCollapseBtn" type="button" onclick="toggleSidebar()" class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition-all" aria-label="Toggle sidebar" title="Toggle sidebar">
+                    <svg id="sidebarCollapseIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
             </div>
             <nav class="sidebar-groups lg:block" aria-label="Main navigation">
                 <div class="sidebar-group mb-4">
                     <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Orders</p>
                     <button type="button" onclick="document.getElementById('menuSearch').focus()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-semibold flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Counter & menu
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Counter & menu
+                    </span></button>
                     <button type="button" onclick="openOnlineOrdersModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3 relative">
-                        <span class="w-6 text-center"></span> Online orders
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Online orders
                         <span id="onlineOrdersBadge" class="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
-                    </button>
+                    </span></button>
                     <button type="button" onclick="openHeldOrdersModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Held orders
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Held orders
                         <span id="heldOrdersBadge" class="ml-auto rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">0</span>
-                    </button>
+                    </span></button>
                     <button type="button" onclick="openDeliveryManagementModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Deliveries
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Deliveries
+                    </span></button>
                     <button type="button" onclick="openCustomerModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Customers
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Customers
+                    </span></button>
                 </div>
 
                 <div class="sidebar-group mb-4">
                     <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Insights</p>
                     <button data-role="OWNER" type="button" onclick="openSalesAnalyticsModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Sales analytics
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Sales analytics
+                    </span></button>
                     <button data-role="OWNER" type="button" onclick="openPnlModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Profit &amp; loss
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Profit &amp; loss
+                    </span></button>
                 </div>
 
                 <div class="sidebar-group mb-4">
                     <p class="sidebar-heading px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">Operations</p>
                     <button data-role="OWNER,MANAGER" type="button" onclick="protectedOpenInventoryModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Inventory
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Inventory
+                    </span></button>
                     
                         <button data-role="OWNER,MANAGER" type="button" onclick="openSupplierModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                            <span class="w-6 text-center"></span> Suppliers
-                        </button>
+                            <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Suppliers
+                        </span></button>
 
-                        <span class="w-6 text-center"></span> Expenses
-                    </button>
+                        <button data-role="OWNER,MANAGER" type="button" onclick="openExpenseModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
+                            <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Expenses
+                        </span></button>
+
                     <button data-role="OWNER,MANAGER" type="button" onclick="openStaffManagementModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Staff management
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Staff management
+                    </span></button>
                     <button data-role="OWNER" type="button" onclick="openShiftOpeningModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Opening cash
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Opening cash
+                    </span></button>
                     <button data-role="OWNER,MANAGER" type="button" onclick="openShiftCloseModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Shift summary
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Shift summary
+                    </span></button>
                     <button id="connectPrinterBtn" type="button" onclick="openPrinterSettingsModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Printer settings
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Printer settings
                         <span id="printerStatusIndicator" class="text-xs text-gray-500 font-medium">Disconnected</span>
-                    </button>
+                    </span></button>
                     <button data-role="OWNER" type="button" onclick="openAuditLogModal()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Activity log
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Activity log
+                    </span></button>
                     <button data-role="OWNER" type="button" onclick="authenticateOwner()" class="sidebar-action w-full rounded-xl px-3 text-left text-sm font-medium flex items-center gap-3">
-                        <span class="w-6 text-center"></span> Admin settings
-                    </button>
+                        <span class="sidebar-icon w-6 text-center"></span><span class="sidebar-label"> Admin settings
+                    </span></button>
                 </div>
             </nav>
             <select id="mobileNavigationSelect" class="mobile-navigation-select" aria-label="Quick navigation" onchange="navigateMobileSidebar(this.value)">
