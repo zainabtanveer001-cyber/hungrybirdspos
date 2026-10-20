@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "buildCommand": "cd hungrybirds-pos-modern && npm run build",
+  "outputDirectory": "hungrybirds-pos-modern/dist",
   "headers": [
     {
       "source": "/(.*)",
