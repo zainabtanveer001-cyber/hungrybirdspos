@@ -4,8 +4,10 @@
     {
       "name": "pos-server",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "-p", "3001"],
-      "port": 3001
+      "runtimeArgs": ["vite", "--port", "3004", "--host"],
+      "port": 3004,
+      "cwd": "hungrybirds-pos-modern",
+      "url": "http://localhost:3004"
     }
   ]
 }

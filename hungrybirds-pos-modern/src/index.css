@@ -1,0 +1,115 @@
+@import "tailwindcss";
+@config "../tailwind.config.js";
+
+body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--ui-bg, #f8fafc);
+    color: var(--ui-text, #0f172a);
+    margin: 0;
+    padding: 0;
+  }
+
+  :root {
+    --ui-bg: #f8fafc;
+    --ui-panel: #ffffff;
+    --ui-panel-raised: #f1f5f9;
+    --ui-border: #e2e8f0;
+    --ui-text: #0f172a;
+    --ui-muted: #64748b;
+    --ui-accent: #2563eb;
+    --ui-accent-soft: #eff6ff;
+    --ui-success: #10b981;
+    --ui-warning: #f59e0b;
+    --ui-danger: #ef4444;
+  }
+
+  .dark {
+    --ui-bg: #0f172a;
+    --ui-panel: #1e293b;
+    --ui-panel-raised: #334155;
+    --ui-border: #475569;
+    --ui-text: #f1f5f9;
+    --ui-muted: #94a3b8;
+    --ui-accent: #3b82f6;
+    --ui-accent-soft: #1e3a8a;
+    --ui-success: #22c55e;
+    --ui-warning: #fbbf24;
+    --ui-danger: #f87171;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: var(--ui-panel-raised, #f1f5f9);
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+/* Modal Overlay & Dialog System */
+[data-modal] {
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(4px);
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 1.5rem 1rem !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+
+[data-modal].hidden {
+  display: none !important;
+}
+
+/* Modal Dialog Window */
+[data-modal] > div {
+  max-height: 80vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  margin: auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Modal Header: fixed, never shrinks */
+.modal-header {
+  flex-shrink: 0 !important;
+}
+
+/* Modal Footer: fixed at bottom */
+.modal-footer {
+  flex-shrink: 0 !important;
+}
+
+/* Modal Scrollable Body */
+.modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch target minimum for accessibility */
+.touch-target {
+  min-height: 2.5rem;
+  min-width: 2.5rem;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

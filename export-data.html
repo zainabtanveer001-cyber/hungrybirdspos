@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hungry Birds POS — Export Data</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 0; background: #f8fafc; color: #0f172a; }
+    main { max-width: 42rem; margin: 4rem auto; padding: 0 1.5rem; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 1.5rem; padding: 2rem; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); }
+    h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+    p { color: #475569; font-size: 0.95rem; line-height: 1.5; }
+    button { background: #4f46e5; color: #fff; border: 0; border-radius: 0.9rem; padding: 0.9rem 1.4rem; font-weight: 700; cursor: pointer; font-size: 0.95rem; }
+    button:disabled { opacity: 0.5; cursor: progress; }
+    button[hidden] { display: none; }
+    .status { margin-top: 1.25rem; font-size: 0.875rem; white-space: pre-wrap; }
+    .ok { color: #047857; } .warn { color: #b45309; } .error { color: #b91c1c; }
+    ul { padding-left: 1.2rem; color: #475569; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="card">
+      <h1>Export Hungry Birds POS data</h1>
+      <p>This reads the database already on <strong>this computer and this browser</strong> and saves it as one file you can import into the new POS. It does not change or delete anything.</p>
+      <p>Open this page from the <strong>same address as the original POS</strong> (for example <code>your-pos-site/export-data.html</code>). A browser keeps a separate database for every website, so opening the file from disk or from a different address will show an empty result.</p>
+      <p>If the result is empty, sign in to the original POS once in this browser first — then run this again.</p>
+      <button id="run" type="button">Export all data</button>
+      <button id="again" type="button" hidden>Export again</button>
+      <p id="status" class="status" role="status"></p>
+      <p style="margin-top:2rem;font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;font-weight:700">Tables found in this browser</p>
+      <ul id="tables"><li>Run the export to see them.</li></ul>
+    </div>
+  </main>
+
+  <script>
+    // Opens the existing database without naming a schema version: engaged read-only,
+    // so the original POS's data and structure are left exactly as they are.
+    const DB_NAME = "HungryBirdsPOS";
+
+    const statusEl = document.getElementById("status");
+    const runBtn = document.getElementById("run");
+    const againBtn = document.getElementById("again");
+    const listEl = document.getElementById("tables");
+
+    function say(text, tone = "ok") {
+      statusEl.textContent = text;
+      statusEl.className = "status " + tone;
+    }
+
+    function openExisting() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME);
+        request.onerror = () => reject(request.error || new Error("Could not open the database."));
+        request.onsuccess = () => resolve(request.result);
+        // A database that does not exist yet must not be created empty by this page.
+        request.onupgradeneeded = () => {
+          request.transaction.abort();
+          reject(new Error("No database found in this browser."));
+        };
+      });
+    }
+
+    function readStore(db, name) {
+      return new Promise((resolve, reject) => {
+        const request = db.transaction(name, "readonly").objectStore(name).getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result || []);
+      });
+    }
+
+    async function exportAll() {
+      runBtn.disabled = true;
+      againBtn.hidden = true;
+      say("Reading the database…", "warn");
+
+      let db;
+      try {
+        db = await openExisting();
+        if (!db) throw new Error("No database found in this browser.");
+
+        const names = Array.from(db.objectStoreNames);
+        listEl.innerHTML = names.map(name => `<li>${name}</li>`).join("");
+        if (names.length === 0) {
+          say("This browser has no Hungry Birds database. Open the original POS here first, then run this again.", "warn");
+          return;
+        }
+
+        const tables = {};
+        const counts = [];
+        for (const name of names) {
+          const rows = await readStore(db, name);
+          tables[name] = rows;
+          if (rows.length) counts.push(`${name}: ${rows.length}`);
+        }
+
+        const menu = tables.menu || [];
+        const withImages = menu.filter(item => typeof item.imageUrl === "string" && item.imageUrl.startsWith("data:")).length;
+        const payload = {
+          format: "hungrybirds-pos-backup",
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          source: "legacy",
+          tables
+        };
+
+        const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `HungryBirds_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        if (counts.length === 0) {
+          say("The database opened but every table was empty. Sign in to the original POS in this browser first, then run this again.", "warn");
+        } else {
+          say(`Saved ${counts.length} tables (${menu.length} menu items, ${withImages} with photos).\nKeep this file somewhere safe — it is your backup.`, "ok");
+        }
+        againBtn.hidden = false;
+      } catch (err) {
+        say("Could not read the database: " + (err && err.message ? err.message : err), "error");
+      } finally {
+        if (db) db.close();
+        runBtn.disabled = false;
+      }
+    }
+
+    runBtn.addEventListener("click", exportAll);
+    againBtn.addEventListener("click", exportAll);
+  </script>
+</body>
+</html>

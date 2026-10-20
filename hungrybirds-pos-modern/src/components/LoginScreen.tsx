@@ -1,0 +1,89 @@
+import { useState } from 'react';
+import { signIn } from '../lib/auth';
+import type { User } from '../lib/db/types';
+
+export function LoginScreen({ onSignedIn }: { onSignedIn: (user: User) => void }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      onSignedIn(await signIn(username, password));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sign in failed.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 sm:p-10 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
+        <div className="flex justify-center mb-4">
+          <span className="text-4xl text-indigo-600 font-black">HB</span>
+        </div>
+        <h2 className="text-3xl font-black mb-1 text-center text-gray-900 tracking-tight">Hungry Birds</h2>
+        <p className="text-sm text-center text-indigo-600 font-medium mb-8 uppercase tracking-widest">
+          Point of Sale
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label htmlFor="loginUsername" className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
+              Username
+            </label>
+            <input
+              id="loginUsername"
+              type="text"
+              required
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter username"
+              className="border border-gray-200 p-3.5 rounded-2xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 focus:bg-white transition-all shadow-inner"
+            />
+          </div>
+          <div>
+            <label htmlFor="loginPassword" className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
+              Password
+            </label>
+            <input
+              id="loginPassword"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="border border-gray-200 p-3.5 rounded-2xl w-full text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 focus:bg-white transition-all shadow-inner"
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="text-xs font-bold text-red-600 text-center">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="bg-blue-600 text-white w-full p-4 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-60 transition shadow-sm"
+          >
+            {busy ? 'Signing in…' : 'Secure Login'}
+          </button>
+          <p className="text-[11px] text-center text-gray-400 mt-6">
+            Authorized Personnel Only.
+            <br />
+            Accounts are created by the System Administrator.
+          </p>
+        </form>
+      </div>
+    </div>
+  );
+}
