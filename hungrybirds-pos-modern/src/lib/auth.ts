@@ -2,7 +2,7 @@ import { db } from './db';
 import { sha256 } from './crypto';
 import type { User, UserRole } from './db/types';
 // @ts-ignore
-import firebase from 'firebase/compat/app';
+import * as firebase from 'firebase/compat/app';
 // @ts-ignore
 import 'firebase/compat/auth';
 
