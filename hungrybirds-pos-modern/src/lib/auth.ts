@@ -1,10 +1,8 @@
 import { db } from './db';
 import { sha256 } from './crypto';
 import type { User, UserRole } from './db/types';
-// @ts-ignore
-import * as firebase from 'firebase/compat/app';
-// @ts-ignore
-import 'firebase/compat/auth';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 // Initialize Firebase app – replace with your project's config.
 const firebaseConfig = {
@@ -14,9 +12,10 @@ const firebaseConfig = {
   // Add other fields as needed, e.g., storageBucket, messagingSenderId, appId
 };
 
-// @ts-ignore // firebase.initializeApp typing mismatch
-const firebaseApp = firebase.initializeApp(firebaseConfig);
-export const firebaseAuth = firebase.auth();
+const firebaseApp = initializeApp(firebaseConfig);
+export const firebaseAuth = getAuth(firebaseApp);
+
+
 
 
 export const SESSION_KEY = 'loggedUser';
@@ -69,9 +68,9 @@ export function initializeApp(): Promise<void> {
 
 export async function signIn(username: string, password: string): Promise<User> {
   const normalized = normalizeUsername(username);
-  // First try Firebase authentication (compat API)
+  // First try Firebase authentication (modular API)
   try {
-    await firebase.auth().signInWithEmailAndPassword(username, password);
+    await signInWithEmailAndPassword(firebaseAuth, username, password);
     // Firebase succeeded – ensure a local user record exists
     let user = await db.users.where('username').equals(normalized).first();
     if (!user) {
