@@ -1,8 +1,10 @@
 import { db } from './db';
 import { sha256 } from './crypto';
 import type { User, UserRole } from './db/types';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+// @ts-ignore // firebase/compat import
+import firebase from 'firebase/compat/app';
+// @ts-ignore // firebase/compat auth side-effect
+import 'firebase/compat/auth';
 
 // Initialize Firebase app – replace with your project's config.
 const firebaseConfig = {
@@ -12,8 +14,8 @@ const firebaseConfig = {
   // Add other fields as needed, e.g., storageBucket, messagingSenderId, appId
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-export const firebaseAuth = getAuth(firebaseApp);
+firebase.initializeApp(firebaseConfig);
+export const firebaseAuth = firebase.auth();
 
 
 
@@ -68,9 +70,9 @@ export function initializeApp(): Promise<void> {
 
 export async function signIn(username: string, password: string): Promise<User> {
   const normalized = normalizeUsername(username);
-  // First try Firebase authentication (modular API)
+  // First try Firebase authentication (compat API)
   try {
-    await signInWithEmailAndPassword(firebaseAuth, username, password);
+    await firebase.auth().signInWithEmailAndPassword(username, password);
     // Firebase succeeded – ensure a local user record exists
     let user = await db.users.where('username').equals(normalized).first();
     if (!user) {
