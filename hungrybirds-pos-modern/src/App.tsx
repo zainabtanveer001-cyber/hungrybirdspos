@@ -179,7 +179,13 @@ function App() {
       setPaying(false);
       notify(`Sale #${saleId} completed — ${formatAmount(totals.grandTotal)}`);
       // The button promises a receipt; print after the UI has settled so the dialog is not blocked by the payment modal.
-      setTimeout(() => void printReceipt(sale), 300);
+      setTimeout(() => {
+        try {
+          void printReceipt(sale);
+        } catch (e) {
+          console.error('Print receipt failed', e);
+        }
+      }, 300);
     } catch (err) {
       console.error('Sale failed:', err);
       notify('Failed to process sale. Please try again.');
