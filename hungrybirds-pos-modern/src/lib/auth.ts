@@ -4,9 +4,10 @@ import type { User, UserRole } from './db/types';
 
 // Firebase REST instead of the SDK: the legacy app only needs three calls
 // (username lookup, sign-in, profile read), and this keeps the bundle small.
-const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '';
-const API_KEY = import.meta.env.VITE_FIREBASE_API_KEY ?? '';
-const firebaseEnabled = Boolean(PROJECT_ID && API_KEY);
+// The web config is public by design (it ships in the legacy app.js too), so the
+// defaults let a deploy work without env vars; VITE_* wins when it is set.
+const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'hungry-birds-3e16f';
+const API_KEY = import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyAIibLNTusvBFOEcExpdb1tYQh_1rv2q7k';
 const AUTH_EMAIL_DOMAIN = 'hungrybirds-pos.local';
 
 export const SESSION_KEY = 'loggedUser';
@@ -93,15 +94,23 @@ export function initializeApp(): Promise<void> {
  * `usernameDirectory`, sign in, then read the role from `users/{uid}`.
  * Throws when the cloud is unconfigured or the account/password is wrong.
  */
-async function cloudSignIn(username: string, password: string): Promise<User> {
-  const dir = await firestoreGet(`usernameDirectory/${encodeURIComponent(username)}`);
-  if (!dir) throw new Error('Username not found or account is not configured.');
-  if (dir.active === false) throw new Error('This account is disabled. Contact the Owner.');
+async function cloudSignIn(input: string, password: string): Promise<User> {
+  // The sign-in field accepts either the username or the auth email.
+  let email: string;
+  if (input.includes('@')) {
+    email = input.trim();
+  } else {
+    const dir = await firestoreGet(`usernameDirectory/${encodeURIComponent(input)}`);
+    if (!dir) throw new Error('Username not found or account is not configured.');
+    if (dir.active === false) throw new Error('This account is disabled. Contact the Owner.');
+    email = dir.authEmail ?? `${input}@${AUTH_EMAIL_DOMAIN}`;
+  }
 
-  const email = dir.authEmail ?? `${username}@${AUTH_EMAIL_DOMAIN}`;
   const { uid, idToken } = await firebaseSignIn(email, password);
   const profile = (await firestoreGet(`users/${uid}`, idToken)) ?? {};
+  if (profile.active === false) throw new Error('This account is disabled. Contact the Owner.');
 
+  const username = (profile.username as string) ?? input.split('@')[0];
   const user: User = {
     username,
     role: (profile.role as UserRole) ?? 'WAITER',
@@ -121,16 +130,14 @@ export async function signIn(username: string, password: string): Promise<User> 
   const normalized = normalizeUsername(username);
 
   let cloudError: unknown = null;
-  if (firebaseEnabled) {
-    try {
-      const user = await cloudSignIn(normalized, password);
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
-      return user;
-    } catch (err) {
-      // Fall through to the local DB so the app still works offline, but keep
-      // the cloud's message so a rejected password isn't reported as a missing user.
-      cloudError = err;
-    }
+  try {
+    const user = await cloudSignIn(normalized, password);
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
+    return user;
+  } catch (err) {
+    // Fall through to the local DB so the app still works offline, but keep
+    // the cloud's message so a rejected password isn't reported as a missing user.
+    cloudError = err;
   }
 
   const user = await db.users.where('username').equals(normalized).first();
