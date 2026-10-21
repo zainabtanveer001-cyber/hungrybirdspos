@@ -1,8 +1,8 @@
 import { db } from './db';
 import { sha256 } from './crypto';
 import type { User, UserRole } from './db/types';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
 
 // Initialize Firebase app – replace with your project's config.
 const firebaseConfig = {
@@ -12,8 +12,9 @@ const firebaseConfig = {
   // Add other fields as needed, e.g., storageBucket, messagingSenderId, appId
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-export const firebaseAuth = getAuth(firebaseApp);
+// @ts-ignore // firebase.initializeApp typing mismatch
+const firebaseApp = firebase.initializeApp(firebaseConfig);
+export const firebaseAuth = firebase.auth();
 
 
 export const SESSION_KEY = 'loggedUser';
@@ -76,6 +77,7 @@ export async function signIn(username: string, password: string): Promise<User> 
       const id = await db.users.add({ username: normalized, passwordHash: await sha256(password), role: 'WAITER', active: true });
       user = await db.users.get(id);
     }
+    if (!user) throw new Error('Failed to create local user after Firebase sign‑in.');
     // Set session and return the user
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
     return user;
