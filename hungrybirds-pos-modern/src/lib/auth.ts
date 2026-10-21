@@ -1,24 +1,13 @@
 import { db } from './db';
 import { sha256 } from './crypto';
 import type { User, UserRole } from './db/types';
-// @ts-ignore // firebase/compat import
-import firebase from 'firebase/compat/app';
-// @ts-ignore // firebase/compat auth side-effect
-import 'firebase/compat/auth';
 
-// Initialize Firebase app – replace with your project's config.
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'YOUR_API_KEY',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'YOUR_AUTH_DOMAIN',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'YOUR_PROJECT_ID',
-  // Add other fields as needed, e.g., storageBucket, messagingSenderId, appId
-};
-
-firebase.initializeApp(firebaseConfig);
-export const firebaseAuth = firebase.auth();
-
-
-
+// Firebase REST instead of the SDK: the legacy app only needs three calls
+// (username lookup, sign-in, profile read), and this keeps the bundle small.
+const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '';
+const API_KEY = import.meta.env.VITE_FIREBASE_API_KEY ?? '';
+const firebaseEnabled = Boolean(PROJECT_ID && API_KEY);
+const AUTH_EMAIL_DOMAIN = 'hungrybirds-pos.local';
 
 export const SESSION_KEY = 'loggedUser';
 
@@ -26,11 +15,42 @@ export function normalizeUsername(value: string): string {
   return String(value || '').trim().toLowerCase();
 }
 
+type FirestoreDoc = Record<string, any> | null;
+
+async function firestoreGet(path: string, idToken?: string): Promise<FirestoreDoc> {
+  const res = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}?key=${API_KEY}`,
+    { headers: idToken ? { Authorization: `Bearer ${idToken}` } : {}, signal: AbortSignal.timeout(6000) },
+  );
+  if (!res.ok) return null;
+  const fields = (await res.json()).fields ?? {};
+  return Object.fromEntries(Object.entries(fields).map(([k, v]: [string, any]) => [k, v.stringValue ?? v.booleanValue]));
+}
+
+/** Signs in with the Firebase REST API; returns the auth uid and id token. */
+async function firebaseSignIn(email: string, password: string): Promise<{ uid: string; idToken: string }> {
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, returnSecureToken: true }),
+    signal: AbortSignal.timeout(6000),
+  });
+  if (!res.ok) {
+    const { error } = await res.json().catch(() => ({ error: {} }));
+    const code = error?.message ?? '';
+    if (code === 'INVALID_LOGIN_CREDENTIALS' || code === 'EMAIL_NOT_FOUND' || code === 'INVALID_PASSWORD')
+      throw new Error('Incorrect password.');
+    throw new Error('Login failed. Check your connection and try again.');
+  }
+  const { localId, idToken } = await res.json();
+  return { uid: localId, idToken };
+}
+
 /**
  * Seeds the four default role accounts on a fresh install.
  * ponytail: passwords are stored as SHA-256, not bcrypt — matches the
- * "no new dependency for a few lines" rule. Upgrade to bcrypt (or Firebase
- * auth) when real credential hardening is required.
+ * "no new dependency for a few lines" rule. Upgrade to bcrypt when real
+ * credential hardening is required.
  */
 async function ensureDefaultUsers(): Promise<void> {
   if ((await db.users.count()) > 0) return;
@@ -68,33 +88,60 @@ export function initializeApp(): Promise<void> {
   return bootstrap;
 }
 
-export async function signIn(username: string, password: string): Promise<User> {
-  const normalized = normalizeUsername(username);
-  // First try Firebase authentication (compat API)
-  try {
-    await firebase.auth().signInWithEmailAndPassword(username, password);
-    // Firebase succeeded – ensure a local user record exists
-    let user = await db.users.where('username').equals(normalized).first();
-    if (!user) {
-      const id = await db.users.add({ username: normalized, passwordHash: await sha256(password), role: 'WAITER', active: true });
-      user = await db.users.get(id);
-    }
-    if (!user) throw new Error('Failed to create local user after Firebase sign‑in.');
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
-    return user;
-  } catch (firebaseErr) {
-    // If Firebase fails, fall back to local DB auth (legacy behavior)
-    const user = await db.users.where('username').equals(normalized).first();
-    if (!user) throw new Error('Username not found.');
-    if (user.active === false) throw new Error('This account is disabled. Contact the Owner.');
-    const enteredHash = await sha256(password);
-    const matches = user.passwordHash ? user.passwordHash === enteredHash : false;
-    if (!matches) throw new Error('Incorrect password.');
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
-    return user;
+/**
+ * Legacy cloud login, as the original app did it: username -> auth email via
+ * `usernameDirectory`, sign in, then read the role from `users/{uid}`.
+ * Throws when the cloud is unconfigured or the account/password is wrong.
+ */
+async function cloudSignIn(username: string, password: string): Promise<User> {
+  const dir = await firestoreGet(`usernameDirectory/${encodeURIComponent(username)}`);
+  if (!dir) throw new Error('Username not found or account is not configured.');
+  if (dir.active === false) throw new Error('This account is disabled. Contact the Owner.');
+
+  const email = dir.authEmail ?? `${username}@${AUTH_EMAIL_DOMAIN}`;
+  const { uid, idToken } = await firebaseSignIn(email, password);
+  const profile = (await firestoreGet(`users/${uid}`, idToken)) ?? {};
+
+  const user: User = {
+    username,
+    role: (profile.role as UserRole) ?? 'WAITER',
+    active: true,
+  };
+  const existing = await db.users.where('username').equals(username).first();
+  if (existing?.id) {
+    await db.users.update(existing.id, { role: user.role, active: true });
+    user.id = existing.id;
+  } else {
+    user.id = await db.users.add(user);
   }
+  return user;
 }
 
+export async function signIn(username: string, password: string): Promise<User> {
+  const normalized = normalizeUsername(username);
+
+  let cloudError: unknown = null;
+  if (firebaseEnabled) {
+    try {
+      const user = await cloudSignIn(normalized, password);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
+      return user;
+    } catch (err) {
+      // Fall through to the local DB so the app still works offline, but keep
+      // the cloud's message so a rejected password isn't reported as a missing user.
+      cloudError = err;
+    }
+  }
+
+  const user = await db.users.where('username').equals(normalized).first();
+  if (!user) throw cloudError instanceof Error ? cloudError : new Error('Username not found.');
+  if (user.active === false) throw new Error('This account is disabled. Contact the Owner.');
+  const enteredHash = await sha256(password);
+  if (!user.passwordHash || user.passwordHash !== enteredHash)
+    throw cloudError instanceof Error ? cloudError : new Error('Incorrect password.');
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
+  return user;
+}
 
 export function signOut(): void {
   sessionStorage.removeItem(SESSION_KEY);
