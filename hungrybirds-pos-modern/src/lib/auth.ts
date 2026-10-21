@@ -1,7 +1,9 @@
 import { db } from './db';
 import { sha256 } from './crypto';
 import type { User, UserRole } from './db/types';
+// @ts-ignore
 import firebase from 'firebase/compat/app';
+// @ts-ignore
 import 'firebase/compat/auth';
 
 // Initialize Firebase app – replace with your project's config.
@@ -67,18 +69,16 @@ export function initializeApp(): Promise<void> {
 
 export async function signIn(username: string, password: string): Promise<User> {
   const normalized = normalizeUsername(username);
-  // First try Firebase authentication
+  // First try Firebase authentication (compat API)
   try {
-    const firebaseResult = await signInWithEmailAndPassword(firebaseAuth, username, password);
+    await firebase.auth().signInWithEmailAndPassword(username, password);
     // Firebase succeeded – ensure a local user record exists
     let user = await db.users.where('username').equals(normalized).first();
     if (!user) {
-      // Create a local user with default role WAITER
       const id = await db.users.add({ username: normalized, passwordHash: await sha256(password), role: 'WAITER', active: true });
       user = await db.users.get(id);
     }
     if (!user) throw new Error('Failed to create local user after Firebase sign‑in.');
-    // Set session and return the user
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
     return user;
   } catch (firebaseErr) {
