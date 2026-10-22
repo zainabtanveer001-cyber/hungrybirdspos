@@ -35,14 +35,16 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
       encoder.text(`${item.qty}x ${name}${item.note ? ` - ${item.note}` : ''}`);
     }
     encoder.text('--------------------------------');
-    encoder.feed(3);
+    encoder.feed(5);
     encoder.cut();
   }
 
   // Customer Copy
   encoder.align('center');
   encoder.bold(true);
+  encoder.setSize(2, 2);
   encoder.text(settings.headerText || RESTAURANT.name);
+  encoder.setSize(0, 0);
   encoder.bold(false);
   encoder.text(`Ph: ${RESTAURANT.phone}`);
   encoder.text(RESTAURANT.address);
@@ -334,7 +336,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     settings.printDeliveryDetails && sale.orderType === 'DELIVERY' && sale.deliveryInfo
       ? `<div class="rule"></div><strong>DELIVERY DETAILS</strong>
           <div>Name: ${escapeHtml(sale.deliveryInfo.name || 'N/A')}</div>
-          <div>Phone: ${escapeHtml(sale.deliveryInfo.phone || 'N/A)}</div>
+          <div>Phone: ${escapeHtml(sale.deliveryInfo.phone || 'N/A')}</div>
           <div>Address: ${escapeHtml(sale.deliveryInfo.address || 'N/A')}</div>`
       : '';
 
@@ -370,7 +372,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   body { font: ${FONT_PT[settings.receiptFontSize] ?? '12pt'}/1.3 "Courier New", monospace; }
   main { width: ${width}; padding: 0 1mm 3mm; }
   header { text-align: center; padding-bottom: 2mm; border-bottom: 1px dashed #000; }
-  header h1 { margin: 0 0 1mm; font-size: 1.35em; }
+  header h1 { margin: 0 0 1mm; font-size: 1.6em; }
   p { margin: 0; }
   .title { margin: 2mm 0; text-align: center; font-weight: bold; }
   .rule { margin: 2mm 0; border-top: 1px dashed #000; }
@@ -388,7 +390,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   .k-item { display: flex; gap: 1.5mm; padding: 0.8mm 0; overflow-wrap: anywhere; }
   .k-qty { font-weight: bold; min-width: 5mm; }
   .k-name { font-weight: bold; }
-  .cut { border-top: 1px dashed #000; margin: 12mm 0 10mm; }
+  .cut { border-top: 1px dashed #000; margin: 20mm 0 15mm; }
   </style></head><body><main>
   ${kitchen}
   <header><h1>${escapeHtml(settings.headerText || RESTAURANT.name)}</h1><p>Ph: ${escapeHtml(RESTAURANT.phone)}</p><p>${escapeHtml(RESTAURANT.address)}</p></header>

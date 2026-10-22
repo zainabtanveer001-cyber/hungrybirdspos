@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bluetooth, Check, X } from 'lucide-react';
-import { getPrinterSettings, receiptFontClass, savePrinterSettings, setPrinterDevice } from '../lib/printer';
+import { getPrinterSettings, receiptFontClass, savePrinterSettings, setPrinterDevice, PRINTER_SERVICE } from '../lib/printer';
 import type { DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
@@ -17,8 +17,6 @@ interface BluetoothDeviceLike {
 type BluetoothLike = {
   requestDevice(options: { acceptAllDevices: boolean; optionalServices: string[] }): Promise<BluetoothDeviceLike>;
 };
-
-const PRINTER_SERVICE = '000018f0-0000-1000-8000-00805f9b34fb';
 
 const FONT_OPTIONS: Array<{ value: ReceiptFontSize; label: string }> = [
   { value: 'small', label: 'Small (compact)' },
@@ -288,8 +286,8 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
               )}
             </div>
             <p className="text-[10px] text-gray-500">
-              The pairing is remembered for this browser tab only. ESC/POS printing is not ported yet — this
-              stores the printer choice and receipt layout for when it is.
+              The pairing is remembered for this browser tab only. ESC/POS binary printing is supported — test it
+              by completing a sale with auto-print enabled, or print a past receipt from Sales History.
             </p>
           </section>
         </div>

@@ -25,7 +25,10 @@ export interface PrinterSettings {
 }
 
 export const PRINTER_SETTINGS_KEY = 'printerSettings';
-export const PRINTER_SERVICE = '000018f0-0000-1000-8000-00805f9b34fb';
+// Common BLE service/characteristic UUIDs for ESC/POS thermal printers.
+// Most printers expose the HM-10 / HM-16 style UART bridge.
+export const PRINTER_SERVICE = '0000ffe0-0000-1000-8000-00805f9b34fb';
+export const PRINTER_CHARACTERISTIC = '0000ffe1-0000-1000-8000-00805f9b34fb';
 
 export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   receiptFontSize: 'normal',
@@ -76,11 +79,12 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
 
   try {
     const service = await server.getPrimaryService(PRINTER_SERVICE);
-    const characteristic = await service.getCharacteristic('00002a37-0000-1000-8000-00805f9b34fb');
+    const characteristic = await service.getCharacteristic(PRINTER_CHARACTERISTIC);
 
     const CHUNK_SIZE = 20;
+    const write = characteristic.writeValueWithoutResponse?.bind(characteristic) ?? characteristic.writeValue.bind(characteristic);
     for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
-      await characteristic.writeValue(bytes.slice(i, i + CHUNK_SIZE));
+      await write(bytes.slice(i, i + CHUNK_SIZE));
     }
   } finally {
     await server.disconnect();

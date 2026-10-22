@@ -51,9 +51,10 @@ class ConfigManager {
     this.cache = null;
   }
 
-  /** Synchronous check if config is likely available (based on cache). */
+  /** Synchronous check if config is available (cache or env fallback). */
   isConfigured(): boolean {
-    return this.cache !== null;
+    if (this.cache !== null) return true;
+    return Boolean(import.meta.env.VITE_FIREBASE_PROJECT_ID && import.meta.env.VITE_FIREBASE_API_KEY);
   }
 }
 
