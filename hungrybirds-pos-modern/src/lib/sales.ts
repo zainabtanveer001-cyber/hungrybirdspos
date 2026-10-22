@@ -1,6 +1,7 @@
 import { db } from './db';
 import { logAudit } from './audit';
 import { upsertCustomer } from './customers';
+import { deleteSale, pushSale, pushStock } from './sync';
 import type { CartItem, OrderType, PaymentDetail, Sale, CustomerInfo } from './db/types';
 
 export const MIN_DELIVERY_ORDER = 500;
@@ -49,6 +50,7 @@ export async function recordSale(input: SaleInput): Promise<number> {
   }));
 
   let saleId = 0;
+  const touchedStock = new Set<string>();
   await db.transaction('rw', db.sales, db.inventory, db.recipes, db.deliveries, db.customers, async () => {
     const sale: Sale = {
       ...input,
@@ -73,6 +75,7 @@ export async function recordSale(input: SaleInput): Promise<number> {
         await db.inventory.update(recipe.inventoryId, {
           stock: Math.max(0, (Number(ingredient.stock) || 0) - recipe.qtyRequired * cartItem.qty),
         });
+        touchedStock.add(recipe.inventoryId);
       }
     }
 
@@ -96,6 +99,9 @@ export async function recordSale(input: SaleInput): Promise<number> {
     await upsertCustomer(crm, sale.total, sale.loyaltyRedeemPoints || 0);
   });
 
+  // Fire-and-forget after the local commit, exactly like the legacy app.
+  pushSale(saleId);
+  pushStock(touchedStock);
   return saleId;
 }
 
@@ -123,5 +129,6 @@ export async function reopenSale(sale: Sale, user: string) {
     await db.sales.delete(sale.id!);
     await db.deliveries.where('saleId').equals(sale.id!).delete();
   });
+  if (sale.cloudId) deleteSale(sale.cloudId);
   await logAudit('SALE_EDIT', `Order #${sale.id} re-opened into cart for editing`, user, sale.id);
 }

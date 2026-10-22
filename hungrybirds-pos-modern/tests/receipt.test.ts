@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { receiptDocument, receiptLines, receiptText } from '../src/lib/receipt';
+import { formatDate, receiptDocument, receiptLines, receiptText } from '../src/lib/receipt';
 import type { Sale } from '../src/lib/db/types';
 
 const sale: Sale = {
@@ -26,7 +26,21 @@ const sale: Sale = {
   deliveryInfo: { name: 'Ayesha', phone: '03001234567', address: 'Model Town' },
 };
 
-const settings = { receiptFontSize: 'normal' as const, receiptLogo: true, paperWidth: '80mm' as const };
+const settings = {
+  receiptFontSize: 'normal' as const,
+  paperWidth: '80mm' as const,
+  autoPrint: true,
+  printKitchenTicket: true,
+  printOrderDetails: true,
+  printDeliveryDetails: true,
+  printItemPrices: true,
+  printTotals: true,
+  printPayments: true,
+  printFooter: true,
+  headerText: 'Hungry Birds Restaurant',
+  footerText: '',
+  dateFormat: 'locale' as const,
+};
 
 describe('receipt', () => {
   it('lists items, charges and payments in print order', () => {
@@ -42,7 +56,7 @@ describe('receipt', () => {
 
   it('shares a WhatsApp-ready message', () => {
     const text = receiptText(sale);
-    expect(text.startsWith('*HUNGRY BIRDS RESTAURANT*')).toBe(true);
+    expect(text.startsWith('*Hungry Birds Restaurant*')).toBe(true);
     expect(text).toContain('Address: Model Town');
   });
 
@@ -52,5 +66,59 @@ describe('receipt', () => {
     expect(html58).not.toContain('Cola <500ml>');
     expect(html58).toContain('@page { size: 58mm auto;');
     expect(receiptDocument(sale, settings)).toContain('@page { size: 80mm auto;');
+  });
+
+  it('prints the restaurant name as the receipt header', () => {
+    const html = receiptDocument(sale, settings);
+    expect(html).toContain('<h1>Hungry Birds Restaurant</h1>');
+    expect(html).not.toContain('HUNGRY BIRDS RESTAURANT');
+  });
+
+  it('prints a kitchen ticket above the customer copy, with a gap to tear on', () => {
+    const html = receiptDocument(sale, settings);
+    expect(html).toContain('KITCHEN ORDER');
+    expect(html.indexOf('KITCHEN ORDER')).toBeLessThan(html.indexOf('ORDER RECEIPT'));
+    // The cut line is padded so the two slips do not touch.
+    expect(html).toMatch(/\.cut \{[^}]*margin: 12mm 0 10mm/);
+  });
+
+  it('leaves the kitchen ticket off when the shop turns it off', () => {
+    const html = receiptDocument(sale, { ...settings, printKitchenTicket: false });
+    expect(html).not.toContain('KITCHEN ORDER');
+    expect(html).toContain('ORDER RECEIPT');
+  });
+
+  it('uses the custom header and footer text', () => {
+    const html = receiptDocument(sale, { ...settings, headerText: 'HB Grill', footerText: 'Call again!' });
+    expect(html).toContain('<h1>HB Grill</h1>');
+    expect(html).toContain('Call again!');
+    expect(html).not.toContain('Thank you for dining with us!');
+  });
+
+  it('drops the sections the shop turns off', () => {
+    const html = receiptDocument(sale, {
+      ...settings,
+      printOrderDetails: false,
+      printDeliveryDetails: false,
+      printItemPrices: false,
+      printTotals: false,
+      printPayments: false,
+      printFooter: false,
+    });
+    expect(html).not.toContain('DELIVERY DETAILS');
+    expect(html).not.toContain('GRAND TOTAL');
+    expect(html).not.toContain('PAYMENTS');
+    expect(html).not.toContain('Server:');
+    expect(html).toContain('ITEMS');
+    expect(html).toContain('Zinger Burger');
+  });
+
+  it('formats the date the way the shop asked', () => {
+    // Local time, so the assertion does not depend on the machine's timezone.
+    const stamp = new Date(2026, 9, 20, 12, 0, 0);
+    expect(formatDate(stamp, 'iso')).toBe('2026-10-20');
+    expect(formatDate(stamp, 'dmy')).toBe('20/10/2026');
+    expect(formatDate(stamp, 'mdy')).toBe('10/20/2026');
+    expect(receiptDocument(sale, { ...settings, dateFormat: 'iso' })).toMatch(/Date: \d{4}-\d{2}-\d{2}/);
   });
 });

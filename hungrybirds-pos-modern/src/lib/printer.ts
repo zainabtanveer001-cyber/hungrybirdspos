@@ -1,25 +1,50 @@
 import { db } from './db';
 
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
+export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
 
 export interface PrinterSettings {
   receiptFontSize: ReceiptFontSize;
-  receiptLogo: boolean;
   paperWidth: '58mm' | '80mm';
+  /** Print the receipt by itself as soon as a sale is completed. */
+  autoPrint: boolean;
+  /** Print a kitchen ticket above the customer copy. */
+  printKitchenTicket: boolean;
+  /** What the receipt shows. */
+  printOrderDetails: boolean;
+  printDeliveryDetails: boolean;
+  printItemPrices: boolean;
+  printTotals: boolean;
+  printPayments: boolean;
+  printFooter: boolean;
+  /** What the receipt says. */
+  headerText: string;
+  footerText: string;
+  dateFormat: DateFormat;
 }
 
 export const PRINTER_SETTINGS_KEY = 'printerSettings';
 
 export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   receiptFontSize: 'normal',
-  receiptLogo: true,
   paperWidth: '80mm',
+  autoPrint: true,
+  printKitchenTicket: true,
+  printOrderDetails: true,
+  printDeliveryDetails: true,
+  printItemPrices: true,
+  printTotals: true,
+  printPayments: true,
+  printFooter: true,
+  headerText: 'Hungry Birds Restaurant',
+  footerText: '',
+  dateFormat: 'locale',
 };
 
 const FONT_CLASS: Record<ReceiptFontSize, string> = {
-  small: 'text-[8px]',
-  normal: 'text-[10px]',
-  large: 'text-[12px]',
+  small: 'text-[10px]',
+  normal: 'text-[12px]',
+  large: 'text-[14px]',
 };
 
 export function receiptFontClass(size: ReceiptFontSize): string {

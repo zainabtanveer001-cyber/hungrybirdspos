@@ -1,5 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { pushCategory, pushMenu } from './sync';
 import type { Category, MenuItem, Recipe } from './db/types';
 
 export function newCategoryId(): string {
@@ -15,6 +16,7 @@ export async function saveCategory(name: string, user: string): Promise<Category
   if (!trimmed) throw new Error('Enter a category name.');
   const category = { id: newCategoryId(), name: trimmed };
   await db.categories.put(category);
+  pushCategory(category.id);
   await logAudit('CATEGORY_ADDED', `Category "${trimmed}" added`, user);
   return category;
 }
@@ -25,6 +27,7 @@ export async function deleteCategory(id: string, user: string): Promise<number> 
   if (!category) return 0;
   const affected = await db.menu.where('categoryId').equals(id).count();
   await db.categories.delete(id);
+  pushCategory(id);
   await logAudit('CATEGORY_DELETED', `Category "${category.name}" deleted (${affected} items moved to Uncategorized)`, user);
   return affected;
 }
@@ -87,6 +90,7 @@ export async function saveMenuItem(
     }
   });
 
+  pushMenu(id);
   await logAudit(
     existingId ? 'MENU_ITEM_UPDATED' : 'MENU_ITEM_ADDED',
     `${existingId ? 'Updated' : 'Added'} "${name}" at ${price} with ${cleanRecipes.length} recipe line(s)`,
@@ -106,5 +110,6 @@ export async function deleteMenuItem(id: string, user: string, force = false): P
     await db.recipes.where('menuItemId').equals(id).delete();
     await db.menu.delete(id);
   });
+  pushMenu(id);
   await logAudit('MENU_ITEM_DELETED', `Deleted "${item.name}" and its recipe`, user);
 }

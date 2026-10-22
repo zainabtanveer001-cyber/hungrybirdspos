@@ -93,6 +93,13 @@ export class HungryBirdsDB extends Dexie {
       onlineOrders: '++id, createdAt, status, orderType',
     });
 
+    // Cloud doc ids are the merge key for the Firestore pull; indexed so a poll
+    // can look a sale or order up by cloud id without scanning the table.
+    this.version(23).stores({
+      sales: '++id, timestamp, total, orderType, discountPercent, serverUser, cloudId',
+      onlineOrders: '++id, createdAt, status, orderType, cloudId',
+    });
+
     // Timestamp hooks (port of app.js lines 302-325)
     // NB: 'creating' hooks must not return a value — Dexie treats the return
     // value as a primary-key override, which throws DataError on auto-increment tables.
@@ -120,6 +127,14 @@ export class HungryBirdsDB extends Dexie {
     });
 
     this.menu.hook('updating', (_updates, _keys, _idbCur) => {
+      (_updates as any).updatedAt = new Date().toISOString();
+    });
+
+    this.categories.hook('updating', (_updates) => {
+      (_updates as any).updatedAt = new Date().toISOString();
+    });
+
+    this.onlineOrders.hook('updating', (_updates) => {
       (_updates as any).updatedAt = new Date().toISOString();
     });
 

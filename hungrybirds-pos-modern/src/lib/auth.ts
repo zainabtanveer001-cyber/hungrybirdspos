@@ -1,5 +1,6 @@
 import { db } from './db';
 import { sha256 } from './crypto';
+import { forgetToken, rememberToken } from './sync';
 import type { User, UserRole } from './db/types';
 
 // Firebase REST instead of the SDK: the legacy app only needs three calls
@@ -28,8 +29,11 @@ async function firestoreGet(path: string, idToken?: string): Promise<FirestoreDo
   return Object.fromEntries(Object.entries(fields).map(([k, v]: [string, any]) => [k, v.stringValue ?? v.booleanValue]));
 }
 
-/** Signs in with the Firebase REST API; returns the auth uid and id token. */
-async function firebaseSignIn(email: string, password: string): Promise<{ uid: string; idToken: string }> {
+/** Signs in with the Firebase REST API; returns the auth uid and token pair. */
+async function firebaseSignIn(
+  email: string,
+  password: string,
+): Promise<{ uid: string; idToken: string; refreshToken?: string; expiresIn?: string }> {
   const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -43,8 +47,8 @@ async function firebaseSignIn(email: string, password: string): Promise<{ uid: s
       throw new Error('Incorrect password.');
     throw new Error('Login failed. Check your connection and try again.');
   }
-  const { localId, idToken } = await res.json();
-  return { uid: localId, idToken };
+  const { localId, idToken, refreshToken, expiresIn } = await res.json();
+  return { uid: localId, idToken, refreshToken, expiresIn };
 }
 
 /**
@@ -106,7 +110,8 @@ async function cloudSignIn(input: string, password: string): Promise<User> {
     email = dir.authEmail ?? `${input}@${AUTH_EMAIL_DOMAIN}`;
   }
 
-  const { uid, idToken } = await firebaseSignIn(email, password);
+  const { uid, idToken, refreshToken, expiresIn } = await firebaseSignIn(email, password);
+  rememberToken(idToken, refreshToken, Number(expiresIn));
   const profile = (await firestoreGet(`users/${uid}`, idToken)) ?? {};
   if (profile.active === false) throw new Error('This account is disabled. Contact the Owner.');
 
@@ -152,6 +157,7 @@ export async function signIn(username: string, password: string): Promise<User> 
 
 export function signOut(): void {
   sessionStorage.removeItem(SESSION_KEY);
+  forgetToken();
 }
 
 export function readSession(): { id?: number; username: string; role: UserRole } | null {

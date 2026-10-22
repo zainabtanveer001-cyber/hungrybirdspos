@@ -1,5 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { pushInventory } from './sync';
 import type { InventoryItem } from './db/types';
 
 const THRESHOLD_KEY = 'lowStockThreshold';
@@ -28,5 +29,6 @@ export function normalizeQuantity(value: string | number): number | null {
 export async function adjustStock(item: InventoryItem, delta: number, user: string): Promise<void> {
   const updated = Math.max(0, (Number(item.stock) || 0) + delta);
   await db.inventory.update(item.id, { stock: updated });
+  pushInventory(item.id);
   await logAudit('STOCK_ADJUST', `${delta > 0 ? 'Added' : 'Removed'} ${Math.abs(delta)} units of "${item.name}" (now ${updated})`, user);
 }

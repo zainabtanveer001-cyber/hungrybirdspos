@@ -139,14 +139,17 @@ export interface Sale {
   refundedAmount?: number;
   refundStatus?: 'FULL' | 'PARTIAL';
   refunds?: RefundRecord[];
+  /** Firestore doc id once the sale has been pushed (append-only in the cloud). */
+  cloudId?: string;
   onlineOrderId?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
-/** Local inbox for website orders; cloud sync is not wired up yet. */
+/** Local inbox for website orders. `cloudId` is the Firestore doc id; the POS may only update those. */
 export interface OnlineOrder {
   id?: number;
+  cloudId?: string;
   createdAt: string;
   customer: CustomerInfo;
   orderType: OrderType;
@@ -160,12 +163,16 @@ export interface OnlineOrder {
   completedAt?: string;
   rejectedAt?: string;
   rejectReason?: string;
+  /** Firestore doc id of the sale that fulfilled this order, once checked out. */
+  saleId?: number;
+  updatedAt?: string;
 }
 
 export interface Category {
   id: string;
   name: string;
   order?: number;
+  updatedAt?: string;
 }
 
 export interface MenuItem {

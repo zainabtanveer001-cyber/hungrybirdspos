@@ -1,5 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { pushOrder } from './sync';
 import type { CartItem, OnlineOrder, OnlineOrderStatus } from './db/types';
 
 /** Lifecycle for delivery orders; takeaway/dine-in stop at COMPLETED. */
@@ -42,7 +43,7 @@ const TIMESTAMP_FIELD: Partial<Record<OnlineOrderStatus, keyof OnlineOrder>> = {
   REJECTED: 'rejectedAt',
 };
 
-/** Mirrors the legacy `syncOrderStatusToFirestore`, minus the network hop. */
+/** Mirrors the legacy `syncOrderStatusToFirestore`; the cloud hop is fire-and-forget. */
 export async function setOrderStatus(
   id: number,
   status: OnlineOrderStatus,
@@ -56,6 +57,7 @@ export async function setOrderStatus(
     ...extra,
   });
   const order = await db.onlineOrders.get(id);
+  if (order) pushOrder(order);
   const who = order?.customer?.name ? ` for ${order.customer.name}` : '';
   const why = extra.rejectReason ? ` — ${extra.rejectReason}` : '';
   await logAudit(`ONLINE_ORDER_${status}`, `Website order #${id}${who} → ${STATUS_LABEL[status]}${why}`, user);

@@ -3,6 +3,7 @@ import { Download, Plus, Search, Trash2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { getLowStockThreshold, newInventoryId, normalizeQuantity, setLowStockThreshold } from '../lib/inventory';
+import { pushInventory } from '../lib/sync';
 import { formatAmount } from '../lib/format';
 import { downloadCsv, datedFilename } from '../lib/export';
 import { Modal } from './Modal';
@@ -39,13 +40,15 @@ export function InventoryModal({ onClose, notify }: {
       notify('Cost must be a non-negative number.');
       return;
     }
+    const id = newInventoryId();
     await db.inventory.put({
-      id: newInventoryId(),
+      id,
       name: draft.name.trim(),
       stock,
       unit: draft.unit.trim() || 'pcs',
       cost,
     });
+    pushInventory(id);
     setDraft(BLANK);
     notify('Ingredient added.');
   }
@@ -60,6 +63,7 @@ export function InventoryModal({ onClose, notify }: {
       return;
     }
     await db.inventory.update(item.id, { name, stock, unit: (patch.unit ?? item.unit).trim() || 'pcs', cost });
+    pushInventory(item.id);
     setEditing((current) => {
       const next = { ...current };
       delete next[item.id];
@@ -72,6 +76,7 @@ export function InventoryModal({ onClose, notify }: {
     const used = await db.recipes.where('inventoryId').equals(item.id).count();
     if (used > 0 && !window.confirm(`${used} recipe(s) reference this item. Delete anyway? (Recipes are kept but orphaned.)`)) return;
     await db.inventory.delete(item.id);
+    pushInventory(item.id);
     notify(`${item.name} deleted.`);
   }
 

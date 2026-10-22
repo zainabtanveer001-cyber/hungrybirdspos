@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Check, Inbox, Plus, X } from 'lucide-react';
+import { Check, Inbox, Plus, RefreshCw, X } from 'lucide-react';
 import { db } from '../lib/db';
+import { syncNow } from '../lib/sync';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
 import { STATUS_LABEL, isActive, nextStatus, rejectOrder, resolveOrderToCart, setOrderStatus } from '../lib/onlineOrders';
@@ -64,13 +65,25 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
       wide
       footer={
         <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={() => setAdding((v) => !v)}
-            className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-xl hover:bg-indigo-100"
-          >
-            <Plus className="w-3.5 h-3.5" aria-hidden /> {adding ? 'Hide form' : 'Record website order'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAdding((v) => !v)}
+              className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-xl hover:bg-indigo-100"
+            >
+              <Plus className="w-3.5 h-3.5" aria-hidden /> {adding ? 'Hide form' : 'Record website order'}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                const changed = await syncNow();
+                notify(changed ? 'Online order inbox refreshed.' : 'Everything is already up to date.');
+              }}
+              className="flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 px-3 py-2 rounded-xl hover:bg-gray-200"
+            >
+              <RefreshCw className="w-3.5 h-3.5" aria-hidden /> Sync now
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
@@ -98,8 +111,8 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
             <Inbox className="w-8 h-8 text-gray-300 mx-auto mb-2" aria-hidden />
             <p className="text-gray-400 text-xs">No active online orders.</p>
             <p className="text-[10px] text-gray-400 mt-1 max-w-sm mx-auto">
-              Website orders sync is not connected yet — use “Record website order” to log one that
-              came in by phone or from another device.
+              Website orders arrive here automatically. Use “Record website order” for one that came
+              in by phone.
             </p>
           </div>
         ) : (

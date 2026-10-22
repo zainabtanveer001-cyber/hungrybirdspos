@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
-import { LogOut, Menu } from 'lucide-react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { CloudOff, LogOut, Menu, RefreshCw } from 'lucide-react';
 import { db } from './lib/db';
 import { useLive } from './lib/useLive';
 import { initializeApp, readSession, signOut } from './lib/auth';
+import { getSyncStatus, startSync, stopSync, subscribeToSync, syncNow } from './lib/sync';
 import { addToCart, calculateCartTotals, setQty } from './lib/cart';
 import type { CartCharges } from './lib/cart';
 import { getCustomer } from './lib/customers';
 import { holdOrder } from './lib/held';
+import { setOrderStatus } from './lib/onlineOrders';
 import { formatAmount } from './lib/format';
 import { MIN_DELIVERY_ORDER, recordSale, reopenSale, verifyStock } from './lib/sales';
 import { printReceipt } from './lib/receipt';
+import { getPrinterSettings } from './lib/printer';
 import { LoginScreen } from './components/LoginScreen';
 import { Sidebar } from './components/Sidebar';
 import { MenuGrid } from './components/MenuGrid';
@@ -33,7 +36,7 @@ import { ActivityLogModal } from './components/ActivityLogModal';
 import { PrinterSettingsModal } from './components/PrinterSettingsModal';
 import { AdminSettingsModal } from './components/AdminSettingsModal';
 import { OnlineOrdersModal } from './components/OnlineOrdersModal';
-import type { CartItem, CustomerInfo, MenuItem, PaymentDetail, Sale, User, UserRole } from './lib/db/types';
+import type { CartItem, CustomerInfo, MenuItem, OnlineOrder, PaymentDetail, Sale, User, UserRole } from './lib/db/types';
 
 type Session = { username: string; role: UserRole };
 
@@ -72,6 +75,7 @@ function App() {
   const [printerOpen, setPrinterOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [onlineOrdersOpen, setOnlineOrdersOpen] = useState(false);
+  const [activeOnlineOrder, setActiveOnlineOrder] = useState<OnlineOrder | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   const totals = calculateCartTotals(cart, charges);
@@ -79,6 +83,12 @@ function App() {
   useEffect(() => {
     initializeApp().catch((err) => console.error('App init failed:', err));
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    startSync();
+    return stopSync;
+  }, [session]);
 
   useEffect(() => {
     let active = true;
@@ -110,12 +120,25 @@ function App() {
     setCharges(EMPTY_CHARGES);
     setCustomer({});
     setLoyaltyBalance(0);
+    setActiveOnlineOrder(null);
   }
 
   async function hold() {
     const id = await holdOrder(cart, charges, customer.phone ? customer : undefined, session?.username || 'Staff');
     resetOrder();
     notify(`Held order #${id}.`);
+  }
+
+  /**
+   * Tells the website the order was paid. Delivery keeps moving (rider + delivered
+   * are still staff steps); takeaway completes at checkout — legacy app.js:5351.
+   */
+  async function closeOnlineOrder(saleId: number) {
+    const order = activeOnlineOrder;
+    if (!order?.id) return;
+    const status = order.orderType === 'DELIVERY' ? 'PREPARING' : 'COMPLETED';
+    await db.onlineOrders.update(order.id, { saleId });
+    await setOrderStatus(order.id, status, session?.username || 'Staff');
   }
 
   async function complete(payments: PaymentDetail[]) {
@@ -153,7 +176,9 @@ function App() {
         payments,
         customer: customer.phone ? customer : undefined,
         deliveryInfo: charges.orderType === 'DELIVERY' ? customer : undefined,
+        onlineOrderId: activeOnlineOrder?.cloudId ?? null,
       });
+      closeOnlineOrder(saleId);
       const sale: Sale = {
         id: saleId,
         timestamp: new Date().toISOString(),
@@ -179,13 +204,16 @@ function App() {
       setPaying(false);
       notify(`Sale #${saleId} completed — ${formatAmount(totals.grandTotal)}`);
       // The button promises a receipt; print after the UI has settled so the dialog is not blocked by the payment modal.
-      setTimeout(() => {
-        try {
-          void printReceipt(sale);
-        } catch (e) {
-          console.error('Print receipt failed', e);
-        }
-      }, 300);
+      getPrinterSettings().then((printer) => {
+        if (!printer.autoPrint) return;
+        setTimeout(() => {
+          try {
+            void printReceipt(sale);
+          } catch (e) {
+            console.error('Print receipt failed', e);
+          }
+        }, 300);
+      });
     } catch (err) {
       console.error('Sale failed:', err);
       notify('Failed to process sale. Please try again.');
@@ -217,6 +245,7 @@ function App() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <SyncBadge />
           <span className="hidden lg:inline text-xs text-gray-600">
             Welcome, <strong className="text-gray-800">{session.username}</strong>
           </span>
@@ -377,6 +406,7 @@ function App() {
             setCharges({ ...EMPTY_CHARGES, orderType: order.orderType });
             setCustomer(order.customer || {});
             setLoyaltyBalance(0);
+            setActiveOnlineOrder(order);
           }}
         />
       )}
@@ -459,6 +489,32 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function SyncBadge() {
+  const status = useSyncExternalStore(subscribeToSync, getSyncStatus, getSyncStatus);
+
+  if (status.state === 'off') {
+    return (
+      <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-gray-400" title="Sign in with a cloud account to sync across devices">
+        <CloudOff className="w-3.5 h-3.5" /> Local only
+      </span>
+    );
+  }
+  const error = status.state === 'error';
+  return (
+    <button
+      type="button"
+      onClick={() => void syncNow()}
+      title={error ? `Sync error: ${status.error}` : status.lastSync ? `Last synced ${new Date(status.lastSync).toLocaleTimeString()}` : 'Syncing'}
+      className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg border ${
+        error ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+      }`}
+    >
+      <RefreshCw className={`w-3.5 h-3.5 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
+      {error ? 'Sync issue' : status.state === 'syncing' ? 'Syncing' : 'Synced'}
+    </button>
   );
 }
 
