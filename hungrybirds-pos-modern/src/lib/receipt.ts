@@ -291,7 +291,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     .map(
       (payment) => `<div class="row"><span>${escapeHtml(payment.method)}</span><span>${escapeHtml(formatAmount(payment.amount))}</span></div>
     ${payment.method === 'Cash' && payment.cashGiven != null ? `<div class="row muted"><span>Given</span><span>${escapeHtml(formatAmount(payment.cashGiven))}</span></div>` : ''}
-    ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${escapeHtml(formatAmount(Number(payment.change))}</span></div>` : ''}`,
+    ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${escapeHtml(formatAmount(Number(payment.change)))}</span></div>` : ''}`,
     )
     .join('');
   const totalRow = (label: string, amount: number, sign = '') =>

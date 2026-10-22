@@ -142,8 +142,9 @@ export function AdminSettingsModal({ username, notify, onClose }: {
   }
 
   return (
-    <Modal title="Admin Settings" onClose={onClose} wide>
-      <div className="space-y-4">
+    <>
+      <Modal title="Admin Settings" onClose={onClose} wide>
+        <div className="space-y-4">
         <section className="p-3 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
           <SectionTitle>Cloud Setup & Data</SectionTitle>
           <p className="text-[11px] text-gray-600 leading-relaxed">
@@ -372,6 +373,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
         onClose={() => setShowCloudSetup(false)}
       />
     )}
+    </>
   );
 }
 
