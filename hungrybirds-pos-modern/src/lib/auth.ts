@@ -1,15 +1,15 @@
 import { db } from './db';
 import { sha256 } from './crypto';
 import { forgetToken, rememberToken } from './sync';
+import { configManager } from './config';
 import type { User, UserRole } from './db/types';
 
 // Firebase REST instead of the SDK: the legacy app only needs three calls
 // (username lookup, sign-in, profile read), and this keeps the bundle small.
 // The web config is public by design (it ships in the legacy app.js too), so the
 // defaults let a deploy work without env vars; VITE_* wins when it is set.
-const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'hungry-birds-3e16f';
-const API_KEY = import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyAIibLNTusvBFOEcExpdb1tYQh_1rv2q7k';
 const AUTH_EMAIL_DOMAIN = 'hungrybirds-pos.local';
+
 
 export const SESSION_KEY = 'loggedUser';
 
@@ -20,8 +20,11 @@ export function normalizeUsername(value: string): string {
 type FirestoreDoc = Record<string, any> | null;
 
 async function firestoreGet(path: string, idToken?: string): Promise<FirestoreDoc> {
+  const config = await configManager.getConfig();
+  if (!config) return null;
+
   const res = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}?key=${API_KEY}`,
+    `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${path}?key=${config.apiKey}`,
     { headers: idToken ? { Authorization: `Bearer ${idToken}` } : {}, signal: AbortSignal.timeout(6000) },
   );
   if (!res.ok) return null;
@@ -34,7 +37,10 @@ async function firebaseSignIn(
   email: string,
   password: string,
 ): Promise<{ uid: string; idToken: string; refreshToken?: string; expiresIn?: string }> {
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+  const config = await configManager.getConfig();
+  if (!config) throw new Error('Cloud not configured. Please run Setup Wizard.');
+
+  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${config.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),

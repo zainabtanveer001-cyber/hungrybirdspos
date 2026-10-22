@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bluetooth, Check, X } from 'lucide-react';
-import { getPrinterSettings, receiptFontClass, savePrinterSettings } from '../lib/printer';
+import { getPrinterSettings, receiptFontClass, savePrinterSettings, setPrinterDevice } from '../lib/printer';
 import type { DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
@@ -70,8 +70,12 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
     setConnecting(true);
     try {
       const picked = await bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [PRINTER_SERVICE] });
-      picked.addEventListener('gattserverdisconnected', () => setDevice(null));
+      picked.addEventListener('gattserverdisconnected', () => {
+        setDevice(null);
+        setPrinterDevice(null);
+      });
       setDevice(picked);
+      setPrinterDevice(picked);
       notify(`Paired with ${picked.name || 'thermal printer'}.`);
     } catch (err) {
       // Cancelling the chooser rejects with NotFoundError — not an error worth a toast.

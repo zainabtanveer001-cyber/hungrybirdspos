@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { Download, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { Download, Pencil, Plus, Search, Trash2, Upload, X, Cloud } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
@@ -8,6 +8,7 @@ import type { RecipeDraft } from '../lib/menu';
 import { collectBackup, importBackup } from '../lib/backup';
 import { downloadJson } from '../lib/export';
 import { Modal } from './Modal';
+import { CloudSetupModal } from './CloudSetupModal';
 import type { Category, MenuItem, Recipe } from '../lib/db/types';
 
 const INPUT = 'p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-w-0';
@@ -38,6 +39,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [recipeRows, setRecipeRows] = useState<RecipeDraft[]>([]);
   const [importReport, setImportReport] = useState<string[] | null>(null);
+  const [showCloudSetup, setShowCloudSetup] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const categoryName = useMemo(() => {
@@ -143,12 +145,19 @@ export function AdminSettingsModal({ username, notify, onClose }: {
     <Modal title="Admin Settings" onClose={onClose} wide>
       <div className="space-y-4">
         <section className="p-3 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
-          <SectionTitle>Move data from the original POS</SectionTitle>
+          <SectionTitle>Cloud Setup & Data</SectionTitle>
           <p className="text-[11px] text-gray-600 leading-relaxed">
-            In the original POS, open <code className="bg-white px-1 rounded">export-data.html</code> on the same computer and
-            browser, then import the file it saves below. Importing replaces any matching rows; it never deletes anything else.
+            Configure your Firebase project to enable multi-device sync and website orders.
           </p>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowCloudSetup(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2.5 rounded-xl flex items-center gap-1.5"
+            >
+              <Cloud className="w-3.5 h-3.5" aria-hidden /> Cloud Setup
+            </button>
+            <div className="h-8 w-px bg-indigo-200 mx-1" />
             <button
               type="button"
               onClick={() => fileInput.current?.click()}
@@ -356,6 +365,13 @@ export function AdminSettingsModal({ username, notify, onClose }: {
         </section>
       </div>
     </Modal>
+    {showCloudSetup && (
+      <CloudSetupModal
+        username={username}
+        notify={notify}
+        onClose={() => setShowCloudSetup(false)}
+      />
+    )}
   );
 }
 

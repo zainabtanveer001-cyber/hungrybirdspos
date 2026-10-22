@@ -1,7 +1,8 @@
 import { formatAmount } from './format';
-import { DEFAULT_PRINTER_SETTINGS, getPrinterSettings } from './printer';
+import { DEFAULT_PRINTER_SETTINGS, getPrinterSettings, printRaw } from './printer';
 import type { PrinterSettings } from './printer';
 import type { CartItem, Sale } from './db/types';
+import { EscPosEncoder } from './escpos';
 
 export const RESTAURANT = {
   name: 'Hungry Birds Restaurant',
@@ -10,17 +11,148 @@ export const RESTAURANT = {
 };
 
 /**
+ * Encodes the sale into raw ESC/POS bytes for thermal printers.
+ */
+export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Uint8Array {
+  const encoder = new EscPosEncoder();
+  encoder.initialize();
+
+  if (settings.printKitchenTicket) {
+    encoder.align('center');
+    encoder.bold(true);
+    encoder.text('KITCHEN ORDER');
+    encoder.bold(false);
+    encoder.align('center');
+    encoder.text(`Order: #${sale.id}`);
+    encoder.text(`By: ${sale.serverUser || 'Staff'}`);
+    encoder.text(`Time: ${new Date(sale.timestamp).toLocaleTimeString()}`);
+    encoder.text(`Type: ${sale.orderType}`);
+    encoder.text('--------------------------------');
+    encoder.align('left');
+    for (const item of sale.items || []) {
+      const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
+      const name = modifiers ? `${item.name} (${modifiers})` : item.name;
+      encoder.text(`${item.qty}x ${name}${item.note ? ` - ${item.note}` : ''}`);
+    }
+    encoder.text('--------------------------------');
+    encoder.feed(3);
+    encoder.cut();
+  }
+
+  // Customer Copy
+  encoder.align('center');
+  encoder.bold(true);
+  encoder.text(settings.headerText || RESTAURANT.name);
+  encoder.bold(false);
+  encoder.text(`Ph: ${RESTAURANT.phone}`);
+  encoder.text(RESTAURANT.address);
+  encoder.text(' ');
+  encoder.bold(true);
+  encoder.text('ORDER RECEIPT');
+  encoder.bold(false);
+  encoder.text(' ');
+
+  encoder.align('left');
+  if (settings.printOrderDetails) {
+    encoder.text(`Order ID: #${sale.id}`);
+    encoder.text(`Date: ${formatDate(sale.timestamp, settings.dateFormat)}`);
+    encoder.text(`Server: ${sale.serverUser || 'Staff'}`);
+    encoder.text(`Type: ${sale.orderType}`);
+  }
+
+  if (settings.printDeliveryDetails && sale.orderType === 'DELIVERY' && sale.deliveryInfo) {
+    encoder.text(' ');
+    encoder.bold(true);
+    encoder.text('DELIVERY DETAILS');
+    encoder.bold(false);
+    encoder.text(`Name: ${sale.deliveryInfo.name || 'N/A'}`);
+    encoder.text(`Phone: ${sale.deliveryInfo.phone || 'N/A'}`);
+    encoder.text(`Address: ${sale.deliveryInfo.address || 'N/A'}`);
+  }
+
+  encoder.text(' ');
+  encoder.bold(true);
+  encoder.text('ITEMS');
+  encoder.bold(false);
+
+  for (const item of sale.items || []) {
+    const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
+    const name = modifiers ? `${item.name} (${modifiers})` : item.name;
+    if (settings.printItemPrices) {
+      const price = formatAmount(item.price * item.qty);
+      const line = `${name}`.padEnd(20, ' ') + price;
+      encoder.text(line.slice(0, 32));
+    } else {
+      encoder.text(`${item.qty}x ${name}`);
+    }
+  }
+
+  if (settings.printTotals) {
+    encoder.text('--------------------------------');
+    const totalRow = (label: string, amount: number, sign = '') => {
+      if (!amount) return;
+      const line = `${label}`.padEnd(20, ' ') + `${sign}${formatAmount(amount)}`;
+      encoder.text(line.slice(0, 32));
+    };
+    totalRow('Subtotal', sale.subtotal);
+    if (sale.discountAmount) totalRow(`Discount ${sale.discountPercent || 0}%`, sale.discountAmount, '-');
+    totalRow('Delivery charge', sale.deliveryCharge);
+    totalRow('Packing charge', sale.packingCharge);
+    totalRow(`Tax ${sale.taxPercent || 0}%`, sale.taxAmount);
+    totalRow('Other charges', sale.otherCharge);
+
+    encoder.bold(true);
+    const grandLine = `GRAND TOTAL`.padEnd(20, ' ') + formatAmount(sale.total);
+    encoder.text(grandLine.slice(0, 32));
+    encoder.bold(false);
+
+    if (settings.printPayments) {
+      encoder.text(' ');
+      encoder.bold(true);
+      encoder.text('PAYMENTS');
+      encoder.bold(false);
+      for (const p of sale.payments || []) {
+        const line = `${p.method}`.padEnd(20, ' ') + formatAmount(p.amount);
+        encoder.text(line.slice(0, 32));
+      }
+      if (sale.totalChange) {
+        const changeLine = `Change`.padEnd(20, ' ') + formatAmount(sale.totalChange);
+        encoder.text(changeLine.slice(0, 32));
+      }
+    }
+  }
+
+  if (settings.printFooter) {
+    encoder.text(' ');
+    encoder.align('center');
+    encoder.text(settings.footerText || (sale.orderType === 'DELIVERY' ? 'Thank you for ordering delivery!' : sale.orderType === 'TAKEAWAY' ? 'Thank you for choosing takeaway!' : 'Thank you for dining with us!'));
+  }
+
+  encoder.feed(3);
+  encoder.cut();
+  return encoder.build();
+}
+
+/**
  * Prints through a hidden iframe: the POS tab keeps its cart and open modals,
  * unlike a new window.
  */
 export async function printReceipt(sale: Sale): Promise<void> {
   const settings = await getPrinterSettings();
+
+  try {
+    const bytes = generateEscPosReceipt(sale, settings);
+    await printRaw(bytes);
+    return;
+  } catch (e) {
+    console.warn('Bluetooth print failed, falling back to browser print:', e);
+  }
+
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
   document.body.appendChild(frame);
 
-  // srcdoc + onload: printing before the document has laid out drops the page.
   frame.srcdoc = receiptDocument(sale, settings);
   await new Promise<void>((resolve) => {
     frame.addEventListener('load', () => resolve(), { once: true });
@@ -36,7 +168,6 @@ export async function printReceipt(sale: Sale): Promise<void> {
   win.addEventListener('afterprint', cleanUp, { once: true });
   win.focus();
   win.print();
-  // Safari does not fire afterprint for iframes.
   cleanUp();
 }
 
@@ -133,47 +264,6 @@ function itemLine(item: CartItem): string {
   return modifiers ? `${item.name} (${modifiers})` : item.name;
 }
 
-/** The compact slip for the cooks: no prices, no totals. */
-export function kitchenTicketDocument(sale: Sale, settings: PrinterSettings): string {
-  const width = settings.paperWidth === '58mm' ? '54mm' : '76mm';
-  const items = (sale.items || [])
-    .map(
-      (item) => `<div class="k-item">
-    <span class="k-qty">${escapeHtml(item.qty)}x</span>
-    <span class="k-name">${escapeHtml(itemLine(item))}${item.note ? ` — ${escapeHtml(item.note)}` : ''}</span>
-  </div>`,
-    )
-    .join('');
-
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Kitchen #${escapeHtml(sale.id)}</title><style>
-  @page { size: ${settings.paperWidth} auto; margin: 2mm; }
-  * { box-sizing: border-box; }
-  html, body { width: ${width}; margin: 0; padding: 0; color: #000; background: #fff; }
-  body { font: ${FONT_PT[settings.receiptFontSize] ?? '12pt'}/1.35 "Courier New", monospace; }
-  main { width: ${width}; padding: 0 1mm 2mm; }
-  h1 { margin: 0 0 1mm; font-size: 1.3em; text-align: center; }
-  p { margin: 0; }
-  .k-meta { text-align: center; margin-bottom: 1.5mm; }
-  .k-rule { border-top: 1px dashed #000; margin: 1.5mm 0; }
-  .k-item { display: flex; gap: 1.5mm; padding: 0.8mm 0; overflow-wrap: anywhere; }
-  .k-qty { font-weight: bold; min-width: 5mm; }
-  .k-name { font-weight: bold; }
-  .k-notes { margin-top: 1.5mm; }
-  </style></head><body><main>
-  <h1>KITCHEN ORDER</h1>
-  <div class="k-meta">
-    <p>Order: #${escapeHtml(sale.id)}</p>
-    <p>By: ${escapeHtml(sale.serverUser || 'Staff')}</p>
-    <p>Time: ${escapeHtml(new Date(sale.timestamp).toLocaleTimeString())}</p>
-    <p>Type: ${escapeHtml(sale.orderType)}</p>
-  </div>
-  <div class="k-rule"></div>
-  ${items}
-  <div class="k-rule"></div>
-  ${(sale.items || []).some((item) => item.note) ? '<div class="k-notes">Notes are printed next to the dish above.</div>' : ''}
-  </main></body></html>`;
-}
-
 /**
  * Standalone receipt document, sized to the configured paper. Printed into a
  * hidden iframe rather than a new window so the POS tab keeps its state.
@@ -201,7 +291,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     .map(
       (payment) => `<div class="row"><span>${escapeHtml(payment.method)}</span><span>${escapeHtml(formatAmount(payment.amount))}</span></div>
     ${payment.method === 'Cash' && payment.cashGiven != null ? `<div class="row muted"><span>Given</span><span>${escapeHtml(formatAmount(payment.cashGiven))}</span></div>` : ''}
-    ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${escapeHtml(formatAmount(Number(payment.change)))}</span></div>` : ''}`,
+    ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${escapeHtml(formatAmount(Number(payment.change))}</span></div>` : ''}`,
     )
     .join('');
   const totalRow = (label: string, amount: number, sign = '') =>
@@ -220,9 +310,9 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
       ${(sale.items || [])
         .map(
           (item) => `<div class="k-item">
-        <span class="k-qty">${escapeHtml(item.qty)}x</span>
-        <span class="k-name">${escapeHtml(itemLine(item))}${item.note ? ` — ${escapeHtml(item.note)}` : ''}</span>
-      </div>`,
+            <span class="k-qty">${escapeHtml(item.qty)}x</span>
+            <span class="k-name">${escapeHtml(itemLine(item))}${item.note ? ` — ${escapeHtml(item.note)}` : ''}</span>
+          </div>`,
         )
         .join('')}
       <div class="k-rule"></div>
@@ -244,7 +334,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     settings.printDeliveryDetails && sale.orderType === 'DELIVERY' && sale.deliveryInfo
       ? `<div class="rule"></div><strong>DELIVERY DETAILS</strong>
           <div>Name: ${escapeHtml(sale.deliveryInfo.name || 'N/A')}</div>
-          <div>Phone: ${escapeHtml(sale.deliveryInfo.phone || 'N/A')}</div>
+          <div>Phone: ${escapeHtml(sale.deliveryInfo.phone || 'N/A)}</div>
           <div>Address: ${escapeHtml(sale.deliveryInfo.address || 'N/A')}</div>`
       : '';
 

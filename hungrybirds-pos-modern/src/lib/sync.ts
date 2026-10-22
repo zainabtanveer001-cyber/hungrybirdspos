@@ -1,4 +1,5 @@
 import { db } from './db';
+import { configManager } from './config';
 import {
   cloudOrderToLocal, cloudSaleToLocal, decodeFields, documentId, encodeFields,
   localOrderPatch, toIso,
@@ -7,10 +8,6 @@ import type { Category, InventoryItem, MenuItem, OnlineOrder } from './db/types'
 
 // Firestore REST, same reasoning as auth.ts: the `firebase` package broke the
 // Vercel/Rolldown build, and polling a tiny metadata projection is cheap.
-const PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'hungry-birds-3e16f';
-const API_KEY = import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyAIibLNTusvBFOEcExpdb1tYQh_1rv2q7k';
-const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
-
 const TOKEN_KEY = 'hb.syncToken';
 const SNAPSHOT_KEY = 'sync.snapshot';
 const POLL_MS = 25_000;
@@ -43,7 +40,7 @@ export function getSyncStatus(): SyncStatus {
 }
 
 export function isSyncEnabled(): boolean {
-  return Boolean(localStorage.getItem(TOKEN_KEY));
+  return Boolean(localStorage.getItem(TOKEN_KEY)) && configManager.isConfigured();
 }
 
 /* ------------------------------------------------------------------- token */
@@ -81,7 +78,10 @@ async function accessToken(): Promise<string | null> {
   }
   if (token.expiresAt - 60_000 > Date.now()) return token.idToken;
 
-  const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${API_KEY}`, {
+  const config = await configManager.getConfig();
+  if (!config) return null;
+
+  const res = await fetch(`https://securetoken.googleapis.com/v1/token?key=${config.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: token.refreshToken }),
@@ -98,17 +98,30 @@ async function accessToken(): Promise<string | null> {
 
 /* -------------------------------------------------------------------- rest */
 
-function url(path: string, mask: string[] = []): string {
-  const query = new URLSearchParams({ key: API_KEY });
-  for (const field of mask) query.append('updateMask.fieldPaths', field);
-  return `${BASE}/${path}?${query}`;
+async function getBaseUrl(): Promise<string | null> {
+  const config = await configManager.getConfig();
+  if (!config) return null;
+  return `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents`;
 }
 
-async function rest(method: string, target: string, body?: unknown): Promise<any | null> {
+function url(path: string, mask: string[] = []): Promise<string | null> {
+  return (async () => {
+    const config = await configManager.getConfig();
+    const base = await getBaseUrl();
+    if (!config || !base) return null;
+    const query = new URLSearchParams({ key: config.apiKey });
+    for (const field of mask) query.append('updateMask.fieldPaths', field);
+    return `${base}/${path}?${query}`;
+  })();
+}
+
+async function rest(method: string, target: string | Promise<string | null>, body?: unknown): Promise<any | null> {
   const token = await accessToken();
   if (!token) return null;
+  const resolvedTarget = typeof target === 'string' ? target : await target;
+  if (!resolvedTarget) return null;
   try {
-    const res = await fetch(target, {
+    const res = await fetch(resolvedTarget, {
       method,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -155,7 +168,10 @@ async function getSnapshot(): Promise<Snapshot> {
 
 /** `{docId: updateTime}` for every doc — ~2–21 KB per collection. */
 async function metadata(collection: string): Promise<Record<string, string>> {
-  const rows = await rest('POST', `${BASE}:runQuery?key=${API_KEY}`, {
+  const config = await configManager.getConfig();
+  const base = await getBaseUrl();
+  if (!config || !base) return {};
+  const rows = await rest('POST', `${base}:runQuery?key=${config.apiKey}`, {
     structuredQuery: {
       from: [{ collectionId: collection }],
       select: { fields: [{ fieldPath: '___syncMeta' }] },
@@ -169,12 +185,15 @@ async function metadata(collection: string): Promise<Record<string, string>> {
 }
 
 async function listAll(collection: string): Promise<any[]> {
+  const config = await configManager.getConfig();
+  const base = await getBaseUrl();
+  if (!config || !base) return [];
   const docs: any[] = [];
   let pageToken = '';
   do {
-    const query = new URLSearchParams({ key: API_KEY, pageSize: '1000' });
+    const query = new URLSearchParams({ key: config.apiKey, pageSize: '1000' });
     if (pageToken) query.set('pageToken', pageToken);
-    const page = await rest('GET', `${BASE}/${collection}?${query}`);
+    const page = await rest('GET', `${base}/${collection}?${query}`);
     if (!page) break;
     docs.push(...(page.documents ?? []));
     pageToken = page.nextPageToken ?? '';
