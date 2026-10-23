@@ -148,7 +148,11 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                   <item.icon className="w-5 h-5 shrink-0" aria-hidden />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                   {!collapsed && !!item.badge && (
-                    <span className="ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                    <span className={`ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white ${
+                      item.label === 'Online orders' && item.badge > 0
+                        ? 'animate-pulse ring-2 ring-blue-400'
+                        : ''
+                    }`}>
                       {item.badge}
                     </span>
                   )}

@@ -36,6 +36,7 @@ import { ActivityLogModal } from './components/ActivityLogModal';
 import { PrinterSettingsModal } from './components/PrinterSettingsModal';
 import { AdminSettingsModal } from './components/AdminSettingsModal';
 import { OnlineOrdersModal } from './components/OnlineOrdersModal';
+import { useOrderAlert } from './hooks/useOrderAlert';
 import type { CartItem, CustomerInfo, MenuItem, OnlineOrder, PaymentDetail, Sale, User, UserRole } from './lib/db/types';
 
 type Session = { username: string; role: UserRole };
@@ -104,6 +105,8 @@ function App() {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
   }, []);
+
+  useOrderAlert(notify, onlineOrdersOpen);
 
   function pickItem(item: MenuItem) {
     if (item.modifierGroups?.length) {

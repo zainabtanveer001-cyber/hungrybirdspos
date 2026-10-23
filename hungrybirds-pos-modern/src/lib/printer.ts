@@ -1,5 +1,4 @@
 import { db } from './db';
-import { EscPosEncoder } from './escpos';
 
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
 export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
@@ -57,9 +56,9 @@ export function receiptFontClass(size: ReceiptFontSize): string {
 }
 
 /** Global reference to the paired Bluetooth device. */
-let activeDevice: BluetoothDevice | null = null;
+let activeDevice: any | null = null;
 
-export function setPrinterDevice(device: BluetoothDevice | null) {
+export function setPrinterDevice(device: any | null) {
   activeDevice = device;
 }
 
