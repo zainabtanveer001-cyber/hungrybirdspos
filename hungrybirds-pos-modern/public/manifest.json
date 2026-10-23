@@ -1,0 +1,16 @@
+{
+  "name": "Hungry Birds POS",
+  "short_name": "Hungry Birds POS",
+  "description": "Point of Sale for Hungry Birds Restaurant",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -3,7 +3,30 @@ import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 
 /**
- * Plays an alert sound and fires a toast when a new website order lands
+ * Plays a short beep using the Web Audio API — avoids CSP issues with
+ * external CDN audio URLs in production (Vercel sets default-src 'self').
+ */
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    gain.gain.value = 0.3;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // Web Audio API unavailable — silently skip
+  }
+}
+
+/**
+ * Plays an alert sound and fires a toast when a new order arrives
  * in the POS inbox — but only when the OnlineOrdersModal is not already open,
  * so accepting orders doesn't produce a cascade of alerts.
  */
@@ -14,7 +37,6 @@ export function useOrderAlert(notify: (message: string) => void, ordersModalOpen
   ) ?? 0;
 
   const prevCountRef = useRef(pendingCount);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const prev = prevCountRef.current;
@@ -22,13 +44,7 @@ export function useOrderAlert(notify: (message: string) => void, ordersModalOpen
 
     if (pendingCount > prev && !ordersModalOpen) {
       const newOrders = pendingCount - prev;
-      // Play alert sound (silent-fail on browsers that block autoplay)
-      if (!audioRef.current) {
-        audioRef.current = new Audio('https://assets.mixkit.co/sfx/2580/2580-signal.mp3');
-        audioRef.current.volume = 0.5;
-      }
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(() => {});
+      playBeep();
 
       notify(
         newOrders === 1
