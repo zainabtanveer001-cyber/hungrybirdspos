@@ -4,6 +4,7 @@ import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { logAudit } from '../lib/audit';
 import { restoreInventory } from '../lib/sales';
+import { deleteSale } from '../lib/sync';
 import { formatAmount } from '../lib/format';
 import { refundableTotal } from '../lib/refunds';
 import { printReceipt, shareReceipt } from '../lib/receipt';
@@ -69,6 +70,7 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
     });
     // Outside the transaction: Dexie forbids writing a table the rw scope doesn't include.
     for (const sale of voided) {
+      if (sale.cloudId) deleteSale(sale.cloudId);
       await logAudit('SALE_DELETE', `Order #${sale.id} deleted (${formatAmount(sale.total)})`, username, sale.id);
     }
     setSelected(new Set());
