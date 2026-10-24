@@ -14,9 +14,14 @@ service cloud.firestore {
             ];
         }
 
-        // Staff accounts have a profile doc keyed by their auth uid (see app.js createEmployee).
+        // Staff accounts have a profile doc keyed by their auth uid (see app.js createEmployee)
+        // carrying a role. Customer docs (loyalty tracking) never have one, and customers
+        // cannot write a role (see /users below), so they cannot become staff.
         function isStaff() {
-            return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+            return isSignedIn()
+                && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', null)
+                    in ['OWNER', 'MANAGER', 'CASHIER', 'WAITER'];
         }
 
         // The customer website needs to display the published POS menu.
@@ -34,7 +39,10 @@ service cloud.firestore {
         // Website orders require a signed-in customer; only staff can accept/reject/complete them.
         match /onlineOrders/{orderId} {
             allow create: if isSignedIn();
-            allow read: if isSignedIn();
+            // Tracking fetches one order by its ID (the ID is the secret), so `get` stays open to
+            // signed-in users; `list` (enumeration) is staff or the customer's own orders.
+            allow get: if isSignedIn();
+            allow list: if isStaff() || (isSignedIn() && resource.data.customerUid == request.auth.uid);
             allow update: if isStaff();
         }
 
@@ -58,7 +66,10 @@ service cloud.firestore {
         // Admin can look up/manage any profile; staff-provisioning writes go through the Owner Admin panel.
         match /users/{userId} {
             allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-            allow write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+            allow create: if isAdmin() || (isSignedIn() && request.auth.uid == userId && !('role' in request.resource.data));
+            allow update: if isAdmin() || (isSignedIn() && request.auth.uid == userId
+                && request.resource.data.get('role', null) == resource.data.get('role', null));
+            allow delete: if isAdmin();
         }
 
         // Coupons: admins manage promo codes; customers can only self-issue/consume

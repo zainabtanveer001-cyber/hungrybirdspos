@@ -2,3 +2,8 @@ node_modules/
 dist/
 coverage/
 *.min.js
+
+# Legacy vanilla-JS app (superseded by hungrybirds-pos-modern)
+app.js
+db.js
+sw.js

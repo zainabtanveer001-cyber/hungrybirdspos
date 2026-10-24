@@ -11,10 +11,25 @@ import type { User, UserRole } from './db/types';
 const AUTH_EMAIL_DOMAIN = 'hungrybirds-pos.local';
 
 
+const ROLES: UserRole[] = ['OWNER', 'MANAGER', 'CASHIER', 'WAITER'];
+
 export const SESSION_KEY = 'loggedUser';
 
 export function normalizeUsername(value: string): string {
   return String(value || '').trim().toLowerCase();
+}
+
+/** Network/server failure: the only case where the local accounts may stand in for the cloud. */
+class OfflineError extends Error {}
+
+async function cloudFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(6000) });
+    if (res.status >= 500) throw new OfflineError('Cloud unavailable.');
+    return res;
+  } catch (err) {
+    throw err instanceof OfflineError ? err : new OfflineError('Cloud unreachable. Check your connection.');
+  }
 }
 
 type FirestoreDoc = Record<string, any> | null;
@@ -23,9 +38,9 @@ async function firestoreGet(path: string, idToken?: string): Promise<FirestoreDo
   const config = await configManager.getConfig();
   if (!config) return null;
 
-  const res = await fetch(
+  const res = await cloudFetch(
     `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${path}?key=${config.apiKey}`,
-    { headers: idToken ? { Authorization: `Bearer ${idToken}` } : {}, signal: AbortSignal.timeout(6000) },
+    { headers: idToken ? { Authorization: `Bearer ${idToken}` } : {} },
   );
   if (!res.ok) return null;
   const fields = (await res.json()).fields ?? {};
@@ -40,11 +55,10 @@ async function firebaseSignIn(
   const config = await configManager.getConfig();
   if (!config) throw new Error('Cloud not configured. Please run Setup Wizard.');
 
-  const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${config.apiKey}`, {
+  const res = await cloudFetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${config.apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password, returnSecureToken: true }),
-    signal: AbortSignal.timeout(6000),
   });
   if (!res.ok) {
     const { error } = await res.json().catch(() => ({ error: {} }));
@@ -121,10 +135,13 @@ async function cloudSignIn(input: string, password: string): Promise<User> {
   const profile = (await firestoreGet(`users/${uid}`, idToken)) ?? {};
   if (profile.active === false) throw new Error('This account is disabled. Contact the Owner.');
 
+  // Customer accounts sign in to the same Firebase project but have no staff role.
+  if (!ROLES.includes(profile.role as UserRole)) throw new Error('This account does not have POS access.');
+
   const username = (profile.username as string) ?? input.split('@')[0];
   const user: User = {
     username,
-    role: (profile.role as UserRole) ?? 'WAITER',
+    role: profile.role as UserRole,
     active: true,
   };
   const existing = await db.users.where('username').equals(username).first();
@@ -140,23 +157,20 @@ async function cloudSignIn(input: string, password: string): Promise<User> {
 export async function signIn(username: string, password: string): Promise<User> {
   const normalized = normalizeUsername(username);
 
-  let cloudError: unknown = null;
   try {
     const user = await cloudSignIn(normalized, password);
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
     return user;
   } catch (err) {
-    // Fall through to the local DB so the app still works offline, but keep
-    // the cloud's message so a rejected password isn't reported as a missing user.
-    cloudError = err;
+    // A definitive cloud answer (wrong password, unknown/disabled user) must not be
+    // overridden by the seeded local accounts; only an unreachable cloud may.
+    if (!(err instanceof OfflineError)) throw err;
   }
 
   const user = await db.users.where('username').equals(normalized).first();
-  if (!user) throw cloudError instanceof Error ? cloudError : new Error('Username not found.');
+  if (!user) throw new Error('Cloud unreachable and no local account for this username.');
   if (user.active === false) throw new Error('This account is disabled. Contact the Owner.');
-  const enteredHash = await sha256(password);
-  if (!user.passwordHash || user.passwordHash !== enteredHash)
-    throw cloudError instanceof Error ? cloudError : new Error('Incorrect password.');
+  if (!user.passwordHash || user.passwordHash !== (await sha256(password))) throw new Error('Incorrect password.');
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
   return user;
 }

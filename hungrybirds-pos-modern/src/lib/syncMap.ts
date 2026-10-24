@@ -65,7 +65,7 @@ export function stampMs(value: unknown): number {
 const CLOUD_TIMESTAMP: Partial<Record<OnlineOrderStatus, [keyof OnlineOrder, string]>> = {
   ACCEPTED: ['acceptedAt', 'acceptedAt'],
   PREPARING: ['preparingAt', 'preparingAt'],
-  OUT_FOR_DELIVERY: ['dispatchedAt', 'out_for_deliveryat'],
+  OUT_FOR_DELIVERY: ['dispatchedAt', 'out_for_deliveryAt'],
   COMPLETED: ['completedAt', 'completedAt'],
   REJECTED: ['rejectedAt', 'rejectedAt'],
 };

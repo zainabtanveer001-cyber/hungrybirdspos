@@ -2,27 +2,35 @@ import { useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 
-/**
- * Plays a short beep using the Web Audio API — avoids CSP issues with
- * external CDN audio URLs in production (Vercel sets default-src 'self').
- */
-function playBeep() {
+let audioCtx: AudioContext | null = null;
+
+function getAudio(): AudioContext | null {
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.value = 880;
-    gain.gain.value = 0.3;
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-    osc.stop(ctx.currentTime + 0.3);
+    audioCtx ??= new (window.AudioContext || (window as any).webkitAudioContext)();
+    return audioCtx;
   } catch {
-    // Web Audio API unavailable — silently skip
+    return null;
   }
+}
+
+// Browsers keep audio suspended until a user gesture; unlock it on the first one.
+for (const evt of ['pointerdown', 'keydown'] as const)
+  window.addEventListener(evt, () => void getAudio()?.resume(), { once: true });
+
+// Web Audio (not an external mp3) so Vercel's default-src 'self' CSP doesn't block it.
+function playBeep() {
+  const ctx = getAudio();
+  if (!ctx) return;
+  void ctx.resume();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.frequency.value = 880;
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0.3, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+  osc.start();
+  osc.stop(ctx.currentTime + 0.3);
 }
 
 /**
@@ -31,21 +39,19 @@ function playBeep() {
  * so accepting orders doesn't produce a cascade of alerts.
  */
 export function useOrderAlert(notify: (message: string) => void, ordersModalOpen: boolean) {
-  const pendingCount = useLive(
-    () => db.onlineOrders.where('status').equals('PENDING').count(),
-    [],
-  ) ?? 0;
+  const pendingCount = useLive(() => db.onlineOrders.where('status').equals('PENDING').count(), []);
 
-  const prevCountRef = useRef(pendingCount);
+  // null until the first real count arrives, so existing orders don't alert on load.
+  const prevCountRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (pendingCount === undefined) return;
     const prev = prevCountRef.current;
     prevCountRef.current = pendingCount;
 
-    if (pendingCount > prev && !ordersModalOpen) {
+    if (prev !== null && pendingCount > prev && !ordersModalOpen) {
       const newOrders = pendingCount - prev;
       playBeep();
-
       notify(
         newOrders === 1
           ? '🔔 New website order received!'
