@@ -240,7 +240,7 @@ function App() {
             <Menu className="w-5 h-5" aria-hidden />
           </button>
           <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-            <span className="text-2xl text-indigo-600 font-black">HB</span>
+            <img src="/logo.svg" alt="" className="w-9 h-9" />
             <span className="text-gray-900">Hungry Birds</span>
           </h1>
           <span className="text-[10px] px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 font-bold uppercase tracking-widest text-blue-700">

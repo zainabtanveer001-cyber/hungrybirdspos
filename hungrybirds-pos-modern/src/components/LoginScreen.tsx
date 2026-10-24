@@ -25,7 +25,7 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (user: User) => void }
     <div className="fixed inset-0 bg-gray-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white/95 backdrop-blur-sm rounded-3xl p-8 sm:p-10 w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
         <div className="flex justify-center mb-4">
-          <span className="text-4xl text-indigo-600 font-black">HB</span>
+          <img src="/logo.svg" alt="" className="w-16 h-16" />
         </div>
         <h2 className="text-3xl font-black mb-1 text-center text-gray-900 tracking-tight">Hungry Birds</h2>
         <p className="text-sm text-center text-indigo-600 font-medium mb-8 uppercase tracking-widest">
