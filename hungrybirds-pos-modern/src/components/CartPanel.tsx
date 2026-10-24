@@ -42,7 +42,7 @@ export function CartPanel({
               type="button"
               onClick={() => onChange({ ...charges, orderType: t.value, deliveryCharge: t.value === 'DELIVERY' ? deliveryCharge : 0 })}
               aria-pressed={orderType === t.value}
-              className={`px-3 sm:px-4 py-2 rounded-xl whitespace-nowrap transition-all duration-300 ${
+              className={`px-3 sm:px-4 py-2 min-h-11 rounded-xl whitespace-nowrap transition-all duration-300 ${
                 orderType === t.value
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-white hover:shadow-sm hover:text-indigo-600'
@@ -75,7 +75,7 @@ export function CartPanel({
             step={0.01}
             value={deliveryCharge || 0}
             onChange={(e) => onChange({ ...charges, deliveryCharge: Math.max(0, Number(e.target.value) || 0) })}
-            className="w-full p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-sm font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full p-2.5 min-h-11 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-sm font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       )}
@@ -150,7 +150,7 @@ export function CartPanel({
               onChange={(e) =>
                 onChange({ ...charges, discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) })
               }
-              className="w-16 p-1.5 text-right font-black text-sm border-0 rounded-lg focus:outline-none text-amber-900 bg-transparent"
+              className="w-16 p-1.5 min-h-11 text-right font-black text-sm border-0 rounded-lg focus:outline-none text-amber-900 bg-transparent"
             />
             <span className="text-sm font-black text-amber-900 pr-2">%</span>
           </div>

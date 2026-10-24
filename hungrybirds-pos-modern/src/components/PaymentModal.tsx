@@ -13,6 +13,7 @@ export function PaymentModal({ total, onCancel, onConfirm }: {
   const [method, setMethod] = useState<PaymentMethod>('Cash');
   const [cashGiven, setCashGiven] = useState<number>(total);
   const change = Math.max(0, cashGiven - total);
+  const short = method === 'Cash' && cashGiven < total;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
@@ -62,8 +63,10 @@ export function PaymentModal({ total, onCancel, onConfirm }: {
                 className="w-full p-3 text-right font-black text-lg border-0 ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <div className="flex justify-between text-sm font-bold">
-                <span className="text-gray-500">Change:</span>
-                <span className={change > 0 ? 'text-emerald-600' : 'text-gray-400'}>{formatAmount(change)}</span>
+                <span className="text-gray-500">{short ? 'Still owed:' : 'Change:'}</span>
+                <span className={short ? 'text-red-600' : change > 0 ? 'text-emerald-600' : 'text-gray-400'}>
+                  {formatAmount(short ? total - cashGiven : change)}
+                </span>
               </div>
             </div>
           )}
@@ -79,6 +82,7 @@ export function PaymentModal({ total, onCancel, onConfirm }: {
           </button>
           <button
             type="button"
+            disabled={short}
             onClick={() =>
               onConfirm([
                 method === 'Cash'
@@ -86,7 +90,7 @@ export function PaymentModal({ total, onCancel, onConfirm }: {
                   : { method, amount: total },
               ])
             }
-            className="flex-2 basis-2/3 py-3 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition"
+            className="flex-2 basis-2/3 py-3 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Complete Sale
           </button>

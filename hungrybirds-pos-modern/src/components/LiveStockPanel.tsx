@@ -49,7 +49,7 @@ export function LiveStockPanel({ canManage, username, onManage }: {
               <button
                 type="button"
                 onClick={onManage}
-                className="text-[10px] text-amber-700 bg-amber-100/50 hover:bg-amber-100 px-2 py-1 rounded-lg font-bold ring-1 ring-amber-200/50"
+                className="text-[10px] text-amber-700 bg-amber-100/50 hover:bg-amber-100 px-3 min-h-11 rounded-lg font-bold ring-1 ring-amber-200/50"
               >
                 Manage
               </button>
@@ -64,7 +64,7 @@ export function LiveStockPanel({ canManage, username, onManage }: {
             <button
               type="button"
               onClick={() => setPrompting(true)}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-300"
+              className="bg-gray-200 text-gray-800 px-4 py-2 min-h-11 rounded-xl text-xs font-bold hover:bg-gray-300"
             >
               Authenticate to View
             </button>
@@ -91,14 +91,14 @@ export function LiveStockPanel({ canManage, username, onManage }: {
                     <button
                       type="button"
                       onClick={() => bump(item, 1)}
-                      className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-1 rounded hover:bg-emerald-200 flex items-center gap-0.5"
+                      className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-emerald-200 flex items-center gap-0.5"
                     >
                       <Plus className="w-3 h-3" aria-hidden />1
                     </button>
                     <button
                       type="button"
                       onClick={() => bump(item, -1)}
-                      className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-1 rounded hover:bg-red-200 flex items-center gap-0.5"
+                      className="bg-red-100 text-red-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-red-200 flex items-center gap-0.5"
                     >
                       <Minus className="w-3 h-3" aria-hidden />1
                     </button>

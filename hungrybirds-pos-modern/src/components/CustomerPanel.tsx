@@ -67,7 +67,7 @@ export function CustomerPanel({ orderType, customer, loyaltyBalance, loyaltyPoin
             onChange({});
             onRedeem(0);
           }}
-          className={`hover:text-red-500 text-[10px] uppercase tracking-wider bg-gray-100 px-2 py-1 rounded-lg border border-gray-200 flex items-center gap-1 ${clear}`}
+          className={`hover:text-red-500 text-[10px] uppercase tracking-wider bg-gray-100 px-3 min-h-11 rounded-lg border border-gray-200 flex items-center gap-1 ${clear}`}
         >
           <X className="w-3 h-3" aria-hidden /> Clear
         </button>
@@ -80,7 +80,7 @@ export function CustomerPanel({ orderType, customer, loyaltyBalance, loyaltyPoin
           onChange={(e) => onChange({ ...customer, phone: e.target.value })}
           placeholder="Phone Number"
           aria-label="Customer phone"
-          className={`w-full p-2.5 border-0 ring-1 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 ${field}`}
+          className={`w-full p-2.5 min-h-11 border-0 ring-1 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 ${field}`}
         />
         <input
           type="text"
@@ -88,7 +88,7 @@ export function CustomerPanel({ orderType, customer, loyaltyBalance, loyaltyPoin
           onChange={(e) => onChange({ ...customer, name: e.target.value })}
           placeholder="Customer Name"
           aria-label="Customer name"
-          className={`w-full p-2.5 border-0 ring-1 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 ${field}`}
+          className={`w-full p-2.5 min-h-11 border-0 ring-1 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 ${field}`}
         />
       </div>
 
@@ -99,7 +99,7 @@ export function CustomerPanel({ orderType, customer, loyaltyBalance, loyaltyPoin
           onChange={(e) => onChange({ ...customer, address: e.target.value })}
           placeholder="Delivery Address / Landmark"
           aria-label="Delivery address"
-          className="w-full p-2.5 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full p-2.5 min-h-11 border-0 ring-1 ring-blue-200 rounded-xl bg-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       )}
 

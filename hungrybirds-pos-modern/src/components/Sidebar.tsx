@@ -114,7 +114,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
             if (window.matchMedia('(min-width: 1024px)').matches) setCollapsed((c) => !c);
             else onClose();
           }}
-          className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition"
+          className="w-11 h-11 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -165,7 +165,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
 
       {!collapsed && (
         <div className="mx-2 mt-4 border-t border-gray-200 pt-3 text-[11px] leading-relaxed text-gray-500">
-          <button type="button" onClick={onSignOut} className="block font-semibold text-gray-600 hover:text-red-600">
+          <button type="button" onClick={onSignOut} className="block font-semibold text-gray-600 hover:text-red-600 min-h-11 px-2">
             Hungry Birds POS
           </button>
           <span>
