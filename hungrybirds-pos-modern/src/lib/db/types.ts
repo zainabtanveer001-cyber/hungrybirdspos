@@ -256,6 +256,24 @@ export interface Customer {
   updatedAt: string;
 }
 
+export interface LoyaltyReward {
+  id?: number;
+  name: string;
+  description: string;
+  pointsRequired: number;
+  discountAmount?: number;
+  discountPercent?: number;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LoyaltySettings {
+  earnRate: number;
+  key?: string;
+  value: string;
+}
+
 export interface Waiter {
   id: string;
   name: string;

@@ -6,6 +6,7 @@ import type {
   KitchenOrder, User, Setting, Delivery, Expense, AuditLog,
   StaffMember, Attendance, Leave, SalaryPayment, AdvancePayment,
   StockIn, SupplierPayment, SupplierLedger, OnlineOrder,
+  LoyaltyReward,
 } from './types';
 
 /**
@@ -34,6 +35,7 @@ export class HungryBirdsDB extends Dexie {
 
   // Customers & Users
   customers!: Table<Customer, string>;
+  loyaltyRewards!: Table<LoyaltyReward, number>;
   waiters!: Table<Waiter, string>;
   users!: Table<User, number>;
   settings!: Table<Setting, string>;
@@ -100,6 +102,10 @@ export class HungryBirdsDB extends Dexie {
       onlineOrders: '++id, createdAt, status, orderType, cloudId',
     });
 
+    this.version(24).stores({
+      loyaltyRewards: '++id, pointsRequired, active',
+    });
+
     // Timestamp hooks (port of app.js lines 302-325)
     // NB: 'creating' hooks must not return a value — Dexie treats the return
     // value as a primary-key override, which throws DataError on auto-increment tables.
@@ -132,6 +138,15 @@ export class HungryBirdsDB extends Dexie {
 
     this.categories.hook('updating', (_updates) => {
       (_updates as any).updatedAt = new Date().toISOString();
+    });
+
+    this.loyaltyRewards.hook('creating', (_primKey, obj: any) => {
+      obj.createdAt = new Date().toISOString();
+      obj.updatedAt = new Date().toISOString();
+    });
+
+    this.loyaltyRewards.hook('updating', (_updates: any) => {
+      _updates.updatedAt = new Date().toISOString();
     });
 
     this.onlineOrders.hook('updating', (_updates) => {

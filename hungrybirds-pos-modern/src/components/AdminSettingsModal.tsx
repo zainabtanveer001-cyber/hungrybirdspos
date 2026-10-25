@@ -10,6 +10,7 @@ import { downloadJson } from '../lib/export';
 import { Modal } from './Modal';
 import { CloudSetupModal } from './CloudSetupModal';
 import { StaffAccountsSection } from './StaffAccountsSection';
+import { LoyaltyRewardsSection } from './LoyaltyRewardsSection';
 import { readSession } from '../lib/auth';
 import type { Category, MenuItem, Recipe } from '../lib/db/types';
 
@@ -303,6 +304,13 @@ export function AdminSettingsModal({ username, notify, onClose }: {
         </section>
 
         {readSession()?.role === 'OWNER' && <StaffAccountsSection username={username} notify={notify} />}
+
+        {readSession()?.role === 'OWNER' && (
+          <section className="space-y-3">
+            <h3 className="text-xs font-black uppercase tracking-wider text-gray-700">Loyalty Rewards</h3>
+            <LoyaltyRewardsSection username={username} notify={notify} />
+          </section>
+        )}
 
         <section className="space-y-2">
           <div className="relative">

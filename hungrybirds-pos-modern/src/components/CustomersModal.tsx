@@ -21,7 +21,7 @@ export function CustomersModal({ onClose }: { onClose: () => void }) {
   return (
     <Modal title={selected ? 'Customer History' : 'Customer CRM'} onClose={onClose} wide>
       {selected ? (
-        <CustomerHistory customer={selected} onBack={() => setSelected(null)} />
+        <CustomerHistory customer={selected} onBack={() => setSelected(null)} onUpdate={(c) => setSelected(c)} />
       ) : (
         <div className="space-y-3">
           <div className="relative">
@@ -71,7 +71,7 @@ export function CustomersModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-function CustomerHistory({ customer, onBack }: { customer: Customer; onBack: () => void }) {
+function CustomerHistory({ customer, onBack, onUpdate }: { customer: Customer; onBack: () => void; onUpdate: (c: Customer) => void }) {
   const sales = useLive(() => db.sales.toArray(), []) ?? [];
 
   const orders = useMemo(
@@ -88,10 +88,25 @@ function CustomerHistory({ customer, onBack }: { customer: Customer; onBack: () 
         <ChevronLeft className="w-3.5 h-3.5" aria-hidden /> Back to customer list
       </button>
 
-      <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl">
-        <p className="font-bold text-sm text-gray-800">{customer.name || 'Unnamed Customer'}</p>
+      <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={customer.name || ''}
+            onChange={(e) => onUpdate({ ...customer, name: e.target.value })}
+            placeholder="Customer name"
+            className="flex-1 p-1.5 text-sm border-0 ring-1 ring-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-9"
+          />
+          <button
+            type="button"
+            onClick={() => onUpdate({ ...customer, name: customer.name || '' })}
+            className="text-[10px] px-2 py-1 bg-purple-100 text-purple-800 rounded-lg min-h-9"
+          >
+            Save
+          </button>
+        </div>
         <p className="text-xs text-gray-600">{customer.phone}</p>
-        <div className="flex gap-4 mt-2 text-xs">
+        <div className="flex gap-4 mt-1 text-xs">
           <span>
             <strong className="text-purple-700">{customer.totalOrders || 0}</strong> orders
           </span>
