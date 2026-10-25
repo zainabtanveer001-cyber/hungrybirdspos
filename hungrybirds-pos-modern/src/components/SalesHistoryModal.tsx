@@ -84,7 +84,8 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
 
   async function print(sale: Sale) {
     try {
-      await printReceipt(sale);
+      const how = await printReceipt(sale);
+      if (how === 'browser') notify('Printer unavailable — printing from the browser instead.');
     } catch (err) {
       notify((err as Error).message);
     }

@@ -9,6 +9,8 @@ import { collectBackup, importBackup } from '../lib/backup';
 import { downloadJson } from '../lib/export';
 import { Modal } from './Modal';
 import { CloudSetupModal } from './CloudSetupModal';
+import { StaffAccountsSection } from './StaffAccountsSection';
+import { readSession } from '../lib/auth';
 import type { Category, MenuItem, Recipe } from '../lib/db/types';
 
 const INPUT = 'p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-w-0';
@@ -299,6 +301,8 @@ export function AdminSettingsModal({ username, notify, onClose }: {
             </button>
           </div>
         </section>
+
+        {readSession()?.role === 'OWNER' && <StaffAccountsSection username={username} notify={notify} />}
 
         <section className="space-y-2">
           <div className="relative">

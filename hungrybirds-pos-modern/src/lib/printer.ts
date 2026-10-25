@@ -67,7 +67,8 @@ export function getPrinterDevice() {
 }
 
 /**
- * Sends raw bytes to the paired Bluetooth printer.
+ * Sends raw bytes to the paired Bluetooth printer. Chunks stay within the
+ * negotiated MTU; many thermal printers reject the BLE default of 20 bytes.
  */
 export async function printRaw(bytes: Uint8Array): Promise<void> {
   const device = activeDevice;
@@ -80,7 +81,8 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
     const service = await server.getPrimaryService(PRINTER_SERVICE);
     const characteristic = await service.getCharacteristic(PRINTER_CHARACTERISTIC);
 
-    const CHUNK_SIZE = 20;
+    const mtu = (device as { gatt?: { mtu?: number } }).gatt?.mtu ?? 512;
+    const CHUNK_SIZE = Math.min(182, Math.max(20, mtu - 3));
     const write = characteristic.writeValueWithoutResponse?.bind(characteristic) ?? characteristic.writeValue.bind(characteristic);
     for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
       await write(bytes.slice(i, i + CHUNK_SIZE));

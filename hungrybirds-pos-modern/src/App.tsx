@@ -210,11 +210,14 @@ function App() {
       getPrinterSettings().then((printer) => {
         if (!printer.autoPrint) return;
         setTimeout(() => {
-          try {
-            void printReceipt(sale);
-          } catch (e) {
-            console.error('Print receipt failed', e);
-          }
+          printReceipt(sale)
+            .then((how) => {
+              if (how === 'browser') notify('Printer unavailable — printing from the browser instead.');
+            })
+            .catch((e) => {
+              console.error('Print receipt failed', e);
+              notify('Printing failed. Sale was still recorded.');
+            });
         }, 300);
       });
     } catch (err) {

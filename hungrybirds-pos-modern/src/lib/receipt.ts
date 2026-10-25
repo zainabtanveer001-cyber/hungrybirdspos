@@ -136,16 +136,18 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
 }
 
 /**
- * Prints through a hidden iframe: the POS tab keeps its cart and open modals,
- * unlike a new window.
+ * Prints to the paired thermal printer, else to the browser's print dialog
+ * via a hidden iframe (the POS tab keeps its cart and open modals, unlike a
+ * new window). Returns how the receipt was printed so the caller can warn
+ * when the thermal printer was not used.
  */
-export async function printReceipt(sale: Sale): Promise<void> {
+export async function printReceipt(sale: Sale): Promise<'thermal' | 'browser'> {
   const settings = await getPrinterSettings();
 
   try {
     const bytes = generateEscPosReceipt(sale, settings);
     await printRaw(bytes);
-    return;
+    return 'thermal';
   } catch (e) {
     console.warn('Bluetooth print failed, falling back to browser print:', e);
   }
@@ -170,7 +172,7 @@ export async function printReceipt(sale: Sale): Promise<void> {
   win.addEventListener('afterprint', cleanUp, { once: true });
   win.focus();
   win.print();
-  cleanUp();
+  return 'browser';
 }
 
 /** Native share sheet on mobile, WhatsApp web otherwise. */

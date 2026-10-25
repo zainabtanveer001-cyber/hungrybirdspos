@@ -45,6 +45,11 @@ export function isSyncEnabled(): boolean {
 
 /* ------------------------------------------------------------------- token */
 
+/** Caller's cloud id token, refreshed when needed; null when offline/local. */
+export function getAccessToken(): Promise<string | null> {
+  return accessToken();
+}
+
 interface Token {
   idToken: string;
   refreshToken: string;
@@ -137,6 +142,11 @@ async function rest(method: string, target: string | Promise<string | null>, bod
     setStatus({ state: 'error', error: err instanceof Error ? err.message : 'network error' });
     return null;
   }
+}
+
+/** Authenticated Firestore REST call for one-off writes outside the sync queue. */
+export function restWrite(method: string, target: string, body?: unknown): Promise<any | null> {
+  return rest(method, target, body);
 }
 
 /* ---------------------------------------------------------------- snapshot */

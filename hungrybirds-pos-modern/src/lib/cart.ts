@@ -1,5 +1,5 @@
 import type { CartItem, MenuItem, ModifierSelection, OrderType } from './db/types';
-import { normalizeCharge } from './format';
+import { normalizeCharge, roundAmount } from './format';
 
 export const LOYALTY_POINT_VALUE = 1;
 
@@ -36,7 +36,7 @@ export function calculateCartTotals(items: CartItem[], charges: CartCharges): Ca
     (Number(charges.loyaltyPoints) || 0) * LOYALTY_POINT_VALUE,
     Math.max(0, subtotal - discountAmount),
   );
-  const grandTotal = Math.max(0, taxableAmount + taxAmount - loyaltyDiscount);
+  const grandTotal = roundAmount(Math.max(0, taxableAmount + taxAmount - loyaltyDiscount));
 
   return { subtotal, discountAmount, deliveryCharge, packingCharge, otherCharge, taxAmount, loyaltyDiscount, grandTotal };
 }
