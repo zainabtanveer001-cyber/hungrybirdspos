@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { db } from '../lib/db';
+import { useLive } from '../lib/useLive';
 import { getAnalytics, getPeriodSummary } from '../lib/analytics';
 import type { AnalyticsReport, Period } from '../lib/analytics';
 import { formatAmount } from '../lib/format';
@@ -12,12 +14,14 @@ const PERIODS: Array<{ key: Period; label: string }> = [
 
 export function SalesAnalyticsModal({ onClose }: { onClose: () => void }) {
   const [period, setPeriod] = useState<Period>('week');
+  const [category, setCategory] = useState<string>('');
   const [report, setReport] = useState<AnalyticsReport | null>(null);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getPeriodSummary>> | null>(null);
+  const categories = useLive(() => db.categories.toArray(), []) ?? [];
 
   useEffect(() => {
     let active = true;
-    Promise.all([getAnalytics(period), getPeriodSummary()]).then(([nextReport, nextSummary]) => {
+    Promise.all([getAnalytics(period, category || undefined), getPeriodSummary()]).then(([nextReport, nextSummary]) => {
       if (!active) return;
       setReport(nextReport);
       setSummary(nextSummary);
@@ -25,7 +29,7 @@ export function SalesAnalyticsModal({ onClose }: { onClose: () => void }) {
     return () => {
       active = false;
     };
-  }, [period]);
+  }, [period, category]);
 
   return (
     <Modal title="Sales Analytics" onClose={onClose} wide>
@@ -63,6 +67,17 @@ export function SalesAnalyticsModal({ onClose }: { onClose: () => void }) {
               {label}
             </button>
           ))}
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            aria-label="Filter by category"
+            className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          >
+            <option value="">All categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
         </div>
 
         <section className="p-3 bg-white rounded-2xl border border-gray-100 shadow-sm">

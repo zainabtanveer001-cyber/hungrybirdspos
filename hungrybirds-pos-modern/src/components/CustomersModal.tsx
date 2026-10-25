@@ -9,14 +9,19 @@ import type { Customer } from '../lib/db/types';
 export function CustomersModal({ onClose }: { onClose: () => void }) {
   const customers = useLive(() => db.customers.toArray(), []) ?? [];
   const [search, setSearch] = useState('');
+  const [sortOrders, setSortOrders] = useState<'asc' | 'desc' | null>(null);
   const [selected, setSelected] = useState<Customer | null>(null);
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
-    return customers
+    let list = customers
       .filter((c) => !query || c.name.toLowerCase().includes(query) || c.phone.includes(query))
       .sort((a, b) => (b.lastVisit || '').localeCompare(a.lastVisit || ''));
-  }, [customers, search]);
+    if (sortOrders) {
+      list.sort((a, b) => sortOrders === 'asc' ? a.totalOrders - b.totalOrders : b.totalOrders - a.totalOrders);
+    }
+    return list;
+  }, [customers, search, sortOrders]);
 
   return (
     <Modal title={selected ? 'Customer History' : 'Customer CRM'} onClose={onClose} wide>
@@ -36,6 +41,40 @@ export function CustomersModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-gray-500">Sort by orders:</span>
+            <button
+              type="button"
+              onClick={() => setSortOrders(sortOrders === 'asc' ? null : 'asc')}
+              className={`px-2 py-1 rounded-lg border text-xs font-semibold ${
+                sortOrders === 'asc'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              ▲
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortOrders(sortOrders === 'desc' ? null : 'desc')}
+              className={`px-2 py-1 rounded-lg border text-xs font-semibold ${
+                sortOrders === 'desc'
+                  ? 'bg-purple-600 text-white border-purple-600'
+                  : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              ▼
+            </button>
+            {sortOrders === null && (
+              <button
+                type="button"
+                onClick={() => setSortOrders(null)}
+                className="text-[10px] text-gray-400 hover:text-gray-600 underline"
+              >
+                Reset
+              </button>
+            )}
+          </div>
           {filtered.length === 0 ? (
             <p className="text-gray-400 text-xs text-center py-6">
               No customers found. Enter a customer phone during checkout to save them here.

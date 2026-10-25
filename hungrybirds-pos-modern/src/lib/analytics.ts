@@ -126,8 +126,8 @@ export interface AnalyticsReport {
   topCustomers: Ranking[];
 }
 
-export async function getAnalytics(period: Period): Promise<AnalyticsReport> {
-  const [sales, customers] = await Promise.all([db.sales.toArray(), db.customers.toArray()]);
+export async function getAnalytics(period: Period, categoryId?: string): Promise<AnalyticsReport> {
+  const [sales, customers, menu] = await Promise.all([db.sales.toArray(), db.customers.toArray(), db.menu.toArray()]);
   const { buckets, caption } = getBuckets(period);
   const from = buckets[0].start;
   const to = buckets[buckets.length - 1].end;
@@ -139,6 +139,7 @@ export async function getAnalytics(period: Period): Promise<AnalyticsReport> {
   const items = new Map<string, Ranking>();
   const people = new Map<string, Ranking>();
   const profiles = new Map(customers.map((c) => [c.phone || c.id, c.name]));
+  const categoryByItem = new Map(menu.map((m) => [m.id, m.categoryId]));
 
   for (const sale of inPeriod) {
     const at = new Date(sale.timestamp).getTime();
@@ -151,6 +152,7 @@ export async function getAnalytics(period: Period): Promise<AnalyticsReport> {
     for (const item of sale.items || []) {
       const qty = Number(item.qty) || 0;
       if (qty <= 0) continue;
+      if (categoryId !== undefined && categoryByItem.get(item.menuItemId) !== categoryId) continue;
       const name = item.name || 'Unnamed item';
       const row = items.get(name) || { name, metric: 0, detail: 0 };
       row.metric += qty;
