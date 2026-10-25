@@ -1,6 +1,6 @@
 import { configManager } from './config';
 import { normalizeUsername } from './auth';
-import { getAccessToken, restWrite } from './sync';
+import { getAccessToken, rememberToken, restWrite } from './sync';
 import type { UserRole } from './db/types';
 
 /**
@@ -139,4 +139,85 @@ export async function setStaffActive(account: StaffAccount, active: boolean): Pr
 /** True when the signed-in session carries a cloud token, which staff actions need. */
 export function cloudSessionAvailable(): boolean {
   return getAccessToken() !== null;
+}
+
+/* --------------------------------------------------------- first-run owner */
+
+/**
+ * One-time bootstrap: sign in (or create) the Firebase auth account whose
+ * email is on the admin allowlist in the Firestore rules, then write the
+ * OWNER profile and username-directory entry. Only the allowlisted admin
+ * email may attach a role, so this is the first-run path and fails loudly for
+ * anyone who is not the project admin. Returns the signed-in identity.
+ */
+export async function bootstrapOwnerAccount(input: {
+  adminEmail: string;
+  displayName: string;
+  username: string;
+  password: string;
+}): Promise<{ uid: string; idToken: string }> {
+  const username = normalizeUsername(input.username);
+  const adminEmail = input.adminEmail.trim().toLowerCase();
+  if (!adminEmail.includes('@')) throw new Error('Enter the admin email listed in the Firestore rules.');
+  if (!input.displayName.trim()) throw new Error('Enter a display name.');
+  if (!USERNAME_RE.test(username)) throw new Error('Username may only use lowercase letters, numbers, dots, underscores and hyphens.');
+  if (input.password.length < 6) throw new Error('Password must be at least 6 characters.');
+
+  const existing = await directoryGet(username);
+  if (existing && Object.keys(existing).length > 0) throw new Error('That username is already in use.');
+
+  const { key } = await firestoreBase();
+
+  // Try to create the admin auth account; if it already exists, sign in.
+  let uid: string;
+  let idToken: string;
+  let refreshToken: string | undefined;
+  let expiresIn: string | undefined;
+  const body = JSON.stringify({ email: adminEmail, password: input.password, returnSecureToken: true });
+  const signUp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${key}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(8000),
+  });
+  if (signUp.ok) {
+    ({ localId: uid, idToken, refreshToken, expiresIn } = await signUp.json());
+  } else {
+    const { error } = await signUp.json().catch(() => ({ error: {} }));
+    if (error?.message !== 'EMAIL_EXISTS') throw new Error('Could not create the account. Check your connection.');
+    const signIn = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: AbortSignal.timeout(8000),
+    });
+    if (!signIn.ok) throw new Error('That admin email already exists and the password is wrong.');
+    ({ localId: uid, idToken, refreshToken, expiresIn } = await signIn.json());
+  }
+
+  // Use THIS account's token — the Firestore rules only allow an admin email
+  // to attach a role, and a self-create may not carry one.
+  const { base } = await firestoreBase();
+  const authz = { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' };
+  const write = async (path: string, fields: Record<string, unknown>, mask?: string) => {
+    const res = await fetch(`${base}/${path}${mask ? `?${mask}&` : '?'}key=${key}`, {
+      method: 'PATCH',
+      headers: authz,
+      body: JSON.stringify({ fields }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error('The owner profile write was rejected. Is this email on the admin allowlist in the Firestore rules?');
+  };
+
+  await write(`users/${uid}`, {
+    username: { stringValue: username },
+    usernameLower: { stringValue: username },
+    displayName: { stringValue: input.displayName.trim() },
+    role: { stringValue: 'OWNER' },
+    active: { booleanValue: true },
+    authEmail: { stringValue: adminEmail },
+  });
+  await write(`usernameDirectory/${encodeURIComponent(username)}`, {
+    authEmail: { stringValue: adminEmail },
+    active: { booleanValue: true },
+  });
+
+  // The writes above only succeed when the rules accepted this account as
+  // admin; keep its token so the app treats this as a real cloud session.
+  rememberToken(idToken, refreshToken, Number(expiresIn));
+  return { uid, idToken };
 }
