@@ -176,22 +176,12 @@ async function getSnapshot(): Promise<Snapshot> {
 
 /* -------------------------------------------------------------------- pull */
 
-/** `{docId: updateTime}` for every doc — ~2–21 KB per collection. */
-async function metadata(collection: string): Promise<Record<string, string>> {
-  const config = await configManager.getConfig();
-  const base = await getBaseUrl();
-  if (!config || !base) return {};
-  const rows = await rest('POST', `${base}:runQuery?key=${config.apiKey}`, {
-    structuredQuery: {
-      from: [{ collectionId: collection }],
-      select: { fields: [{ fieldPath: '___syncMeta' }] },
-    },
-  });
-  const out: Record<string, string> = {};
-  for (const row of rows ?? []) {
-    if (row?.document) out[documentId(row.document.name)] = row.document.updateTime;
-  }
-  return out;
+/** `{docId: updateTime}` plus the docs themselves, from one list per collection. */
+async function metadata(collection: string): Promise<{ times: Record<string, string>; docs: any[] }> {
+  const docs = await listAll(collection);
+  const times: Record<string, string> = {};
+  for (const doc of docs) times[documentId(doc.name)] = doc.updateTime ?? '';
+  return { times, docs };
 }
 
 async function listAll(collection: string): Promise<any[]> {
@@ -280,27 +270,18 @@ const APPLY: Record<string, (doc: any, updateTime: string) => Promise<void>> = {
 const COLLECTIONS = Object.keys(APPLY);
 
 async function pullCollection(collection: string, snap: Snapshot): Promise<boolean> {
-  const remote = await metadata(collection);
+  const { times: remote, docs } = await metadata(collection);
   const seen = snap[collection] ?? {};
   const changed = Object.keys(remote).filter((id) => remote[id] !== seen[id]);
   const removed = Object.keys(seen).filter((id) => !(id in remote));
   if (!changed.length && !removed.length) return false;
 
   const apply = APPLY[collection];
+  const byId = new Map(docs.map((d) => [documentId(d.name), d]));
 
-  // First run has no prior snapshot: hydrate everything in one list request.
-  const hydrated = Object.keys(seen).length === 0 && changed.length > 0;
-  if (hydrated) {
-    for (const doc of await listAll(collection)) {
-      const updateTime = doc.updateTime ?? '';
-      remote[documentId(doc.name)] ??= updateTime;
-      await apply(doc, updateTime);
-    }
-  } else {
-    for (const id of changed) {
-      const doc = await fetchDoc(collection, id);
-      if (doc?.fields) await apply(doc, remote[id]);
-    }
+  for (const id of changed) {
+    const doc = byId.get(id) ?? (await fetchDoc(collection, id));
+    if (doc?.fields) await apply(doc, remote[id]);
   }
 
   if (collection === 'menu') {
