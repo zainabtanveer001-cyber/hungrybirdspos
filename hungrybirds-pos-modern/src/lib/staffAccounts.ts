@@ -136,9 +136,9 @@ export async function setStaffActive(account: StaffAccount, active: boolean): Pr
   });
 }
 
-/** True when the signed-in session carries a cloud token, which staff actions need. */
-export function cloudSessionAvailable(): boolean {
-  return getAccessToken() !== null;
+/** Resolves true when the session holds a usable cloud token (staff actions need it). */
+export async function cloudSessionAvailable(): Promise<boolean> {
+  return (await getAccessToken()) !== null;
 }
 
 /* --------------------------------------------------------- first-run owner */

@@ -37,11 +37,13 @@ export function StaffAccountsSection({ username, notify }: {
   }
 
   useEffect(() => {
-    if (!cloudSessionAvailable()) {
-      setOffline(true);
-      return;
-    }
-    void refresh();
+    void (async () => {
+      if (!(await cloudSessionAvailable())) {
+        setOffline(true);
+        return;
+      }
+      await refresh();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -83,7 +85,8 @@ export function StaffAccountsSection({ username, notify }: {
       <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-2">
         <SectionTitle>Staff accounts</SectionTitle>
         <p className="text-[11px] text-gray-500">
-          Staff accounts need a cloud connection. Sign in online to create or manage accounts.
+          Staff accounts need a cloud sign-in. Sign out and sign back in while online — a session started
+          offline or with an expired token can&apos;t manage accounts.
         </p>
       </section>
     );
