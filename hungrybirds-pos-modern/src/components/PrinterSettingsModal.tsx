@@ -54,6 +54,8 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
 
   useEffect(() => {
     getPrinterSettings().then(setSettings);
+    const paired = getPrinterDevice();
+    if (paired) setDevice(paired);
   }, []);
 
   useEffect(() => () => device?.gatt?.disconnect(), [device]);
