@@ -77,13 +77,17 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   encoder.text('ITEMS');
   encoder.bold(false);
 
+  const cols = settings.paperWidth === '80mm' ? 48 : 32;
+  const nameCols = cols - 12;
+
   for (const item of sale.items || []) {
     const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
     const name = modifiers ? `${item.name} (${modifiers})` : item.name;
+
     if (settings.printItemPrices) {
       const price = formatAmount(item.price * item.qty);
-      const line = `${name}`.padEnd(20, ' ') + price;
-      encoder.text(line.slice(0, 32));
+      const line = `${name}`.padEnd(nameCols, ' ') + price;
+      encoder.text(line.slice(0, cols));
     } else {
       encoder.text(`${item.qty}x ${name}`);
     }
@@ -93,8 +97,8 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     encoder.text('--------------------------------');
     const totalRow = (label: string, amount: number, sign = '') => {
       if (!amount) return;
-      const line = `${label}`.padEnd(20, ' ') + `${sign}${formatAmount(amount)}`;
-      encoder.text(line.slice(0, 32));
+      const line = `${label}`.padEnd(nameCols, ' ') + `${sign}${formatAmount(amount)}`;
+      encoder.text(line.slice(0, cols));
     };
     totalRow('Subtotal', sale.subtotal);
     if (sale.discountAmount) totalRow(`Discount ${sale.discountPercent || 0}%`, sale.discountAmount, '-');
@@ -104,8 +108,8 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     totalRow('Other charges', sale.otherCharge);
 
     encoder.bold(true);
-    const grandLine = `GRAND TOTAL`.padEnd(20, ' ') + formatAmount(sale.total);
-    encoder.text(grandLine.slice(0, 32));
+    const grandLine = `GRAND TOTAL`.padEnd(nameCols, ' ') + formatAmount(sale.total);
+    encoder.text(grandLine.slice(0, cols));
     encoder.bold(false);
 
     if (settings.printPayments) {
@@ -114,12 +118,12 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
       encoder.text('PAYMENTS');
       encoder.bold(false);
       for (const p of sale.payments || []) {
-        const line = `${p.method}`.padEnd(20, ' ') + formatAmount(p.amount);
-        encoder.text(line.slice(0, 32));
+        const line = `${p.method}`.padEnd(nameCols, ' ') + formatAmount(p.amount);
+        encoder.text(line.slice(0, cols));
       }
       if (sale.totalChange) {
-        const changeLine = `Change`.padEnd(20, ' ') + formatAmount(sale.totalChange);
-        encoder.text(changeLine.slice(0, 32));
+        const changeLine = `Change`.padEnd(nameCols, ' ') + formatAmount(sale.totalChange);
+        encoder.text(changeLine.slice(0, cols));
       }
     }
   }

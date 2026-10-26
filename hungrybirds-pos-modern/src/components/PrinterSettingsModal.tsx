@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bluetooth, Check, X } from 'lucide-react';
-import { getPrinterSettings, receiptFontClass, savePrinterSettings, setPrinterDevice, PRINTER_SERVICE } from '../lib/printer';
+import { getPrinterSettings, getPrinterDevice, receiptFontClass, savePrinterSettings, setPrinterDevice, PRINTER_SERVICE } from '../lib/printer';
 import type { DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
