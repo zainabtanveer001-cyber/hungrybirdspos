@@ -3,6 +3,16 @@ import { db } from './db';
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
 export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
 
+type BluetoothDeviceLike = {
+  id: string;
+  name?: string;
+  gatt?: { connect(): Promise<unknown>; connected: boolean; disconnect(): void; mtu?: number };
+  addEventListener(type: string, listener: () => void): void;
+}
+type BluetoothLike = {
+  requestDevice(options: { acceptAllDevices: boolean; deviceId?: string; optionalServices: string[] }): Promise<BluetoothDeviceLike>;
+};
+
 export interface PrinterSettings {
   receiptFontSize: ReceiptFontSize;
   paperWidth: '58mm' | '80mm';
@@ -24,6 +34,7 @@ export interface PrinterSettings {
 }
 
 export const PRINTER_SETTINGS_KEY = 'printerSettings';
+const PRINTER_DEVICE_KEY = 'printerDeviceId';
 // Common BLE service/characteristic UUIDs for ESC/POS thermal printers.
 // Most printers expose the HM-10 / HM-16 style UART bridge.
 export const PRINTER_SERVICE = '0000ffe0-0000-1000-8000-00805f9b34fb';
@@ -58,12 +69,49 @@ export function receiptFontClass(size: ReceiptFontSize): string {
 /** Global reference to the paired Bluetooth device. */
 let activeDevice: any | null = null;
 
-export function setPrinterDevice(device: any | null) {
+export async function setPrinterDevice(device: any | null): Promise<void> {
   activeDevice = device;
+  if (device) {
+    await db.settings.put({ key: PRINTER_DEVICE_KEY, value: device.id });
+  } else {
+    await db.settings.delete(PRINTER_DEVICE_KEY);
+  }
 }
 
 export function getPrinterDevice() {
   return activeDevice;
+}
+
+/**
+ * Reconnects to the last-paired Bluetooth printer using the device id
+ * persisted in IndexedDB. Call on app startup and before printing so the
+ * pairing survives a page reload.
+ */
+export async function restorePrinterDevice(): Promise<void> {
+  if (activeDevice) return;
+  const stored = await db.settings.get(PRINTER_DEVICE_KEY);
+  const deviceId = stored?.value as string | undefined;
+  if (!deviceId) return;
+
+  const bluetooth = (navigator as Navigator & { bluetooth?: BluetoothLike }).bluetooth;
+  if (!bluetooth?.requestDevice) return;
+
+  try {
+    const device = await bluetooth.requestDevice({
+      acceptAllDevices: true,
+      deviceId,
+      optionalServices: [PRINTER_SERVICE],
+    }) as any;
+    device.addEventListener('gattserverdisconnected', () => {
+      activeDevice = null;
+      setPrinterDevice(null).catch(() => {});
+    });
+    await device.gatt?.connect();
+    activeDevice = device;
+  } catch {
+    // Printer out of range / permissions lost / user gesture required —
+    // degrade gracefully and leave activeDevice null so browser fallback works.
+  }
 }
 
 /**

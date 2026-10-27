@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bluetooth, Check, X } from 'lucide-react';
-import { getPrinterSettings, getPrinterDevice, receiptFontClass, savePrinterSettings, setPrinterDevice, PRINTER_SERVICE } from '../lib/printer';
+import { getPrinterSettings, getPrinterDevice, receiptFontClass, restorePrinterDevice, savePrinterSettings, setPrinterDevice, PRINTER_SERVICE } from '../lib/printer';
 import type { DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
@@ -54,8 +54,10 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
 
   useEffect(() => {
     getPrinterSettings().then(setSettings);
-    const paired = getPrinterDevice();
-    if (paired) setDevice(paired);
+    restorePrinterDevice().then(() => {
+      const paired = getPrinterDevice();
+      if (paired) setDevice(paired);
+    });
   }, []);
 
   useEffect(() => () => device?.gatt?.disconnect(), [device]);
@@ -72,10 +74,10 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
       const picked = await bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [PRINTER_SERVICE] });
       picked.addEventListener('gattserverdisconnected', () => {
         setDevice(null);
-        setPrinterDevice(null);
+        setPrinterDevice(null).catch(() => {});
       });
       setDevice(picked);
-      setPrinterDevice(picked);
+      setPrinterDevice(picked).catch(() => {});
       notify(`Paired with ${picked.name || 'thermal printer'}.`);
     } catch (err) {
       // Cancelling the chooser rejects with NotFoundError — not an error worth a toast.
@@ -280,7 +282,7 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
               {device && (
                 <button
                   type="button"
-                  onClick={() => { device.gatt?.disconnect(); setDevice(null); }}
+                  onClick={() => { device.gatt?.disconnect(); setDevice(null); setPrinterDevice(null).catch(() => {}); }}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200"
                 >
                   <X className="w-3.5 h-3.5" aria-hidden /> Disconnect

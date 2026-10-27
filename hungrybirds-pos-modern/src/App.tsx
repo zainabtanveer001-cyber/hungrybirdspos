@@ -12,7 +12,7 @@ import { setOrderStatus } from './lib/onlineOrders';
 import { formatAmount } from './lib/format';
 import { MIN_DELIVERY_ORDER, recordSale, reopenSale, verifyStock } from './lib/sales';
 import { printReceipt } from './lib/receipt';
-import { getPrinterSettings } from './lib/printer';
+import { getPrinterSettings, restorePrinterDevice } from './lib/printer';
 import { LoginScreen } from './components/LoginScreen';
 import { Sidebar } from './components/Sidebar';
 import { MenuGrid } from './components/MenuGrid';
@@ -83,6 +83,7 @@ function App() {
 
   useEffect(() => {
     initializeApp().catch((err) => console.error('App init failed:', err));
+    restorePrinterDevice().catch(() => {});
   }, []);
 
   useEffect(() => {
