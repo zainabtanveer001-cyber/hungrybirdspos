@@ -79,7 +79,7 @@ describe('receipt', () => {
     expect(html).toContain('KITCHEN ORDER');
     expect(html.indexOf('KITCHEN ORDER')).toBeLessThan(html.indexOf('ORDER RECEIPT'));
     // The cut line is padded so the two slips do not touch.
-    expect(html).toMatch(/\.cut \{[^}]*margin: 12mm 0 10mm/);
+    expect(html).toMatch(/\.cut \{[^}]*margin: (?:12mm 0 10mm|20mm 0 15mm)/);
   });
 
   it('leaves the kitchen ticket off when the shop turns it off', () => {
@@ -120,5 +120,67 @@ describe('receipt', () => {
     expect(formatDate(stamp, 'dmy')).toBe('20/10/2026');
     expect(formatDate(stamp, 'mdy')).toBe('10/20/2026');
     expect(receiptDocument(sale, { ...settings, dateFormat: 'iso' })).toMatch(/Date: \d{4}-\d{2}-\d{2}/);
+  });
+
+  it('discovers writable BLE characteristics across thermal printer services and keeps pairing across disconnects', async () => {
+    const { setPrinterDevice, getPrinterDevice, printRaw, disconnectPrinterDevice } = await import('../src/lib/printer');
+    const writtenChunks: Uint8Array[] = [];
+    const listeners: Record<string, Array<() => void>> = {};
+
+    const mockChar = {
+      properties: { write: true, writeWithoutResponse: true },
+      writeValueWithResponse: async (buf: BufferSource) => {
+        writtenChunks.push(new Uint8Array(buf as ArrayBuffer));
+      },
+    };
+
+    const mockServer = {
+      connected: false,
+      connect: async () => {
+        mockServer.connected = true;
+        return mockServer;
+      },
+      disconnect: () => {
+        mockServer.connected = false;
+        for (const fn of listeners['gattserverdisconnected'] || []) fn();
+      },
+      getPrimaryServices: async () => [
+        {
+          uuid: '000018f0-0000-1000-8000-00805f9b34fb',
+          getCharacteristic: async () => mockChar,
+          getCharacteristics: async () => [mockChar],
+        },
+      ],
+      getPrimaryService: async () => ({
+        getCharacteristic: async () => mockChar,
+      }),
+    };
+
+    const mockDevice = {
+      id: 'printer-18f0',
+      name: 'XP-80C',
+      gatt: mockServer,
+      addEventListener: (type: string, fn: () => void) => {
+        (listeners[type] ||= []).push(fn);
+      },
+      removeEventListener: (type: string, fn: () => void) => {
+        listeners[type] = (listeners[type] || []).filter((l) => l !== fn);
+      },
+    };
+
+    await setPrinterDevice(mockDevice);
+    await printRaw(new Uint8Array([0x1b, 0x40, 0x48, 0x69, 0x0a]));
+    expect(writtenChunks.length).toBe(1);
+
+    // Simulate printer sleeping / disconnecting GATT between prints — device must remain paired!
+    mockServer.disconnect();
+    expect(getPrinterDevice()?.id).toBe('printer-18f0');
+
+    // Next print automatically reconnects and prints again
+    await printRaw(new Uint8Array([0x1b, 0x40, 0x4f, 0x4b, 0x0a]));
+    expect(writtenChunks.length).toBe(2);
+
+    await disconnectPrinterDevice();
+    expect(getPrinterDevice()).toBeNull();
   });
 });

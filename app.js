@@ -3664,7 +3664,14 @@ window.connectPrinter = async function () {
     try {
         bluetoothDevice = await navigator.bluetooth.requestDevice({
             acceptAllDevices: true,
-            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb', '49535343-fe7d-41a5-8b53-07423c5a2253']
+            optionalServices: [
+                '000018f0-0000-1000-8000-00805f9b34fb',
+                '0000ffe0-0000-1000-8000-00805f9b34fb',
+                '49535343-fe7d-41a5-8b53-07423c5a2253',
+                '0000ff00-0000-1000-8000-00805f9b34fb',
+                'e7810a71-73ae-499d-8c15-faa9aef0c3f2',
+                '6e400001-b5a3-f393-e0a9-e50e24dcca9e'
+            ]
         });
 
         // Handle disconnection events
@@ -3850,12 +3857,34 @@ window.connectPrinter = window.connectPrinter;
 // Returns a Promise that resolves when all chunks are written.
 // Throws a descriptive error if the printer is disconnected mid-write.
 async function writeToPrinter(uint8Array) {
+    if (!isPrinterConnected() && bluetoothDevice && bluetoothDevice.gatt) {
+        try {
+            const server = bluetoothDevice.gatt.connected ? bluetoothDevice.gatt : await bluetoothDevice.gatt.connect();
+            const services = await server.getPrimaryServices();
+            for (const service of services) {
+                const characteristics = await service.getCharacteristics();
+                const writable = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                if (writable) {
+                    printerCharacteristic = writable;
+                    setPrinterStatus(PRINTER_STATE.CONNECTED, bluetoothDevice.name || "Unknown");
+                    break;
+                }
+            }
+        } catch (err) {
+            console.warn("Printer auto-reconnect failed:", err);
+        }
+    }
     if (!isPrinterConnected()) throw new Error("Printer not connected");
     const CHUNK = 20;
+    const writeFn = (printerCharacteristic.properties?.write && printerCharacteristic.writeValueWithResponse)
+        ? printerCharacteristic.writeValueWithResponse.bind(printerCharacteristic)
+        : (printerCharacteristic.properties?.writeWithoutResponse && printerCharacteristic.writeValueWithoutResponse)
+            ? printerCharacteristic.writeValueWithoutResponse.bind(printerCharacteristic)
+            : printerCharacteristic.writeValue.bind(printerCharacteristic);
     for (let i = 0; i < uint8Array.length; i += CHUNK) {
         const slice = uint8Array.slice(i, i + CHUNK);
         try {
-            await printerCharacteristic.writeValue(slice);
+            await writeFn(slice);
         } catch (e) {
             setPrinterStatus(PRINTER_STATE.ERROR);
             throw new Error("Printer connection lost during write. Please reconnect.");

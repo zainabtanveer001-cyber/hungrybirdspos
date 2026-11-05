@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Bluetooth, Check, X } from 'lucide-react';
-import { getPrinterSettings, getPrinterDevice, receiptFontClass, restorePrinterDevice, savePrinterSettings, setPrinterDevice, PRINTER_SERVICE } from '../lib/printer';
-import type { DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
+import { Bluetooth, Check, Printer, X } from 'lucide-react';
+import {
+  disconnectPrinterDevice,
+  getPrinterDevice,
+  getPrinterSettings,
+  pairPrinterDevice,
+  printTestReceipt,
+  receiptFontClass,
+  restorePrinterDevice,
+  savePrinterSettings,
+} from '../lib/printer';
+import type { BluetoothDeviceLike, DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
 import { formatDate, RESTAURANT } from '../lib/receipt';
 import { Modal } from './Modal';
-
-// Web Bluetooth is Chromium-only and absent from lib.dom for the parts we need.
-interface BluetoothDeviceLike {
-  id: string;
-  name?: string;
-  gatt?: { connected: boolean; disconnect(): void };
-  addEventListener(type: string, listener: () => void): void;
-}
-type BluetoothLike = {
-  requestDevice(options: { acceptAllDevices: boolean; optionalServices: string[] }): Promise<BluetoothDeviceLike>;
-};
 
 const FONT_OPTIONS: Array<{ value: ReceiptFontSize; label: string }> = [
   { value: 'small', label: 'Small (compact)' },
@@ -49,8 +47,9 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   onClose: () => void;
 }) {
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
-  const [device, setDevice] = useState<BluetoothDeviceLike | null>(null);
+  const [device, setDevice] = useState<BluetoothDeviceLike | null>(() => getPrinterDevice());
   const [connecting, setConnecting] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     getPrinterSettings().then(setSettings);
@@ -60,30 +59,39 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
     });
   }, []);
 
-  useEffect(() => () => device?.gatt?.disconnect(), [device]);
-
-  const bluetooth = (navigator as Navigator & { bluetooth?: BluetoothLike }).bluetooth;
+  const hasBluetooth = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
 
   async function connect() {
-    if (!bluetooth) {
+    if (!hasBluetooth) {
       notify('Web Bluetooth needs Chrome or Edge on desktop, or Android.');
       return;
     }
     setConnecting(true);
     try {
-      const picked = await bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [PRINTER_SERVICE] });
-      picked.addEventListener('gattserverdisconnected', () => {
-        setDevice(null);
-        setPrinterDevice(null).catch(() => {});
-      });
+      const picked = await pairPrinterDevice();
       setDevice(picked);
-      setPrinterDevice(picked).catch(() => {});
-      notify(`Paired with ${picked.name || 'thermal printer'}.`);
+      notify(`Connected to ${picked.name || 'thermal printer'}.`);
     } catch (err) {
       // Cancelling the chooser rejects with NotFoundError — not an error worth a toast.
-      if ((err as DOMException)?.name !== 'NotFoundError') notify('Could not pair the printer.');
+      if ((err as DOMException)?.name !== 'NotFoundError') {
+        const message = err instanceof Error ? err.message : 'Could not pair the printer.';
+        notify(message);
+      }
     } finally {
       setConnecting(false);
+    }
+  }
+
+  async function testPrint() {
+    setTesting(true);
+    try {
+      await printTestReceipt(settings?.headerText || RESTAURANT.name);
+      notify('Test receipt sent to thermal printer.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Test print failed.';
+      notify(message);
+    } finally {
+      setTesting(false);
     }
   }
 
@@ -269,29 +277,43 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
               <span className="text-gray-600">{device ? `Connected to ${device.name || device.id.slice(0, 8)}` : 'Not connected'}</span>
               {device && <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden />}
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={connect}
-                disabled={connecting || !bluetooth}
+                disabled={connecting || !hasBluetooth}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 <Bluetooth className="w-3.5 h-3.5" aria-hidden />
-                {connecting ? 'Pairing...' : 'Pair Printer'}
+                {connecting ? 'Pairing...' : device ? 'Change Printer' : 'Pair Printer'}
               </button>
               {device && (
-                <button
-                  type="button"
-                  onClick={() => { device.gatt?.disconnect(); setDevice(null); setPrinterDevice(null).catch(() => {}); }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200"
-                >
-                  <X className="w-3.5 h-3.5" aria-hidden /> Disconnect
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={testPrint}
+                    disabled={testing}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Printer className="w-3.5 h-3.5" aria-hidden />
+                    {testing ? 'Printing...' : 'Test Print'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      disconnectPrinterDevice().catch(() => {});
+                      setDevice(null);
+                      notify('Bluetooth printer disconnected.');
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  >
+                    <X className="w-3.5 h-3.5" aria-hidden /> Disconnect
+                  </button>
+                </>
               )}
             </div>
             <p className="text-[10px] text-gray-500">
-              The pairing is remembered for this browser tab only. ESC/POS binary printing is supported — test it
-              by completing a sale with auto-print enabled, or print a past receipt from Sales History.
+              Supports BLE ESC/POS thermal printers (58mm &amp; 80mm). Click <strong>Test Print</strong> after pairing to verify your printer connection.
             </p>
           </section>
         </div>
