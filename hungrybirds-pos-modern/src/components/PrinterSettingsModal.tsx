@@ -563,15 +563,29 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                     <div className="my-3 border-t border-dashed border-gray-400" />
                   </>
                 )}
-                <div className="text-center font-black pb-1 border-b border-dashed border-gray-300 mb-1">
+                <div className="text-center font-semibold">Customer Copy</div>
+                <div className="text-center font-bold pb-0.5">
                   {settings.headerText || RESTAURANT.name}
                 </div>
-                <p className="text-center font-bold">{preview.title}</p>
+                <div className="text-center text-[10px] text-gray-600 leading-tight">
+                  <div>{RESTAURANT.addressLine1}</div>
+                  <div>{RESTAURANT.addressLine2}</div>
+                  <div>{RESTAURANT.phone}</div>
+                </div>
+                <div className="border-t border-dashed border-gray-300 my-1.5" />
                 {settings.printOrderDetails && (
-                  <p className="text-center text-gray-500 pb-1 border-b border-dashed border-gray-300 mb-1">
-                    {formatDate(Date.now(), settings.dateFormat)}
-                  </p>
+                  <div className="text-[10px] text-gray-700 pb-1 border-b border-dashed border-gray-300 mb-1">
+                    <div className="flex justify-between">
+                      <span>Bill #HBR-42</span>
+                      <span>{formatDate(Date.now(), settings.dateFormat)}</span>
+                    </div>
+                    <div>Cashier: {settings.headerText || RESTAURANT.name}</div>
+                  </div>
                 )}
+                <div className="flex justify-between text-[10px] text-gray-500 border-b border-dashed border-gray-300 pb-0.5 mb-1">
+                  <span>Item</span>
+                  <span>Rate · Qty · Amount</span>
+                </div>
                 {preview.lines.map(([label, value]) => (
                   <div key={label} className="flex justify-between gap-2">
                     <span className="truncate">{label}</span>
@@ -579,15 +593,23 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                   </div>
                 ))}
                 {settings.printTotals && (
-                  <div className="flex justify-between font-black border-t border-dashed border-gray-300 mt-1 pt-1">
-                    <span>TOTAL</span>
-                    <span className="tabular-nums">{formatAmount(preview.total)}</span>
-                  </div>
+                  <>
+                    <div className="flex justify-between font-bold border-t border-dashed border-gray-300 mt-1 pt-1">
+                      <span>Total Amount</span>
+                      <span className="tabular-nums">{formatAmount(preview.total)}</span>
+                    </div>
+                    <div className="border-t border-b border-dashed border-gray-300 my-1 py-0.5 text-[10px]">
+                      Total Items: &nbsp; {preview.lines.length}
+                    </div>
+                  </>
                 )}
                 {settings.printFooter && (
-                  <p className="text-center text-gray-500 mt-2">
-                    {settings.footerText || 'Thank you for dining with us!'}
-                  </p>
+                  <div className="mt-1.5 text-[10px] text-gray-700">
+                    <p className="text-center">{RESTAURANT.phone}</p>
+                    <p>{RESTAURANT.accountTitle}</p>
+                    <p>{RESTAURANT.accountMethod}</p>
+                    {settings.footerText && <p className="text-center mt-1">{settings.footerText}</p>}
+                  </div>
                 )}
               </div>
             </section>

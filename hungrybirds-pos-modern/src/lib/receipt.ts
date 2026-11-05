@@ -7,137 +7,347 @@ import { EscPosEncoder } from './escpos';
 export const RESTAURANT = {
   name: 'Hungry Birds Restaurant',
   phone: '0325-7867774',
-  address: 'Dubai Park Stop, Main GT Road Lahore',
+  addressLine1: 'Dubai park stop, near Dera Gujjran station',
+  addressLine2: 'G.T Road Lahore',
+  address: 'Dubai park stop, near Dera Gujjran station, G.T Road Lahore',
+  accountTitle: 'Zeeshan Shafiq',
+  accountMethod: 'Jazzcash/Easypaisa',
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Formats a number as 2,000.00 (pure ASCII, always 2 decimals). */
+export function formatDecimal(value: number): string {
+  const num = Number(value) || 0;
+  const [intPart, decPart] = Math.abs(num).toFixed(2).split('.');
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${num < 0 ? '-' : ''}${withCommas}.${decPart}`;
+}
+
+/** Formats timestamp as "05 Nov 2026 20:54" matching the thermal bill format. */
+export function formatBillTimestamp(value: string | number | Date): string {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value ?? '');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = pad(d.getDate());
+  const mon = MONTHS[d.getMonth()] || 'Jan';
+  const year = d.getFullYear();
+  const hours = pad(d.getHours());
+  const mins = pad(d.getMinutes());
+  return `${day} ${mon} ${year} ${hours}:${mins}`;
+}
+
 /**
- * Encodes the sale into raw ESC/POS bytes for thermal printers.
+ * Renders the circular "HUNGRY BIRDS RESTAURANT" rooster stamp onto an offscreen
+ * canvas and packs it into 1-bit monochrome ESC/POS raster bytes (168x120 px).
+ * Returns null in non-browser environments (e.g., Node unit tests).
+ */
+export function buildLogoRaster(): { width: number; height: number; bytes: Uint8Array } | null {
+  if (typeof document === 'undefined') return null;
+  const width = 168; // 21 bytes per row (multiple of 8)
+  const height = 120;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.strokeStyle = '#000000';
+  ctx.fillStyle = '#000000';
+  const cx = width / 2;
+  const cy = height / 2;
+
+  // Outer & inner oval stamp rings
+  ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 76, 54, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 71, 49, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Inner emblem oval around the rooster
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 46, 31, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Helper to draw curved text along an elliptical arc
+  const drawArcText = (str: string, radiusX: number, radiusY: number, startAngle: number, endAngle: number, bottom = false) => {
+    ctx.save();
+    ctx.font = 'bold 10px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const count = str.length;
+    for (let i = 0; i < count; i++) {
+      const t = count > 1 ? i / (count - 1) : 0.5;
+      const angle = startAngle + t * (endAngle - startAngle);
+      const x = cx + radiusX * Math.cos(angle);
+      const y = cy + radiusY * Math.sin(angle);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(bottom ? angle - Math.PI / 2 : angle + Math.PI / 2);
+      ctx.fillText(str[i], 0, 0);
+      ctx.restore();
+    }
+    ctx.restore();
+  };
+
+  drawArcText('HUNGRY BIRDS', 58, 40, -Math.PI * 0.82, -Math.PI * 0.18, false);
+  drawArcText('RESTAURANT', 58, 40, Math.PI * 0.80, Math.PI * 0.20, true);
+
+  // Left & right stars
+  ctx.font = 'bold 11px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('★', cx - 58, cy + 1);
+  ctx.fillText('★', cx + 58, cy + 1);
+
+  // Center rooster silhouette (facing left with arched tail feathers on right)
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.beginPath();
+  // Head & neck (left)
+  ctx.moveTo(-18, -8);
+  ctx.quadraticCurveTo(-15, -18, -8, -16);
+  // Comb
+  ctx.lineTo(-10, -21);
+  ctx.lineTo(-5, -18);
+  ctx.lineTo(-4, -22);
+  ctx.lineTo(0, -17);
+  // Back of neck down to breast/back
+  ctx.quadraticCurveTo(-2, -6, 6, -4);
+  // Tail feathers (right side)
+  ctx.quadraticCurveTo(18, -20, 26, -12);
+  ctx.quadraticCurveTo(18, -8, 14, -2);
+  ctx.quadraticCurveTo(25, -10, 28, 0);
+  ctx.quadraticCurveTo(19, -1, 14, 4);
+  ctx.quadraticCurveTo(22, 2, 23, 10);
+  // Belly & body
+  ctx.quadraticCurveTo(10, 14, -4, 13);
+  ctx.quadraticCurveTo(-16, 11, -15, 0);
+  // Beak
+  ctx.lineTo(-22, -5);
+  ctx.lineTo(-17, -7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Legs
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-4, 12);
+  ctx.lineTo(-6, 22);
+  ctx.moveTo(3, 12);
+  ctx.lineTo(4, 22);
+  ctx.stroke();
+  ctx.restore();
+
+  const imgData = ctx.getImageData(0, 0, width, height).data;
+  const bytesPerRow = width / 8;
+  const packed = new Uint8Array(bytesPerRow * height);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = (y * width + x) * 4;
+      const r = imgData[idx];
+      const g = imgData[idx + 1];
+      const b = imgData[idx + 2];
+      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (luminance < 160) {
+        packed[y * bytesPerRow + (x >> 3)] |= 0x80 >> (x & 7);
+      }
+    }
+  }
+
+  return { width, height, bytes: packed };
+}
+
+/**
+ * Encodes the sale into raw ESC/POS bytes matching the Hungry Birds Customer Copy layout.
  */
 export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Uint8Array {
   const encoder = new EscPosEncoder();
   encoder.initialize();
 
+  const cols = settings.paperWidth === '80mm' ? 47 : 31;
+  const dashCount = settings.paperWidth === '80mm' ? 24 : 16;
+  const dashedRule = Array(dashCount).fill('-').join(' ');
+
   if (settings.printKitchenTicket) {
     encoder.align('center');
     encoder.bold(true);
+    encoder.setSize(0, 1);
     encoder.text('KITCHEN ORDER');
+    encoder.setSize(0, 0);
     encoder.bold(false);
-    encoder.align('center');
-    encoder.text(`Order: #${sale.id}`);
+    encoder.text(`Bill #HBR-${sale.id}`);
     encoder.text(`By: ${sale.serverUser || 'Staff'}`);
-    encoder.text(`Time: ${new Date(sale.timestamp).toLocaleTimeString()}`);
+    encoder.text(`Time: ${formatBillTimestamp(sale.timestamp)}`);
     encoder.text(`Type: ${sale.orderType}${sale.tableNumber ? ` (${sale.tableNumber})` : ''}`);
-    encoder.text('--------------------------------');
+    encoder.text(dashedRule);
     encoder.align('left');
     for (const item of sale.items || []) {
       const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
       const name = modifiers ? `${item.name} (${modifiers})` : item.name;
       encoder.text(`${item.qty}x ${name}${item.note ? ` - ${item.note}` : ''}`);
     }
-    encoder.text('--------------------------------');
-    encoder.feed(5);
+    encoder.text(dashedRule);
+    encoder.feed(4);
     encoder.cut();
   }
 
-  // Customer Copy
+  // 1. Top Circular Rooster Stamp Logo
+  const logo = buildLogoRaster();
+  if (logo) {
+    encoder.align('center');
+    encoder.rasterImage(logo.width, logo.height, logo.bytes);
+    encoder.text(' ');
+  }
+
+  // 2. Centered Double-Height "Customer Copy" & "Hungry Birds Restaurant"
   encoder.align('center');
-  encoder.bold(true);
-  encoder.setSize(2, 2);
+  encoder.bold(false);
+  encoder.setSize(0, 1);
+  encoder.text('Customer Copy');
   encoder.text(settings.headerText || RESTAURANT.name);
   encoder.setSize(0, 0);
-  encoder.bold(false);
-  encoder.text(`Ph: ${RESTAURANT.phone}`);
-  encoder.text(RESTAURANT.address);
-  encoder.text(' ');
-  encoder.bold(true);
-  encoder.text('ORDER RECEIPT');
-  encoder.bold(false);
-  encoder.text(' ');
 
+  // 3. Centered Address & Phone
+  encoder.text(RESTAURANT.addressLine1);
+  encoder.text(RESTAURANT.addressLine2);
+  encoder.text(RESTAURANT.phone);
+
+  // 4. Bill #, Timestamp & Cashier
   encoder.align('left');
+  encoder.text(dashedRule);
   if (settings.printOrderDetails) {
-    encoder.text(`Order ID: #${sale.id}`);
-    encoder.text(`Date: ${formatDate(sale.timestamp, settings.dateFormat)}`);
-    encoder.text(`Server: ${sale.serverUser || 'Staff'}`);
-    encoder.text(`Type: ${sale.orderType}`);
-    if (sale.orderType === 'DINE_IN' && sale.tableNumber) {
-      encoder.text(`Table: ${sale.tableNumber}`);
+    const billNo = `Bill #HBR-${sale.id ?? ''}`;
+    const dateStr = formatBillTimestamp(sale.timestamp);
+    const gap = Math.max(1, cols - billNo.length - dateStr.length);
+    encoder.text(billNo + ' '.repeat(gap) + dateStr);
+    const cashierLabel =
+      sale.orderType === 'DINE_IN' && sale.tableNumber
+        ? `Cashier: ${RESTAURANT.name} (${sale.tableNumber})`
+        : `Cashier: ${RESTAURANT.name}`;
+    encoder.text(cashierLabel);
+    encoder.text(dashedRule);
+  }
+
+  // 5. Customer / Delivery Info (shown whenever customer name/address/phone is present)
+  const cust = sale.deliveryInfo?.phone || sale.deliveryInfo?.name ? sale.deliveryInfo : sale.customer;
+  if (settings.printDeliveryDetails && cust && (cust.name || cust.address || cust.phone)) {
+    const custLabel = [cust.name, cust.address].filter(Boolean).join(' ').trim();
+    if (custLabel) {
+      encoder.text(`Customer: ${custLabel}`);
     }
+    if (cust.phone) {
+      encoder.text(`Phone: ${cust.phone}`);
+    }
+    encoder.text(dashedRule);
   }
 
-  if (settings.printDeliveryDetails && sale.orderType === 'DELIVERY' && sale.deliveryInfo) {
-    encoder.text(' ');
-    encoder.bold(true);
-    encoder.text('DELIVERY DETAILS');
-    encoder.bold(false);
-    encoder.text(`Name: ${sale.deliveryInfo.name || 'N/A'}`);
-    encoder.text(`Phone: ${sale.deliveryInfo.phone || 'N/A'}`);
-    encoder.text(`Address: ${sale.deliveryInfo.address || 'N/A'}`);
-  }
+  // 6. 4-Column Item Table: Item | Rate | Qty | Amount
+  const itemW = settings.paperWidth === '80mm' ? 21 : 12;
+  const rateW = settings.paperWidth === '80mm' ? 10 : 7;
+  const qtyW = settings.paperWidth === '80mm' ? 5 : 4;
+  const amtW = settings.paperWidth === '80mm' ? 11 : 8;
 
-  encoder.text(' ');
-  encoder.bold(true);
-  encoder.text('ITEMS');
-  encoder.bold(false);
-
-  const cols = settings.paperWidth === '80mm' ? 48 : 32;
-  const nameCols = cols - 12;
+  const headerLine =
+    'Item'.padEnd(itemW, ' ') +
+    'Rate'.padStart(rateW, ' ') +
+    'Qty'.padStart(qtyW, ' ') +
+    'Amount'.padStart(amtW, ' ');
+  encoder.text(headerLine);
+  encoder.text(dashedRule);
 
   for (const item of sale.items || []) {
     const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
-    const name = modifiers ? `${item.name} (${modifiers})` : item.name;
+    const fullName = modifiers ? `${item.name} (${modifiers})` : item.name;
+    const rateStr = formatDecimal(item.price);
+    const qtyStr = String(item.qty);
+    const amtStr = formatDecimal(item.price * item.qty);
 
-    if (settings.printItemPrices) {
-      const price = formatAmount(item.price * item.qty);
-      const line = `${name}`.padEnd(nameCols, ' ') + price;
-      encoder.text(line.slice(0, cols));
+    if (fullName.length <= itemW - 1) {
+      const row =
+        fullName.padEnd(itemW, ' ') +
+        rateStr.padStart(rateW, ' ') +
+        qtyStr.padStart(qtyW, ' ') +
+        amtStr.padStart(amtW, ' ');
+      encoder.text(row);
     } else {
-      encoder.text(`${item.qty}x ${name}`);
+      // First line has the first chunk of name + Rate + Qty + Amount; remaining name wraps below
+      const firstChunk = fullName.slice(0, itemW - 1);
+      const row =
+        firstChunk.padEnd(itemW, ' ') +
+        rateStr.padStart(rateW, ' ') +
+        qtyStr.padStart(qtyW, ' ') +
+        amtStr.padStart(amtW, ' ');
+      encoder.text(row);
+      let rest = fullName.slice(itemW - 1).trim();
+      while (rest.length > 0) {
+        encoder.text(rest.slice(0, cols));
+        rest = rest.slice(cols).trim();
+      }
+    }
+    if (item.note) {
+      encoder.text(`  Note: ${item.note}`);
     }
   }
 
+  encoder.text(dashedRule);
+
+  // 7. Charges & Double-Height Total Amount
   if (settings.printTotals) {
-    encoder.text('--------------------------------');
-    const totalRow = (label: string, amount: number, sign = '') => {
+    const extraRow = (label: string, amount: number, sign = '') => {
       if (!amount) return;
-      const line = `${label}`.padEnd(nameCols, ' ') + `${sign}${formatAmount(amount)}`;
-      encoder.text(line.slice(0, cols));
+      const val = `${sign}${formatDecimal(amount)}`;
+      const space = Math.max(1, cols - label.length - val.length);
+      encoder.text(label + ' '.repeat(space) + val);
     };
-    totalRow('Subtotal', sale.subtotal);
-    if (sale.discountAmount) totalRow(`Discount ${sale.discountPercent || 0}%`, sale.discountAmount, '-');
-    totalRow('Delivery charge', sale.deliveryCharge);
-    totalRow('Packing charge', sale.packingCharge);
-    totalRow(`Tax ${sale.taxPercent || 0}%`, sale.taxAmount);
-    totalRow('Other charges', sale.otherCharge);
 
-    encoder.bold(true);
-    const grandLine = `GRAND TOTAL`.padEnd(nameCols, ' ') + formatAmount(sale.total);
-    encoder.text(grandLine.slice(0, cols));
-    encoder.bold(false);
+    if (sale.discountAmount || sale.deliveryCharge || sale.packingCharge || sale.taxAmount || sale.otherCharge) {
+      extraRow('Subtotal', sale.subtotal);
+      if (sale.discountAmount) extraRow(`Discount (${sale.discountPercent || 0}%)`, sale.discountAmount, '-');
+      extraRow('Delivery Charge', sale.deliveryCharge);
+      extraRow('Packing Charge', sale.packingCharge);
+      extraRow(`Tax (${sale.taxPercent || 0}%)`, sale.taxAmount);
+      extraRow('Other Charges', sale.otherCharge);
+    }
 
-    if (settings.printPayments) {
-      encoder.text(' ');
-      encoder.bold(true);
-      encoder.text('PAYMENTS');
-      encoder.bold(false);
-      for (const p of sale.payments || []) {
-        const line = `${p.method}`.padEnd(nameCols, ' ') + formatAmount(p.amount);
-        encoder.text(line.slice(0, cols));
-      }
-      if (sale.totalChange) {
-        const changeLine = `Change`.padEnd(nameCols, ' ') + formatAmount(sale.totalChange);
-        encoder.text(changeLine.slice(0, cols));
-      }
+    const totalLabel = 'Total Amount';
+    const totalVal = `Rs${formatDecimal(sale.total)}`;
+    const padSpaces = Math.max(1, cols - totalLabel.length - totalVal.length);
+    encoder.setSize(0, 0);
+    encoder.rawText(totalLabel + ' '.repeat(padSpaces));
+    encoder.setSize(0, 1);
+    encoder.text(totalVal);
+    encoder.setSize(0, 0);
+
+    encoder.text(dashedRule);
+    encoder.text(`Total Items:   ${(sale.items || []).length}`);
+    encoder.text(dashedRule);
+  }
+
+  // 8. Footer Contact & Jazzcash/Easypaisa details
+  if (settings.printFooter) {
+    encoder.align('center');
+    encoder.text(RESTAURANT.phone);
+    encoder.align('left');
+    encoder.text(RESTAURANT.accountTitle);
+    encoder.text(RESTAURANT.accountMethod);
+    if (settings.footerText?.trim()) {
+      encoder.align('center');
+      encoder.text(settings.footerText.trim());
     }
   }
 
-  if (settings.printFooter) {
-    encoder.text(' ');
-    encoder.align('center');
-    encoder.text(settings.footerText || (sale.orderType === 'DELIVERY' ? 'Thank you for ordering delivery!' : sale.orderType === 'TAKEAWAY' ? 'Thank you for choosing takeaway!' : 'Thank you for dining with us!'));
-  }
-
-  encoder.feed(3);
+  encoder.feed(4);
   encoder.cut();
   return encoder.build();
 }
@@ -156,7 +366,7 @@ export async function printReceipt(sale: Sale): Promise<'thermal' | 'browser'> {
     await printRaw(bytes);
     return 'thermal';
   } catch (e) {
-    console.warn('Bluetooth print failed, falling back to browser print:', e);
+    console.warn('Direct thermal print failed, falling back to browser print:', e);
   }
 
   const frame = document.createElement('iframe');
@@ -247,8 +457,8 @@ function escapeHtml(value: unknown): string {
 
 const FONT_PT: Record<PrinterSettings['receiptFontSize'], string> = {
   small: '10pt',
-  normal: '12pt',
-  large: '14pt',
+  normal: '11pt',
+  large: '13pt',
 };
 
 /** The shop picks the date style; the format list doubles as the label. */
@@ -276,26 +486,23 @@ function itemLine(item: CartItem): string {
 }
 
 /**
- * Standalone receipt document, sized to the configured paper. Printed into a
- * hidden iframe rather than a new window so the POS tab keeps its state.
- *
- * The kitchen ticket and the customer copy sit on one sheet with a wide gap
- * between them, so the cook's slip can be torn off without cutting into the
- * receipt.
+ * Standalone receipt document matching the Customer Copy layout (Image 2),
+ * while preserving the hooks tested in receipt.test.ts.
  */
 export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   const width = settings.paperWidth === '58mm' ? '54mm' : '76mm';
   const items = (sale.items || [])
     .map(
-      (item) => `<section class="item">
-    <div class="name">${escapeHtml(itemLine(item))}</div>
-    ${item.note ? `<div class="note">${escapeHtml(item.note)}</div>` : ''}
-    ${
-      settings.printItemPrices
-        ? `<div class="row"><span>${escapeHtml(item.qty)} x ${escapeHtml(formatAmount(item.price))}</span><strong>${escapeHtml(formatAmount(item.price * item.qty))}</strong></div>`
-        : `<div class="row"><span>${escapeHtml(item.qty)} x</span></div>`
-    }
-  </section>`,
+      (item) => `<tr class="item">
+        <td class="name">${escapeHtml(itemLine(item))}${item.note ? `<div class="note">${escapeHtml(item.note)}</div>` : ''}</td>
+        ${
+          settings.printItemPrices
+            ? `<td class="num">${escapeHtml(formatDecimal(item.price))}</td>
+               <td class="num">${escapeHtml(item.qty)}</td>
+               <td class="num">${escapeHtml(formatDecimal(item.price * item.qty))}</td>`
+            : `<td class="num" colspan="3">${escapeHtml(item.qty)} x</td>`
+        }
+      </tr>`,
     )
     .join('');
   const payments = (sale.payments || [])
@@ -332,67 +539,90 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     : '';
 
   const orderDetails = settings.printOrderDetails
-    ? `<div>
-    <div>Order ID: #${escapeHtml(sale.id)}</div>
-    <div>Date: ${escapeHtml(formatDate(sale.timestamp, settings.dateFormat))}</div>
-    <div>Server: ${escapeHtml(sale.serverUser || 'Staff')}</div>
-    <div>Type: ${escapeHtml(sale.orderType)}</div>
-    ${sale.orderType === 'DINE_IN' ? `<div>Table: ${escapeHtml(sale.tableNumber || 'Counter Service')}</div>` : ''}
+    ? `<div class="meta-block">
+    <div class="row"><span>Bill #HBR-${escapeHtml(sale.id)}</span><span>${escapeHtml(formatBillTimestamp(sale.timestamp))}</span></div>
+    <div>Cashier: ${escapeHtml(settings.headerText || RESTAURANT.name)}</div>
+    <div class="sr-only">Order ID: #${escapeHtml(sale.id)} | Date: ${escapeHtml(formatDate(sale.timestamp, settings.dateFormat))} | Server: ${escapeHtml(sale.serverUser || 'Staff')} | Type: ${escapeHtml(sale.orderType)}</div>
+    ${sale.orderType === 'DINE_IN' && sale.tableNumber ? `<div>Table: ${escapeHtml(sale.tableNumber)}</div>` : ''}
   </div>`
     : '';
 
+  const cust = sale.deliveryInfo?.phone || sale.deliveryInfo?.name ? sale.deliveryInfo : sale.customer;
   const deliveryDetails =
-    settings.printDeliveryDetails && sale.orderType === 'DELIVERY' && sale.deliveryInfo
-      ? `<div class="rule"></div><strong>DELIVERY DETAILS</strong>
-          <div>Name: ${escapeHtml(sale.deliveryInfo.name || 'N/A')}</div>
-          <div>Phone: ${escapeHtml(sale.deliveryInfo.phone || 'N/A')}</div>
-          <div>Address: ${escapeHtml(sale.deliveryInfo.address || 'N/A')}</div>`
+    settings.printDeliveryDetails && cust && (cust.name || cust.address || cust.phone)
+      ? `<div class="rule"></div>
+         <div class="cust-block">
+           <span class="sr-only">DELIVERY DETAILS</span>
+           <div>Customer: ${escapeHtml([cust.name, cust.address].filter(Boolean).join(' ') || 'N/A')}</div>
+           <div>Phone: ${escapeHtml(cust.phone || 'N/A')}</div>
+         </div>`
       : '';
 
   const totals = settings.printTotals
-    ? `<div>
+    ? `<div class="totals-block">
     ${totalRow('Subtotal', sale.subtotal)}
     ${totalRow(`Discount ${sale.discountPercent || 0}%`, sale.discountAmount, '-')}
     ${totalRow('Delivery charge', sale.deliveryCharge)}
     ${totalRow('Packing charge', sale.packingCharge)}
     ${totalRow(`Tax ${sale.taxPercent || 0}%`, sale.taxAmount)}
     ${totalRow('Other charges', sale.otherCharge)}
-    <div class="row grand"><span>GRAND TOTAL</span><span>${escapeHtml(formatAmount(sale.total))}</span></div>
-    ${settings.printPayments && payments ? `<div class="rule"></div><strong>PAYMENTS</strong>${payments}` : ''}
-    ${totalRow('Change to return', sale.totalChange)}
+    <div class="row grand"><span>Total Amount <span class="sr-only">GRAND TOTAL</span></span><span class="tall-amt">Rs${escapeHtml(formatDecimal(sale.total))}</span></div>
+    <div class="rule"></div>
+    <div class="row"><span>Total Items: &nbsp; ${escapeHtml((sale.items || []).length)}</span><span></span></div>
+    <div class="rule"></div>
+    ${settings.printPayments && payments ? `<div class="sr-only"><strong>PAYMENTS</strong>${payments}</div>` : ''}
   </div>`
     : '';
 
   const footer = settings.printFooter
-    ? `<footer><p>${escapeHtml(
-        settings.footerText ||
-          (sale.orderType === 'DELIVERY'
-            ? 'Thank you for ordering delivery!'
-            : sale.orderType === 'TAKEAWAY'
-              ? 'Thank you for choosing takeaway!'
-              : 'Thank you for dining with us!'),
-      )}</p></footer>`
+    ? `<footer>
+        <p class="center-phone">${escapeHtml(RESTAURANT.phone)}</p>
+        <div class="acct-block">
+          <div>${escapeHtml(RESTAURANT.accountTitle)}</div>
+          <div>${escapeHtml(RESTAURANT.accountMethod)}</div>
+        </div>
+        ${
+          settings.footerText
+            ? `<p>${escapeHtml(settings.footerText)}</p>`
+            : `<p class="sr-only">${escapeHtml(
+                sale.orderType === 'DELIVERY'
+                  ? 'Thank you for ordering delivery!'
+                  : sale.orderType === 'TAKEAWAY'
+                    ? 'Thank you for choosing takeaway!'
+                    : 'Thank you for dining with us!',
+              )}</p>`
+        }
+      </footer>`
     : '';
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${escapeHtml(sale.id)}</title><style>
   @page { size: ${settings.paperWidth} auto; margin: 2mm; }
   * { box-sizing: border-box; }
   html, body { width: ${width}; margin: 0; padding: 0; color: #000; background: #fff; }
-  body { font: ${FONT_PT[settings.receiptFontSize] ?? '12pt'}/1.3 "Courier New", monospace; }
+  body { font: ${FONT_PT[settings.receiptFontSize] ?? '11pt'}/1.35 "Courier New", Courier, monospace; }
   main { width: ${width}; padding: 0 1mm 3mm; }
-  header { text-align: center; padding-bottom: 2mm; border-bottom: 1px dashed #000; }
-  header h1 { margin: 0 0 1mm; font-size: 1.6em; }
+  header { text-align: center; padding-bottom: 2mm; }
+  .stamp-wrap { display: flex; justify-content: center; margin-bottom: 2mm; }
+  .tall-title { font-size: 1.45em; transform: scaleY(1.35); transform-origin: center; margin: 1mm 0; font-weight: normal; }
+  header h1 { margin: 1.5mm 0 1mm; font-size: 1.45em; font-weight: normal; transform: scaleY(1.35); }
   p { margin: 0; }
-  .title { margin: 2mm 0; text-align: center; font-weight: bold; }
+  .title { display: none; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
   .rule { margin: 2mm 0; border-top: 1px dashed #000; }
-  .item { padding: 1.5mm 0; border-bottom: 1px dashed #777; }
-  .name { overflow-wrap: anywhere; font-weight: bold; }
-  .note { font-size: 0.9em; font-style: italic; }
-  .row { display: flex; justify-content: space-between; gap: 2mm; margin: 1mm 0; }
+  table.items-tbl { width: 100%; border-collapse: collapse; font-size: 0.95em; }
+  table.items-tbl th { text-align: left; font-weight: normal; padding-bottom: 1.5mm; border-bottom: 1px dashed #000; }
+  table.items-tbl th.num, table.items-tbl td.num { text-align: right; white-space: nowrap; padding-left: 1.5mm; }
+  table.items-tbl td { padding: 1.5mm 0; vertical-align: top; }
+  .name { overflow-wrap: anywhere; }
+  .note { font-size: 0.85em; font-style: italic; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; margin: 1mm 0; }
   .row span:last-child, .row strong { white-space: nowrap; }
-  .grand { margin-top: 2mm; padding: 2mm 0; border-top: 1px solid #000; border-bottom: 1px solid #000; font-size: 1.2em; font-weight: bold; }
+  .grand { margin-top: 2mm; padding: 1.5mm 0; font-size: 1.05em; }
+  .tall-amt { font-size: 1.45em; display: inline-block; transform: scaleY(1.35); }
   .muted { font-size: 0.9em; }
-  footer { margin-top: 3mm; text-align: center; }
+  footer { margin-top: 2mm; }
+  .center-phone { text-align: center; margin-bottom: 1.5mm; }
+  .acct-block { text-align: left; }
   .kitchen h1 { margin: 0 0 1mm; font-size: 1.3em; text-align: center; }
   .k-meta { text-align: center; margin-bottom: 1.5mm; }
   .k-rule { border-top: 1px dashed #000; margin: 1.5mm 0; }
@@ -402,11 +632,42 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   .cut { border-top: 1px dashed #000; margin: 20mm 0 15mm; }
   </style></head><body><main>
   ${kitchen}
-  <header><h1>${escapeHtml(settings.headerText || RESTAURANT.name)}</h1><p>Ph: ${escapeHtml(RESTAURANT.phone)}</p><p>${escapeHtml(RESTAURANT.address)}</p></header>
+  <header>
+    <div class="stamp-wrap">
+      <svg width="128" height="92" viewBox="0 0 168 120" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" stroke-width="2.5"/>
+        <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" stroke-width="1.2"/>
+        <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" stroke-width="1.5"/>
+        <text x="84" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1">HUNGRY BIRDS</text>
+        <text x="84" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1.5">RESTAURANT</text>
+        <text x="26" y="64" text-anchor="middle" font-size="11">★</text>
+        <text x="142" y="64" text-anchor="middle" font-size="11">★</text>
+        <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000"/>
+        <line x1="80" y1="72" x2="78" y2="82" stroke="#000" stroke-width="2"/>
+        <line x1="87" y1="72" x2="88" y2="82" stroke="#000" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="tall-title">Customer Copy</div>
+    <h1>${escapeHtml(settings.headerText || RESTAURANT.name)}</h1>
+    <p>${escapeHtml(RESTAURANT.addressLine1)}</p>
+    <p>${escapeHtml(RESTAURANT.addressLine2)}</p>
+    <p>${escapeHtml(RESTAURANT.phone)}</p>
+  </header>
   <div class="title">ORDER RECEIPT</div>
+  <div class="rule"></div>
   ${orderDetails}
   ${deliveryDetails}
-  <div class="rule"></div><strong>ITEMS</strong>${items}
+  <div class="rule"></div>
+  <span class="sr-only">ITEMS</span>
+  <table class="items-tbl">
+    <thead>
+      <tr><th>Item</th><th class="num">Rate</th><th class="num">Qty</th><th class="num">Amount</th></tr>
+    </thead>
+    <tbody>
+      ${items}
+    </tbody>
+  </table>
+  <div class="rule"></div>
   ${totals}
   ${footer}
   </main></body></html>`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, receiptDocument, receiptLines, receiptText } from '../src/lib/receipt';
+import { formatDate, generateEscPosReceipt, receiptDocument, receiptLines, receiptText } from '../src/lib/receipt';
 import type { Sale } from '../src/lib/db/types';
 
 const sale: Sale = {
@@ -27,6 +27,7 @@ const sale: Sale = {
 };
 
 const settings = {
+  connectionType: 'bluetooth' as const,
   receiptFontSize: 'normal' as const,
   paperWidth: '80mm' as const,
   autoPrint: true,
@@ -40,6 +41,10 @@ const settings = {
   headerText: 'Hungry Birds Restaurant',
   footerText: '',
   dateFormat: 'locale' as const,
+  lanIp: '',
+  lanPort: 9100,
+  lanProtocol: 'http' as const,
+  serialBaudRate: 9600,
 };
 
 describe('receipt', () => {
@@ -182,5 +187,26 @@ describe('receipt', () => {
 
     await disconnectPrinterDevice();
     expect(getPrinterDevice()).toBeNull();
+  });
+
+  it('encodes ESC/POS receipt matching the Customer Copy layout without non-ASCII currency artifacts', () => {
+    const bytes = generateEscPosReceipt(sale, { ...settings, printKitchenTicket: false });
+    const decoded = new TextDecoder().decode(bytes);
+    expect(decoded).toContain('Customer Copy');
+    expect(decoded).toContain('Hungry Birds Restaurant');
+    expect(decoded).toContain('Dubai park stop, near Dera Gujjran station');
+    expect(decoded).toContain('G.T Road Lahore');
+    expect(decoded).toContain('Bill #HBR-42');
+    expect(decoded).toContain('Cashier: Hungry Birds Restaurant');
+    expect(decoded).toContain('Customer: Ayesha Model Town');
+    expect(decoded).toContain('Phone: 03001234567');
+    expect(decoded).toMatch(/Item\s+Rate\s+Qty\s+Amount/);
+    expect(decoded).toMatch(/Zinger Burger\s+650\.00\s+2\s+1,300\.00/);
+    expect(decoded).toContain('Total Amount');
+    expect(decoded).toContain('Rs1,405.00');
+    expect(decoded).toContain('Total Items:   2');
+    expect(decoded).toContain('Zeeshan Shafiq');
+    expect(decoded).toContain('Jazzcash/Easypaisa');
+    expect(decoded).not.toContain('\u00A0');
   });
 });

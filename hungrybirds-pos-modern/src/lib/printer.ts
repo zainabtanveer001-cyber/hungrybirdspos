@@ -155,7 +155,7 @@ export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   receiptFontSize: 'normal',
   paperWidth: '80mm',
   autoPrint: true,
-  printKitchenTicket: true,
+  printKitchenTicket: false,
   printOrderDetails: true,
   printDeliveryDetails: true,
   printItemPrices: true,
