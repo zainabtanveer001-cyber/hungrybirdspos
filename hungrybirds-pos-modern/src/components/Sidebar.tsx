@@ -93,88 +93,93 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
           type="button"
           aria-label="Close navigation"
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-[#000524]/50 lg:hidden"
         />
       )}
       <aside
-        className={`bg-white border-r border-gray-200 py-4 flex-shrink-0 flex flex-col transition-all duration-200 fixed inset-y-0 left-0 z-50 lg:static lg:z-auto ${
+        className={`bg-white border-r border-[#d4d4d8] py-4 flex-shrink-0 flex flex-col transition-all duration-200 fixed inset-y-0 left-0 z-50 lg:static lg:z-auto ${
           open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${collapsed ? 'w-16 px-2' : 'w-64 px-3'}`}
         aria-label="Main navigation"
       >
-      <div className={`sidebar-heading mb-4 flex items-center ${collapsed ? 'justify-center' : 'justify-between px-2'}`}>
+        <div className={`sidebar-heading mb-4 flex items-center ${collapsed ? 'justify-center' : 'justify-between px-2'}`}>
+          {!collapsed && (
+            <div>
+              <p className="text-xs font-normal text-[#616f75]">Workspace</p>
+              <p className="font-display text-sm font-medium text-[#000000]">Quick access</p>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (window.matchMedia('(min-width: 1024px)').matches) setCollapsed((c) => !c);
+              else onClose();
+            }}
+            className="w-9 h-9 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] hover:text-[#2941e0] text-[#273238] flex items-center justify-center transition"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+          {groups.map((group) => {
+            const visible = group.items.filter((i) => !i.roles || i.roles.includes(role));
+            if (!visible.length) return null;
+            return (
+              <div key={group.title}>
+                {!collapsed && (
+                  <p className="px-3 mb-1 text-xs font-medium text-[#616f75]">
+                    {group.title}
+                  </p>
+                )}
+                {visible.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      item.onClick?.();
+                      if (!window.matchMedia('(min-width: 1024px)').matches) onClose();
+                    }}
+                    title={collapsed ? item.label : undefined}
+                    className={`w-full rounded-[8px] px-3 py-2 text-left text-sm font-normal flex items-center gap-3 text-[#000000] hover:bg-[#eff6ff] hover:text-[#2941e0] transition-colors ${
+                      collapsed ? 'justify-center' : ''
+                    }`}
+                  >
+                    <item.icon className="w-4 h-4 shrink-0 text-[#526066]" aria-hidden />
+                    {!collapsed && <span className="truncate">{item.label}</span>}
+                    {!collapsed && !!item.badge && (
+                      <span
+                        className={`ml-auto rounded-[88px] bg-[#eff6ff] text-[#2941e0] px-2.5 py-0.5 text-xs font-medium ${
+                          item.label === 'Online orders' && item.badge > 0
+                            ? 'animate-pulse ring-2 ring-[#795afa]'
+                            : ''
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            );
+          })}
+        </nav>
+
         {!collapsed && (
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500">Workspace</p>
-            <p className="mt-1 text-sm font-semibold text-gray-700">Quick access</p>
+          <div className="mx-1 mt-4 rounded-2xl bg-[#000524] p-3 text-xs leading-relaxed text-white">
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="block font-display font-medium text-white hover:text-[#c5b9fa] text-left"
+            >
+              Hungry Birds POS
+            </button>
+            <span className="text-[#c5b9fa]">
+              Signed in as <span className="font-medium text-white">{username}</span> · {role}
+            </span>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => {
-            // The drawer only collapses to icons on wide screens; on a phone it closes.
-            if (window.matchMedia('(min-width: 1024px)').matches) setCollapsed((c) => !c);
-            else onClose();
-          }}
-          className="w-11 h-11 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center transition"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
-        {groups.map((group) => {
-          const visible = group.items.filter((i) => !i.roles || i.roles.includes(role));
-          if (!visible.length) return null;
-          return (
-            <div key={group.title}>
-              {!collapsed && (
-                <p className="px-3 mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-gray-500">
-                  {group.title}
-                </p>
-              )}
-              {visible.map((item) => (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => {
-                    item.onClick?.();
-                    if (!window.matchMedia('(min-width: 1024px)').matches) onClose();
-                  }}
-                  title={collapsed ? item.label : undefined}
-                  className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium flex items-center gap-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors ${
-                    collapsed ? 'justify-center' : ''
-                  }`}
-                >
-                  <item.icon className="w-5 h-5 shrink-0" aria-hidden />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
-                  {!collapsed && !!item.badge && (
-                    <span className={`ml-auto rounded-full bg-blue-600 px-2 py-0.5 text-[10px] font-bold text-white ${
-                      item.label === 'Online orders' && item.badge > 0
-                        ? 'animate-pulse ring-2 ring-blue-400'
-                        : ''
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          );
-        })}
-      </nav>
-
-      {!collapsed && (
-        <div className="mx-2 mt-4 border-t border-gray-200 pt-3 text-[11px] leading-relaxed text-gray-500">
-          <button type="button" onClick={onSignOut} className="block font-semibold text-gray-600 hover:text-red-600 min-h-11 px-2">
-            Hungry Birds POS
-          </button>
-          <span>
-            Signed in as <span className="font-semibold text-gray-600">{username}</span> · {role}
-          </span>
-        </div>
-      )}
       </aside>
     </>
   );

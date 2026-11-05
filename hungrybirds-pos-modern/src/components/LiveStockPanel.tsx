@@ -30,17 +30,17 @@ export function LiveStockPanel({ canManage, username, onManage }: {
 
   return (
     <>
-      <section className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+      <section className="bg-white p-4 rounded-2xl border border-[#e0edff]">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-xs font-black uppercase tracking-widest text-gray-800 flex items-center gap-1.5">
-            <Boxes className="w-4 h-4 text-amber-600" aria-hidden /> Live Stock
+          <h3 className="font-display text-sm font-medium text-[#273238] flex items-center gap-1.5">
+            <Boxes className="w-4 h-4 text-[#2941e0]" aria-hidden /> Live Stock
           </h3>
           <div className="flex items-center gap-1.5">
             {unlocked && (
               <button
                 type="button"
                 onClick={() => setUnlocked(false)}
-                className="text-[10px] bg-red-50 text-red-600 px-2 py-1 rounded-lg font-bold ring-1 ring-red-200 hover:bg-red-100"
+                className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-[8px] font-medium border border-red-200 hover:bg-red-100"
               >
                 Lock
               </button>
@@ -49,7 +49,7 @@ export function LiveStockPanel({ canManage, username, onManage }: {
               <button
                 type="button"
                 onClick={onManage}
-                className="text-[10px] text-amber-700 bg-amber-100/50 hover:bg-amber-100 px-3 min-h-11 rounded-lg font-bold ring-1 ring-amber-200/50"
+                className="text-xs text-[#2941e0] bg-[#eff6ff] hover:bg-[#e0edff] px-3 py-1 rounded-[8px] font-medium"
               >
                 Manage
               </button>
@@ -58,13 +58,13 @@ export function LiveStockPanel({ canManage, username, onManage }: {
         </div>
 
         {!unlocked ? (
-          <div className="text-center py-6 border border-dashed border-gray-300 rounded-2xl bg-gray-50/50 space-y-2">
-            <Lock className="w-7 h-7 mx-auto text-gray-400" aria-hidden />
-            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Stock Protected</p>
+          <div className="text-center py-6 border border-[#e0edff] rounded-2xl bg-[#eff6ff]/40 space-y-2">
+            <Lock className="w-6 h-6 mx-auto text-[#526066]" aria-hidden />
+            <p className="text-xs font-medium text-[#526066]">Stock Protected</p>
             <button
               type="button"
               onClick={() => setPrompting(true)}
-              className="bg-gray-200 text-gray-800 px-4 py-2 min-h-11 rounded-xl text-xs font-bold hover:bg-gray-300"
+              className="bg-[#2941e0] text-white px-4 h-9 rounded-[8px] text-xs font-medium hover:bg-[#1f35c4] transition"
             >
               Authenticate to View
             </button>

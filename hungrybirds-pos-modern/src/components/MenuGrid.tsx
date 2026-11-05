@@ -43,23 +43,25 @@ export function MenuGrid({ onPick }: MenuGridProps) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+      <div className="bg-white p-4 rounded-2xl border border-[#e0edff]">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616f75]" aria-hidden />
           <input
             id="posMenuSearchInput"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search menu items... (Press / to focus)"
-            className="w-full pl-10 pr-4 py-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white transition-all shadow-inner"
+            className="w-full pl-10 pr-4 h-10 text-sm text-[#000000] border border-[#b4c4cc] rounded-[10px] bg-white focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] transition-all"
           />
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-        <h3 className="text-xs font-black uppercase tracking-widest text-gray-800 mb-3">Menu Categories</h3>
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none" role="tablist" aria-label="Menu categories">
+      <div className="bg-white p-4 rounded-2xl border border-[#e0edff]">
+        <h3 className="font-display text-xs font-medium uppercase tracking-normal text-[#526066] mb-3">
+          Menu Categories
+        </h3>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" role="tablist" aria-label="Menu categories">
           <CategoryButton
             label="All Items"
             count={menu.length}
@@ -78,9 +80,9 @@ export function MenuGrid({ onPick }: MenuGridProps) {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+      <div className="bg-white p-4 rounded-2xl border border-[#e0edff]">
         {grouped.length === 0 ? (
-          <p className="text-center text-gray-400 py-6">
+          <p className="text-center text-[#616f75] py-6 text-sm">
             {search.trim()
               ? `No items match "${search.trim()}".`
               : 'No dishes available. Add some in Owner Admin.'}
@@ -89,9 +91,11 @@ export function MenuGrid({ onPick }: MenuGridProps) {
           <div className="space-y-5">
             {grouped.map((group) => (
               <section key={group.category.id}>
-                <h4 className="text-sm font-bold uppercase tracking-wide text-gray-600 mb-2">
-                  {group.category.name}{' '}
-                  <span className="text-xs font-normal text-gray-400">({group.items.length})</span>
+                <h4 className="font-display text-base font-medium text-[#273238] mb-2.5 flex items-center gap-2">
+                  <span>{group.category.name}</span>
+                  <span className="text-xs font-normal text-[#2941e0] bg-[#eff6ff] px-2.5 py-0.5 rounded-[88px]">
+                    {group.items.length}
+                  </span>
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                   {group.items.map((item) => (
@@ -100,25 +104,25 @@ export function MenuGrid({ onPick }: MenuGridProps) {
                       type="button"
                       onClick={() => onPick(item)}
                       title={`Add ${item.name} to the order`}
-                      className="menu-item-card w-full text-left rounded-2xl shadow-sm border overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-blue-300"
+                      className="menu-item-card w-full text-left rounded-2xl border border-[#e0edff] bg-white overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-[#2941e0]"
                     >
                       {item.imageUrl ? (
                         <img
                           src={item.imageUrl}
                           alt=""
                           loading="lazy"
-                          className="w-full h-24 object-cover border-b border-gray-200"
+                          className="w-full h-24 object-cover border-b border-[#e0edff]"
                         />
                       ) : (
-                        <div className="h-24 bg-gray-100 flex items-center justify-center text-xs font-bold uppercase tracking-widest text-gray-400">
+                        <div className="h-24 bg-[#eff6ff] flex items-center justify-center text-xs font-medium text-[#526066]">
                           Menu
                         </div>
                       )}
                       <div className="p-3">
-                        <h3 className="font-semibold text-sm text-gray-800 leading-snug line-clamp-2 min-h-10">
+                        <h3 className="font-sans font-medium text-sm text-[#000000] leading-snug line-clamp-2 min-h-10">
                           {item.name}
                         </h3>
-                        <p className="text-blue-700 font-bold text-sm mt-2">{formatAmount(item.price)}</p>
+                        <p className="text-[#2941e0] font-semibold text-sm mt-2">{formatAmount(item.price)}</p>
                       </div>
                     </button>
                   ))}
@@ -143,15 +147,21 @@ function CategoryButton({ label, count, active, onClick }: {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`px-4 py-2 rounded-lg whitespace-nowrap font-semibold border transition-all duration-200 flex items-center ${
+      className={`px-4 h-9 rounded-[8px] text-sm whitespace-nowrap font-medium border transition-all duration-150 flex items-center gap-1.5 ${
         active
-          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200'
+          ? 'bg-[#2941e0] text-white border-[#2941e0]'
+          : 'bg-white text-[#273238] border-[#b4c4cc] hover:bg-[#eff6ff] hover:text-[#2941e0] hover:border-[#c5b9fa]'
       }`}
     >
-      {label}
+      <span>{label}</span>
       {count > 0 && (
-        <span className="ml-1 text-[10px] bg-white/20 px-1.5 py-0.5 rounded-full font-mono">{count}</span>
+        <span
+          className={`text-xs px-2 py-0.5 rounded-[88px] font-mono ${
+            active ? 'bg-white/20 text-white' : 'bg-[#eff6ff] text-[#2941e0]'
+          }`}
+        >
+          {count}
+        </span>
       )}
     </button>
   );

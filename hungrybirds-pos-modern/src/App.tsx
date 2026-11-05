@@ -269,21 +269,21 @@ function App() {
 
   return (
     <div className="h-screen overflow-hidden bg-ui-bg flex flex-col">
-      <header className="bg-white p-3 sm:p-4 shadow-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sticky top-0 z-40 border-b border-gray-100">
+      <header className="bg-white px-4 sm:px-6 h-14 flex justify-between items-center gap-2 sticky top-0 z-40 border-b border-[#d4d4d8] shrink-0">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setNavOpen(true)}
             aria-label="Open navigation"
-            className="lg:hidden w-11 h-11 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 flex items-center justify-center"
+            className="lg:hidden w-9 h-9 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
           >
-            <Menu className="w-5 h-5" aria-hidden />
+            <Menu className="w-4 h-4" aria-hidden />
           </button>
-          <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-            <img src="/logo.svg" alt="" className="w-9 h-9" />
-            <span className="text-gray-900">Hungry Birds</span>
+          <h1 className="font-display text-xl font-medium tracking-normal flex items-center gap-2.5">
+            <img src="/logo.svg" alt="" className="w-8 h-8" />
+            <span className="text-[#000000]">Hungry Birds</span>
           </h1>
-          <span className="text-[10px] px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 font-bold uppercase tracking-widest text-blue-700">
+          <span className="text-xs px-3 py-1 rounded-[88px] bg-[#eff6ff] font-medium text-[#2941e0]">
             {session.role}
           </span>
         </div>
@@ -292,13 +292,13 @@ function App() {
             type="button"
             onClick={() => setKdsOpen(true)}
             title="Open Kitchen Display System (F8)"
-            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-2 min-h-11 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            className="bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] px-3.5 h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1.5"
           >
             <ChefHat className="w-4 h-4" aria-hidden /> KDS
           </button>
           <SyncBadge />
-          <span className="hidden lg:inline text-xs text-gray-600">
-            Welcome, <strong className="text-gray-800">{session.username}</strong>
+          <span className="hidden lg:inline text-xs text-[#526066]">
+            Welcome, <strong className="font-medium text-[#000000]">{session.username}</strong>
           </span>
           <button
             type="button"
@@ -307,7 +307,7 @@ function App() {
               setSession(null);
               setCart([]);
             }}
-            className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-4 py-2 min-h-11 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+            className="bg-white hover:bg-red-50 text-[#000000] hover:text-red-600 border border-[#b4c4cc] px-4 h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1.5"
           >
             <LogOut className="w-3.5 h-3.5" /> Logout
           </button>
@@ -354,13 +354,13 @@ function App() {
                 onManage={() => setInventoryOpen(true)}
               />
 
-              <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+              <div className="bg-white p-4 rounded-2xl border border-[#e0edff]">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-800">Recent Sales</h3>
+                  <h3 className="font-display text-sm font-medium text-[#273238]">Recent Sales</h3>
                   <button
                     type="button"
                     onClick={() => setSalesOpen(true)}
-                    className="text-xs font-bold text-indigo-600 hover:underline min-h-11 px-2"
+                    className="text-xs font-medium text-[#2941e0] hover:underline px-2 py-1"
                   >
                     Manage
                   </button>
@@ -542,7 +542,7 @@ function App() {
       )}
 
       {toast && (
-        <div className="fixed bottom-4 right-4 z-[100] bg-gray-900 text-white text-sm font-semibold px-4 py-3 rounded-xl shadow-xl">
+        <div className="fixed bottom-4 right-4 z-[100] bg-[#000524] border border-[#795afa] text-white text-sm font-medium px-4 py-3 rounded-[10px] shadow-xl">
           {toast}
         </div>
       )}
