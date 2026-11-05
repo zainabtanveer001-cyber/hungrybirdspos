@@ -26,7 +26,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     encoder.text(`Order: #${sale.id}`);
     encoder.text(`By: ${sale.serverUser || 'Staff'}`);
     encoder.text(`Time: ${new Date(sale.timestamp).toLocaleTimeString()}`);
-    encoder.text(`Type: ${sale.orderType}`);
+    encoder.text(`Type: ${sale.orderType}${sale.tableNumber ? ` (${sale.tableNumber})` : ''}`);
     encoder.text('--------------------------------');
     encoder.align('left');
     for (const item of sale.items || []) {
@@ -60,6 +60,9 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     encoder.text(`Date: ${formatDate(sale.timestamp, settings.dateFormat)}`);
     encoder.text(`Server: ${sale.serverUser || 'Staff'}`);
     encoder.text(`Type: ${sale.orderType}`);
+    if (sale.orderType === 'DINE_IN' && sale.tableNumber) {
+      encoder.text(`Table: ${sale.tableNumber}`);
+    }
   }
 
   if (settings.printDeliveryDetails && sale.orderType === 'DELIVERY' && sale.deliveryInfo) {
@@ -334,7 +337,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     <div>Date: ${escapeHtml(formatDate(sale.timestamp, settings.dateFormat))}</div>
     <div>Server: ${escapeHtml(sale.serverUser || 'Staff')}</div>
     <div>Type: ${escapeHtml(sale.orderType)}</div>
-    ${sale.orderType === 'DINE_IN' ? '<div>Table: Counter Service</div>' : ''}
+    ${sale.orderType === 'DINE_IN' ? `<div>Table: ${escapeHtml(sale.tableNumber || 'Counter Service')}</div>` : ''}
   </div>`
     : '';
 

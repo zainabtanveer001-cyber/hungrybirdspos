@@ -47,10 +47,11 @@ export function MenuGrid({ onPick }: MenuGridProps) {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden />
           <input
+            id="posMenuSearchInput"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search menu items..."
+            placeholder="Search menu items... (Press / to focus)"
             className="w-full pl-10 pr-4 py-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-gray-50/50 focus:bg-white transition-all shadow-inner"
           />
         </div>

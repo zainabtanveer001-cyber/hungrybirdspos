@@ -62,6 +62,8 @@ export interface HeldOrder {
   timestamp: string;
   serverUser: string;
   orderType: OrderType;
+  tableNumber?: string;
+  kitchenStatus?: KitchenStatus;
   items: CartItem[];
   subtotal: number;
   discountPercent: number;
@@ -117,6 +119,7 @@ export interface Sale {
   timestamp: string;
   orderType: OrderType;
   tableNumber?: string;
+  kitchenStatus?: KitchenStatus;
   serverUser: string;
   customer?: CustomerInfo;
   items: CartItem[];

@@ -23,6 +23,7 @@ export async function verifyStock(items: CartItem[]): Promise<string | null> {
 export interface SaleInput {
   items: CartItem[];
   orderType: OrderType;
+  tableNumber?: string;
   serverUser: string;
   subtotal: number;
   discountPercent: number;

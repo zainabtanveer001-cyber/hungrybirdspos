@@ -13,6 +13,8 @@ export async function holdOrder(
   return (await db.heldOrders.add({
     items: structuredClone(items),
     orderType: charges.orderType,
+    tableNumber: charges.orderType === 'DINE_IN' ? charges.tableNumber : undefined,
+    kitchenStatus: 'PREPARING',
     subtotal: totals.subtotal,
     discountPercent: charges.discountPercent,
     discountAmount: totals.discountAmount,
@@ -44,6 +46,7 @@ export async function readHeldOrder(id: number): Promise<{
     customer: order.customer,
     charges: {
       orderType: order.orderType || 'DINE_IN',
+      tableNumber: order.tableNumber,
       discountPercent: Number(order.discountPercent) || 0,
       deliveryCharge: Number(order.deliveryCharge) || 0,
       packingCharge: Number(order.packingCharge) || 0,

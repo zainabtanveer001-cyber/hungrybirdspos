@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { CloudOff, LogOut, Menu, RefreshCw } from 'lucide-react';
+import { ChefHat, CloudOff, LogOut, Menu, RefreshCw } from 'lucide-react';
 import { db } from './lib/db';
 import { useLive } from './lib/useLive';
 import { initializeApp, readSession, signOut } from './lib/auth';
@@ -36,6 +36,7 @@ import { ActivityLogModal } from './components/ActivityLogModal';
 import { PrinterSettingsModal } from './components/PrinterSettingsModal';
 import { AdminSettingsModal } from './components/AdminSettingsModal';
 import { OnlineOrdersModal } from './components/OnlineOrdersModal';
+import { KitchenDisplayModal } from './components/KitchenDisplayModal';
 import { useOrderAlert } from './hooks/useOrderAlert';
 import type { CartItem, CustomerInfo, MenuItem, OnlineOrder, PaymentDetail, Sale, User, UserRole } from './lib/db/types';
 
@@ -43,6 +44,7 @@ type Session = { username: string; role: UserRole };
 
 const EMPTY_CHARGES: CartCharges = {
   orderType: 'DINE_IN',
+  tableNumber: undefined,
   discountPercent: 0,
   deliveryCharge: 0,
   packingCharge: 0,
@@ -76,6 +78,7 @@ function App() {
   const [printerOpen, setPrinterOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const [onlineOrdersOpen, setOnlineOrdersOpen] = useState(false);
+  const [kdsOpen, setKdsOpen] = useState(false);
   const [activeOnlineOrder, setActiveOnlineOrder] = useState<OnlineOrder | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -119,24 +122,54 @@ function App() {
     );
   }
 
-  function resetOrder() {
+  const resetOrder = useCallback(() => {
     setCart([]);
     setCharges(EMPTY_CHARGES);
     setCustomer({});
     setLoyaltyBalance(0);
     setActiveOnlineOrder(null);
-  }
+  }, []);
 
-  async function hold() {
+  const hold = useCallback(async () => {
+    if (!cart.length) return;
     const id = await holdOrder(cart, charges, customer.phone ? customer : undefined, session?.username || 'Staff');
     resetOrder();
-    notify(`Held order #${id}.`);
-  }
+    notify(`Held order #${id}${charges.tableNumber ? ` (${charges.tableNumber})` : ''}.`);
+  }, [cart, charges, customer, notify, resetOrder, session?.username]);
 
-  /**
-   * Tells the website the order was paid. Delivery keeps moving (rider + delivered
-   * are still staff steps); takeaway completes at checkout — legacy app.js:5351.
-   */
+  useEffect(() => {
+    if (!session) return;
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable);
+
+      if (e.key === '/' && !isInput) {
+        e.preventDefault();
+        document.getElementById('posMenuSearchInput')?.focus();
+      } else if (e.key === 'F2' && cart.length > 0 && !paying) {
+        e.preventDefault();
+        if (session?.role === 'WAITER') {
+          notify('Waiters cannot take payments. Ask a cashier or manager.');
+          return;
+        }
+        setPaying(true);
+      } else if (e.key === 'F4' && cart.length > 0 && !paying) {
+        e.preventDefault();
+        void hold();
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        setKdsOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [session, cart.length, paying, hold, notify]);
+
   async function closeOnlineOrder(saleId: number) {
     const order = activeOnlineOrder;
     if (!order?.id) return;
@@ -161,10 +194,13 @@ function App() {
       return;
     }
 
+    const tableNumber = charges.orderType === 'DINE_IN' ? charges.tableNumber : undefined;
+
     try {
       const saleId = await recordSale({
         items: cart,
         orderType: charges.orderType,
+        tableNumber,
         serverUser: session?.username || 'Staff',
         subtotal: totals.subtotal,
         discountPercent: charges.discountPercent,
@@ -187,6 +223,7 @@ function App() {
         id: saleId,
         timestamp: new Date().toISOString(),
         orderType: charges.orderType,
+        tableNumber,
         serverUser: session?.username || 'Staff',
         items: cart,
         subtotal: totals.subtotal,
@@ -207,7 +244,6 @@ function App() {
       resetOrder();
       setPaying(false);
       notify(`Sale #${saleId} completed — ${formatAmount(totals.grandTotal)}`);
-      // The button promises a receipt; print after the UI has settled so the dialog is not blocked by the payment modal.
       getPrinterSettings().then((printer) => {
         if (!printer.autoPrint) return;
         setTimeout(() => {
@@ -251,7 +287,15 @@ function App() {
             {session.role}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => setKdsOpen(true)}
+            title="Open Kitchen Display System (F8)"
+            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-3 py-2 min-h-11 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+          >
+            <ChefHat className="w-4 h-4" aria-hidden /> KDS
+          </button>
           <SyncBadge />
           <span className="hidden lg:inline text-xs text-gray-600">
             Welcome, <strong className="text-gray-800">{session.username}</strong>
@@ -281,6 +325,7 @@ function App() {
             setSession(null);
             setCart([]);
           }}
+          onOpenKds={() => setKdsOpen(true)}
           onOpenHeldOrders={() => setHeldOpen(true)}
           onOpenDeliveries={() => setDeliveriesOpen(true)}
           onOpenCustomers={() => setCustomersOpen(true)}
@@ -301,6 +346,31 @@ function App() {
         <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
           <div className="xl:col-span-2 space-y-4">
             <MenuGrid onPick={pickItem} />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+              <LiveStockPanel
+                canManage={session.role === 'OWNER' || session.role === 'MANAGER'}
+                username={session.username}
+                onManage={() => setInventoryOpen(true)}
+              />
+
+              <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-gray-800">Recent Sales</h3>
+                  <button
+                    type="button"
+                    onClick={() => setSalesOpen(true)}
+                    className="text-xs font-bold text-indigo-600 hover:underline min-h-11 px-2"
+                  >
+                    Manage
+                  </button>
+                </div>
+                <RecentSales />
+              </div>
+            </div>
+          </div>
+
+          <aside className="xl:sticky xl:top-0">
             <CartPanel
               items={cart}
               role={session.role}
@@ -315,28 +385,6 @@ function App() {
               onHold={hold}
               onCheckout={() => setPaying(true)}
             />
-          </div>
-
-          <aside className="space-y-4">
-            <LiveStockPanel
-              canManage={session.role === 'OWNER' || session.role === 'MANAGER'}
-              username={session.username}
-              onManage={() => setInventoryOpen(true)}
-            />
-
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-black uppercase tracking-widest text-gray-800">Recent Sales</h3>
-                <button
-                  type="button"
-                  onClick={() => setSalesOpen(true)}
-                  className="text-xs font-bold text-indigo-600 hover:underline min-h-11 px-2"
-                >
-                  Manage
-                </button>
-              </div>
-              <RecentSales />
-            </div>
           </aside>
         </main>
       </div>
@@ -348,6 +396,8 @@ function App() {
           onConfirm={complete}
         />
       )}
+
+      {kdsOpen && <KitchenDisplayModal onClose={() => setKdsOpen(false)} notify={notify} />}
 
       {heldOpen && (
         <HeldOrdersModal
@@ -427,7 +477,7 @@ function App() {
           preview={
             totals.grandTotal > 0
               ? {
-                  title: `${charges.orderType.replace('_', ' ')} · Walk-in`,
+                  title: `${charges.orderType.replace('_', ' ')} · ${charges.tableNumber ? `Table ${charges.tableNumber}` : 'Walk-in'}`,
                   lines: cart.map((line): [string, string] => [
                     `${line.qty} × ${line.name}`,
                     formatAmount(line.price * line.qty),
@@ -464,6 +514,7 @@ function App() {
             setCart(sale.items);
             setCharges({
               orderType: sale.orderType || 'DINE_IN',
+              tableNumber: sale.tableNumber,
               discountPercent: Number(sale.discountPercent) || 0,
               deliveryCharge: Number(sale.deliveryCharge) || 0,
               packingCharge: Number(sale.packingCharge) || 0,
@@ -536,6 +587,7 @@ function RecentSales() {
         <li key={sale.id} className="flex justify-between items-center gap-2 p-2 rounded-lg bg-gray-50">
           <span className="text-gray-500 tabular-nums">
             #{sale.id} · {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {sale.tableNumber ? ` · ${sale.tableNumber}` : ''}
           </span>
           <span className="font-bold text-gray-800">{formatAmount(sale.total)}</span>
         </li>

@@ -37,6 +37,11 @@ export function HeldOrdersModal({ onClose, onRestore }: {
                     <span className="ml-1 text-[10px] text-orange-700 font-bold bg-orange-100 px-1.5 py-0.5 rounded">
                       {order.orderType}
                     </span>
+                    {order.tableNumber && (
+                      <span className="ml-1 text-[10px] text-indigo-700 font-bold bg-indigo-100 px-1.5 py-0.5 rounded">
+                        Table {order.tableNumber}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] text-gray-500">
                     By: {order.serverUser} • {new Date(order.timestamp).toLocaleTimeString()}

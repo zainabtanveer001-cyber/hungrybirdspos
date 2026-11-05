@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutGrid, Globe, Archive, Bike, Users, BarChart3, TrendingUp,
   Boxes, Truck, Receipt, UserCog, Wallet, Clock, Printer, ScrollText,
-  ShieldCheck, ChevronLeft, ChevronRight,
+  ShieldCheck, ChevronLeft, ChevronRight, ChefHat,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/db';
@@ -22,7 +22,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOrders, onOpenDeliveries, onOpenCustomers, onOpenInventory, onOpenSuppliers, onOpenExpenses, onOpenAnalytics, onOpenPnl, onOpenStaff, onOpenOpeningCash, onOpenShiftSummary, onOpenActivityLog, onOpenPrinter, onOpenAdmin, onOpenOnlineOrders }: {
+export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOrders, onOpenDeliveries, onOpenCustomers, onOpenInventory, onOpenSuppliers, onOpenExpenses, onOpenAnalytics, onOpenPnl, onOpenStaff, onOpenOpeningCash, onOpenShiftSummary, onOpenActivityLog, onOpenPrinter, onOpenAdmin, onOpenOnlineOrders, onOpenKds }: {
   role: UserRole;
   username: string;
   /** Drawer state below the lg breakpoint, where the sidebar overlays the POS. */
@@ -44,6 +44,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
   onOpenPrinter: () => void;
   onOpenAdmin: () => void;
   onOpenOnlineOrders: () => void;
+  onOpenKds?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const heldCount = useLive(() => db.heldOrders.count(), []) ?? 0;
@@ -55,6 +56,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
       title: 'Orders',
       items: [
         { label: 'Counter & menu', icon: LayoutGrid },
+        { label: 'Kitchen display (KDS)', icon: ChefHat, badge: heldCount, onClick: onOpenKds },
         { label: 'Online orders', icon: Globe, badge: pendingOnline, onClick: onOpenOnlineOrders },
         { label: 'Held orders', icon: Archive, badge: heldCount, onClick: onOpenHeldOrders },
         { label: 'Deliveries', icon: Bike, badge: pendingDeliveries, onClick: onOpenDeliveries },

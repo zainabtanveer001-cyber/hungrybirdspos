@@ -5,6 +5,7 @@ export const LOYALTY_POINT_VALUE = 1;
 
 export interface CartCharges {
   orderType: OrderType;
+  tableNumber?: string;
   discountPercent: number;
   deliveryCharge: number;
   packingCharge: number;

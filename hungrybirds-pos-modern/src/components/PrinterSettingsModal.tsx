@@ -1,16 +1,30 @@
 import { useEffect, useState } from 'react';
-import { Bluetooth, Check, Printer, X } from 'lucide-react';
+import { Bluetooth, Cable, Check, Cpu, Printer, Wifi, X } from 'lucide-react';
 import {
   disconnectPrinterDevice,
+  disconnectSerialPrinter,
+  disconnectUsbPrinter,
   getPrinterDevice,
   getPrinterSettings,
+  getSerialPrinterPort,
+  getUsbPrinterDevice,
   pairPrinterDevice,
+  pairSerialPrinter,
+  pairUsbPrinter,
   printTestReceipt,
   receiptFontClass,
   restorePrinterDevice,
   savePrinterSettings,
 } from '../lib/printer';
-import type { BluetoothDeviceLike, DateFormat, PrinterSettings, ReceiptFontSize } from '../lib/printer';
+import type {
+  BluetoothDeviceLike,
+  DateFormat,
+  PrinterConnectionType,
+  PrinterSettings,
+  ReceiptFontSize,
+  SerialPortLike,
+  UsbDeviceLike,
+} from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
 import { formatDate, RESTAURANT } from '../lib/receipt';
@@ -30,6 +44,15 @@ const DATE_OPTIONS: Array<{ value: DateFormat; label: string }> = [
   { value: 'time', label: 'Time only (5:04:22 pm)' },
 ];
 
+const CONNECTION_TYPES: Array<{ value: PrinterConnectionType; label: string; icon: typeof Bluetooth }> = [
+  { value: 'bluetooth', label: 'Bluetooth (BLE)', icon: Bluetooth },
+  { value: 'usb', label: 'USB Cable', icon: Cable },
+  { value: 'serial', label: 'Serial / COM Port', icon: Cpu },
+  { value: 'lan', label: 'LAN / Wi-Fi IP', icon: Wifi },
+];
+
+const BAUD_RATES = [9600, 19200, 38400, 57600, 115200];
+
 /** The "what to print" switches, in the order they appear on the receipt. */
 const PRINT_OPTIONS: Array<[keyof PrinterSettings, string]> = [
   ['printOrderDetails', 'Order details (ID, date, server, order type)'],
@@ -47,21 +70,26 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   onClose: () => void;
 }) {
   const [settings, setSettings] = useState<PrinterSettings | null>(null);
-  const [device, setDevice] = useState<BluetoothDeviceLike | null>(() => getPrinterDevice());
+  const [btDevice, setBtDevice] = useState<BluetoothDeviceLike | null>(() => getPrinterDevice());
+  const [usbDevice, setUsbDevice] = useState<UsbDeviceLike | null>(() => getUsbPrinterDevice());
+  const [serialPort, setSerialPort] = useState<SerialPortLike | null>(() => getSerialPrinterPort());
   const [connecting, setConnecting] = useState(false);
   const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     getPrinterSettings().then(setSettings);
     restorePrinterDevice().then(() => {
-      const paired = getPrinterDevice();
-      if (paired) setDevice(paired);
+      setBtDevice(getPrinterDevice());
+      setUsbDevice(getUsbPrinterDevice());
+      setSerialPort(getSerialPrinterPort());
     });
   }, []);
 
   const hasBluetooth = typeof navigator !== 'undefined' && 'bluetooth' in navigator;
+  const hasUsb = typeof navigator !== 'undefined' && 'usb' in navigator;
+  const hasSerial = typeof navigator !== 'undefined' && 'serial' in navigator;
 
-  async function connect() {
+  async function connectBluetooth() {
     if (!hasBluetooth) {
       notify('Web Bluetooth needs Chrome or Edge on desktop, or Android.');
       return;
@@ -69,13 +97,49 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
     setConnecting(true);
     try {
       const picked = await pairPrinterDevice();
-      setDevice(picked);
-      notify(`Connected to ${picked.name || 'thermal printer'}.`);
+      setBtDevice(picked);
+      notify(`Connected to ${picked.name || 'Bluetooth thermal printer'}.`);
     } catch (err) {
-      // Cancelling the chooser rejects with NotFoundError — not an error worth a toast.
       if ((err as DOMException)?.name !== 'NotFoundError') {
-        const message = err instanceof Error ? err.message : 'Could not pair the printer.';
-        notify(message);
+        notify(err instanceof Error ? err.message : 'Could not pair the Bluetooth printer.');
+      }
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function connectUsb() {
+    if (!hasUsb) {
+      notify('WebUSB needs Chrome or Edge on desktop or Android.');
+      return;
+    }
+    setConnecting(true);
+    try {
+      const picked = await pairUsbPrinter();
+      setUsbDevice(picked);
+      notify(`Connected to ${picked.productName || 'USB thermal printer'}.`);
+    } catch (err) {
+      if ((err as DOMException)?.name !== 'NotFoundError') {
+        notify(err instanceof Error ? err.message : 'Could not connect USB printer.');
+      }
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  async function connectSerial() {
+    if (!hasSerial) {
+      notify('WebSerial needs Chrome or Edge on desktop.');
+      return;
+    }
+    setConnecting(true);
+    try {
+      const port = await pairSerialPrinter();
+      setSerialPort(port);
+      notify('Serial / COM printer port selected.');
+    } catch (err) {
+      if ((err as DOMException)?.name !== 'NotFoundError') {
+        notify(err instanceof Error ? err.message : 'Could not open Serial/COM port.');
       }
     } finally {
       setConnecting(false);
@@ -83,10 +147,12 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   }
 
   async function testPrint() {
+    if (!settings) return;
     setTesting(true);
     try {
-      await printTestReceipt(settings?.headerText || RESTAURANT.name);
-      notify('Test receipt sent to thermal printer.');
+      await savePrinterSettings(settings);
+      await printTestReceipt(settings.headerText || RESTAURANT.name);
+      notify(`Test receipt sent via ${settings.connectionType.toUpperCase()}.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Test print failed.';
       notify(message);
@@ -98,10 +164,16 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   async function save() {
     if (!settings) return;
     await savePrinterSettings(settings);
-    await logAudit('PRINTER_SETTINGS_UPDATED', `Receipt ${settings.receiptFontSize}, ${settings.paperWidth}, auto-print ${settings.autoPrint ? 'on' : 'off'}, kitchen ticket ${settings.printKitchenTicket ? 'on' : 'off'}`, username);
+    await logAudit(
+      'PRINTER_SETTINGS_UPDATED',
+      `Mode ${settings.connectionType}, Receipt ${settings.receiptFontSize}, ${settings.paperWidth}, auto-print ${settings.autoPrint ? 'on' : 'off'}, kitchen ticket ${settings.printKitchenTicket ? 'on' : 'off'}`,
+      username,
+    );
     notify('Printer settings saved.');
     onClose();
   }
+
+  const connectionType = settings?.connectionType || 'bluetooth';
 
   return (
     <Modal
@@ -123,32 +195,283 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
         <p className="text-xs text-gray-400 text-center py-8">Loading settings...</p>
       ) : (
         <div className="space-y-3">
+          <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-3">
+            <SectionTitle>Thermal Printer Connection</SectionTitle>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {CONNECTION_TYPES.map((item) => {
+                const Icon = item.icon;
+                const active = connectionType === item.value;
+                return (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setSettings({ ...settings, connectionType: item.value })}
+                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition ${
+                      active
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {connectionType === 'bluetooth' && (
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={`w-2 h-2 rounded-full ${btDevice ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden />
+                  <span className="text-gray-700 font-medium">
+                    {btDevice ? `Paired with ${btDevice.name || btDevice.id.slice(0, 8)}` : 'No Bluetooth printer paired'}
+                  </span>
+                  {btDevice && <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden />}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={connectBluetooth}
+                    disabled={connecting || !hasBluetooth}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Bluetooth className="w-3.5 h-3.5" aria-hidden />
+                    {connecting ? 'Pairing...' : btDevice ? 'Change Printer' : 'Pair Bluetooth Printer'}
+                  </button>
+                  {btDevice && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={testPrint}
+                        disabled={testing}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Printer className="w-3.5 h-3.5" aria-hidden />
+                        {testing ? 'Printing...' : 'Test Print'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          disconnectPrinterDevice().catch(() => {});
+                          setBtDevice(null);
+                          notify('Bluetooth printer disconnected.');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
+                      >
+                        <X className="w-3.5 h-3.5" aria-hidden /> Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  Works with BLE ESC/POS printers (58mm &amp; 80mm). If your Bluetooth printer is paired in Windows as a COM port (Bluetooth Classic SPP), choose <strong>Serial / COM Port</strong> above.
+                </p>
+              </div>
+            )}
+
+            {connectionType === 'usb' && (
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={`w-2 h-2 rounded-full ${usbDevice ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden />
+                  <span className="text-gray-700 font-medium">
+                    {usbDevice
+                      ? `Connected to ${usbDevice.productName || `USB (${usbDevice.vendorId.toString(16)}:${usbDevice.productId.toString(16)})`}`
+                      : 'No USB printer connected'}
+                  </span>
+                  {usbDevice && <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden />}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={connectUsb}
+                    disabled={connecting || !hasUsb}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Cable className="w-3.5 h-3.5" aria-hidden />
+                    {connecting ? 'Connecting...' : usbDevice ? 'Change USB Printer' : 'Connect USB Printer'}
+                  </button>
+                  {usbDevice && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={testPrint}
+                        disabled={testing}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Printer className="w-3.5 h-3.5" aria-hidden />
+                        {testing ? 'Printing...' : 'Test Print'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          disconnectUsbPrinter().catch(() => {});
+                          setUsbDevice(null);
+                          notify('USB printer disconnected.');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
+                      >
+                        <X className="w-3.5 h-3.5" aria-hidden /> Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  Direct WebUSB ESC/POS printing. If Windows claims the USB printer as a virtual COM port, use <strong>Serial / COM Port</strong> instead.
+                </p>
+              </div>
+            )}
+
+            {connectionType === 'serial' && (
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className={`w-2 h-2 rounded-full ${serialPort ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden />
+                    <span className="text-gray-700 font-medium">
+                      {serialPort ? 'Serial / COM port ready' : 'No Serial / COM port selected'}
+                    </span>
+                    {serialPort && <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden />}
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-gray-600">
+                    <span className="font-bold text-[10px] uppercase">Baud Rate:</span>
+                    <select
+                      value={settings.serialBaudRate || 9600}
+                      onChange={(e) => setSettings({ ...settings, serialBaudRate: Number(e.target.value) || 9600 })}
+                      className="p-1.5 text-xs rounded-lg border border-gray-200 bg-white font-semibold"
+                    >
+                      {BAUD_RATES.map((rate) => (
+                        <option key={rate} value={rate}>{rate}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={connectSerial}
+                    disabled={connecting || !hasSerial}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    <Cpu className="w-3.5 h-3.5" aria-hidden />
+                    {connecting ? 'Opening...' : serialPort ? 'Change COM Port' : 'Select Serial / COM Port'}
+                  </button>
+                  {serialPort && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={testPrint}
+                        disabled={testing}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        <Printer className="w-3.5 h-3.5" aria-hidden />
+                        {testing ? 'Printing...' : 'Test Print'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          disconnectSerialPrinter().catch(() => {});
+                          setSerialPort(null);
+                          notify('Serial printer disconnected.');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
+                      >
+                        <X className="w-3.5 h-3.5" aria-hidden /> Disconnect
+                      </button>
+                    </>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  Ideal for <strong>USB-Serial</strong> printers and <strong>Bluetooth Classic (SPP)</strong> thermal printers paired in Windows/macOS as a COM port.
+                </p>
+              </div>
+            )}
+
+            {connectionType === 'lan' && (
+              <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className="sm:col-span-2 block">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">
+                      Printer IP / Hostname
+                    </span>
+                    <input
+                      type="text"
+                      value={settings.lanIp || ''}
+                      onChange={(e) => setSettings({ ...settings, lanIp: e.target.value })}
+                      placeholder="192.168.1.200"
+                      className="w-full p-2 text-xs ring-1 ring-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">
+                      Port
+                    </span>
+                    <input
+                      type="number"
+                      value={settings.lanPort || 9100}
+                      onChange={(e) => setSettings({ ...settings, lanPort: Number(e.target.value) || 9100 })}
+                      placeholder="9100"
+                      className="w-full p-2 text-xs ring-1 ring-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                </div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <span className="text-[10px] font-bold uppercase text-gray-600">Protocol:</span>
+                    <select
+                      value={settings.lanProtocol || 'http'}
+                      onChange={(e) =>
+                        setSettings({ ...settings, lanProtocol: e.target.value as 'http' | 'websocket' })
+                      }
+                      className="p-1.5 text-xs rounded-lg border border-gray-200 bg-white font-semibold"
+                    >
+                      <option value="http">HTTP POST (Direct / Print Bridge)</option>
+                      <option value="websocket">WebSocket (ws://IP:Port)</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={testPrint}
+                    disabled={testing || !settings.lanIp?.trim()}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Printer className="w-3.5 h-3.5" aria-hidden />
+                    {testing ? 'Sending...' : 'Test LAN Print'}
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-500">
+                  Sends raw ESC/POS bytes over Wi-Fi / Ethernet to network thermal printers or a local print relay. If unreachable, receipts automatically fall back to the browser print dialog.
+                </p>
+              </div>
+            )}
+          </section>
+
           <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-2">
             <SectionTitle>Receipt appearance</SectionTitle>
-            <label className="block">
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Font size</span>
-              <select
-                value={settings.receiptFontSize}
-                onChange={(e) => setSettings({ ...settings, receiptFontSize: e.target.value as ReceiptFontSize })}
-                className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {FONT_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="block">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Font size</span>
+                <select
+                  value={settings.receiptFontSize}
+                  onChange={(e) => setSettings({ ...settings, receiptFontSize: e.target.value as ReceiptFontSize })}
+                  className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {FONT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
 
-            <label className="block">
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Paper width</span>
-              <select
-                value={settings.paperWidth}
-                onChange={(e) => setSettings({ ...settings, paperWidth: e.target.value as PrinterSettings['paperWidth'] })}
-                className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="58mm">58mm (32 chars)</option>
-                <option value="80mm">80mm (48 chars)</option>
-              </select>
-            </label>
+              <label className="block">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Paper width</span>
+                <select
+                  value={settings.paperWidth}
+                  onChange={(e) => setSettings({ ...settings, paperWidth: e.target.value as PrinterSettings['paperWidth'] })}
+                  className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="58mm">58mm (32 chars)</option>
+                  <option value="80mm">80mm (48 chars)</option>
+                </select>
+              </label>
+            </div>
 
             <label className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
               <input
@@ -269,53 +592,6 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
               </div>
             </section>
           )}
-
-          <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-2">
-            <SectionTitle>Bluetooth printer</SectionTitle>
-            <div className="flex items-center gap-2 text-xs">
-              <span className={`w-2 h-2 rounded-full ${device ? 'bg-emerald-500' : 'bg-gray-300'}`} aria-hidden />
-              <span className="text-gray-600">{device ? `Connected to ${device.name || device.id.slice(0, 8)}` : 'Not connected'}</span>
-              {device && <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden />}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={connect}
-                disabled={connecting || !hasBluetooth}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                <Bluetooth className="w-3.5 h-3.5" aria-hidden />
-                {connecting ? 'Pairing...' : device ? 'Change Printer' : 'Pair Printer'}
-              </button>
-              {device && (
-                <>
-                  <button
-                    type="button"
-                    onClick={testPrint}
-                    disabled={testing}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
-                  >
-                    <Printer className="w-3.5 h-3.5" aria-hidden />
-                    {testing ? 'Printing...' : 'Test Print'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      disconnectPrinterDevice().catch(() => {});
-                      setDevice(null);
-                      notify('Bluetooth printer disconnected.');
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  >
-                    <X className="w-3.5 h-3.5" aria-hidden /> Disconnect
-                  </button>
-                </>
-              )}
-            </div>
-            <p className="text-[10px] text-gray-500">
-              Supports BLE ESC/POS thermal printers (58mm &amp; 80mm). Click <strong>Test Print</strong> after pairing to verify your printer connection.
-            </p>
-          </section>
         </div>
       )}
     </Modal>

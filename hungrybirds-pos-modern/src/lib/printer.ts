@@ -3,6 +3,7 @@ import { EscPosEncoder } from './escpos';
 
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
 export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
+export type PrinterConnectionType = 'bluetooth' | 'usb' | 'serial' | 'lan';
 
 export type BluetoothCharacteristicLike = {
   uuid?: string;
@@ -42,7 +43,61 @@ type BluetoothLike = {
   getDevices?(): Promise<BluetoothDeviceLike[]>;
 };
 
+export interface UsbEndpointLike {
+  endpointNumber: number;
+  direction: 'in' | 'out';
+  type: 'bulk' | 'interrupt' | 'isochronous';
+}
+
+export interface UsbAlternateInterfaceLike {
+  interfaceClass?: number;
+  endpoints: UsbEndpointLike[];
+}
+
+export interface UsbInterfaceLike {
+  interfaceNumber: number;
+  alternate: UsbAlternateInterfaceLike;
+  alternates: UsbAlternateInterfaceLike[];
+}
+
+export interface UsbDeviceLike {
+  productName?: string;
+  manufacturerName?: string;
+  vendorId: number;
+  productId: number;
+  opened?: boolean;
+  configuration?: { interfaces: UsbInterfaceLike[] } | null;
+  open(): Promise<void>;
+  close(): Promise<void>;
+  selectConfiguration(configurationValue: number): Promise<void>;
+  claimInterface(interfaceNumber: number): Promise<void>;
+  transferOut(endpointNumber: number, data: BufferSource): Promise<{ status?: string }>;
+}
+
+type UsbLike = {
+  requestDevice(options: { filters: Array<Record<string, unknown>> }): Promise<UsbDeviceLike>;
+  getDevices?(): Promise<UsbDeviceLike[]>;
+};
+
+export interface SerialPortLike {
+  open(options: { baudRate: number }): Promise<void>;
+  close(): Promise<void>;
+  writable?: {
+    getWriter(): {
+      write(chunk: Uint8Array): Promise<void>;
+      releaseLock(): void;
+    };
+  } | null;
+  getInfo?(): { usbVendorId?: number; usbProductId?: number };
+}
+
+type SerialLike = {
+  requestPort(options?: { filters?: Array<Record<string, unknown>> }): Promise<SerialPortLike>;
+  getPorts?(): Promise<SerialPortLike[]>;
+};
+
 export interface PrinterSettings {
+  connectionType: PrinterConnectionType;
   receiptFontSize: ReceiptFontSize;
   paperWidth: '58mm' | '80mm';
   /** Print the receipt by itself as soon as a sale is completed. */
@@ -60,10 +115,17 @@ export interface PrinterSettings {
   headerText: string;
   footerText: string;
   dateFormat: DateFormat;
+  /** LAN / Wi-Fi thermal printer settings. */
+  lanIp: string;
+  lanPort: number;
+  lanProtocol: 'http' | 'websocket';
+  /** USB / Bluetooth-SPP Serial COM port baud rate. */
+  serialBaudRate: number;
 }
 
 export const PRINTER_SETTINGS_KEY = 'printerSettings';
 const PRINTER_DEVICE_KEY = 'printerDeviceId';
+const USB_PRINTER_KEY = 'usbPrinterIds';
 
 // Common BLE service/characteristic UUIDs for ESC/POS thermal printers
 // (Xprinter, Goojprt, MTP-II, PT-210, Rongta, Sunmi, HM-10/HM-16, ISSC, Nordic UART, Star).
@@ -89,6 +151,7 @@ const KNOWN_SERVICE_CHARACTERISTICS: Array<[string, string]> = [
 ];
 
 export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
+  connectionType: 'bluetooth',
   receiptFontSize: 'normal',
   paperWidth: '80mm',
   autoPrint: true,
@@ -102,6 +165,10 @@ export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   headerText: 'Hungry Birds Restaurant',
   footerText: '',
   dateFormat: 'locale',
+  lanIp: '',
+  lanPort: 9100,
+  lanProtocol: 'http',
+  serialBaudRate: 9600,
 };
 
 const FONT_CLASS: Record<ReceiptFontSize, string> = {
@@ -114,13 +181,13 @@ export function receiptFontClass(size: ReceiptFontSize): string {
   return FONT_CLASS[size] ?? FONT_CLASS.normal;
 }
 
-/** Global reference to the paired Bluetooth device and its resolved writable characteristic. */
+/** Global references to active hardware printer handles. */
 let activeDevice: BluetoothDeviceLike | null = null;
 let activeCharacteristic: BluetoothCharacteristicLike | null = null;
+let activeUsbDevice: UsbDeviceLike | null = null;
+let activeSerialPort: SerialPortLike | null = null;
 
 function handleDisconnected() {
-  // Keep activeDevice so the next print can automatically reconnect to the same device via device.gatt.connect(),
-  // only clearing the cached GATT characteristic handle.
   activeCharacteristic = null;
 }
 
@@ -167,12 +234,19 @@ export function getPrinterDevice(): BluetoothDeviceLike | null {
   return activeDevice;
 }
 
+export function getUsbPrinterDevice(): UsbDeviceLike | null {
+  return activeUsbDevice;
+}
+
+export function getSerialPrinterPort(): SerialPortLike | null {
+  return activeSerialPort;
+}
+
 /**
  * Resolves a writable BLE characteristic on an active GATT server by scanning
  * all exposed primary services first, then falling back to known ESC/POS UUID pairs.
  */
 async function resolveWritableCharacteristic(server: BluetoothGattServerLike): Promise<BluetoothCharacteristicLike> {
-  // 1. Try scanning all primary services exposed by the printer for a writable characteristic.
   if (typeof server.getPrimaryServices === 'function') {
     try {
       const services = await server.getPrimaryServices();
@@ -193,7 +267,6 @@ async function resolveWritableCharacteristic(server: BluetoothGattServerLike): P
     }
   }
 
-  // 2. Try known [serviceUUID, characteristicUUID] pairs directly.
   for (const [serviceUuid, charUuid] of KNOWN_SERVICE_CHARACTERISTICS) {
     try {
       const service = await server.getPrimaryService(serviceUuid);
@@ -216,7 +289,7 @@ async function resolveWritableCharacteristic(server: BluetoothGattServerLike): P
   }
 
   throw new Error(
-    'No writable BLE printer characteristic found. Make sure your printer supports Bluetooth Low Energy (BLE) ESC/POS.',
+    'No writable BLE printer characteristic found. If your printer uses Bluetooth Classic (SPP) or USB, select the Serial / COM or USB mode.',
   );
 }
 
@@ -247,10 +320,230 @@ export async function pairPrinterDevice(): Promise<BluetoothDeviceLike> {
 }
 
 /**
- * Reconnects to a previously permitted Bluetooth printer using
- * navigator.bluetooth.getDevices() (which does not require a user gesture).
+ * Prompts the user to pick a USB thermal printer via WebUSB.
+ */
+export async function pairUsbPrinter(): Promise<UsbDeviceLike> {
+  const usb = (navigator as Navigator & { usb?: UsbLike }).usb;
+  if (!usb?.requestDevice) {
+    throw new Error('WebUSB requires Chrome or Edge over HTTPS or localhost.');
+  }
+  const device = await usb.requestDevice({ filters: [] });
+  await openAndClaimUsbPrinter(device);
+  activeUsbDevice = device;
+  try {
+    await db.settings.put({
+      key: USB_PRINTER_KEY,
+      value: { vendorId: device.vendorId, productId: device.productId },
+    });
+  } catch {
+    // Ignore IndexedDB error
+  }
+  return device;
+}
+
+export async function disconnectUsbPrinter(): Promise<void> {
+  const dev = activeUsbDevice;
+  activeUsbDevice = null;
+  if (dev?.opened) {
+    try {
+      await dev.close();
+    } catch {
+      // Ignore close error
+    }
+  }
+  try {
+    await db.settings.delete(USB_PRINTER_KEY);
+  } catch {
+    // Ignore IndexedDB error
+  }
+}
+
+async function openAndClaimUsbPrinter(device: UsbDeviceLike): Promise<number> {
+  if (!device.opened) {
+    await device.open();
+  }
+  if (!device.configuration) {
+    await device.selectConfiguration(1);
+  }
+  const interfaces = device.configuration?.interfaces ?? [];
+  for (const iface of interfaces) {
+    const alternates = iface.alternates?.length ? iface.alternates : [iface.alternate];
+    for (const alt of alternates) {
+      const outEndpoint = alt?.endpoints?.find((ep) => ep.direction === 'out' && ep.type === 'bulk')
+        ?? alt?.endpoints?.find((ep) => ep.direction === 'out');
+      if (outEndpoint) {
+        await device.claimInterface(iface.interfaceNumber);
+        return outEndpoint.endpointNumber;
+      }
+    }
+  }
+  throw new Error('No bulk OUT endpoint found on the selected USB device.');
+}
+
+async function printViaUsb(bytes: Uint8Array): Promise<void> {
+  if (!activeUsbDevice) {
+    const usb = (navigator as Navigator & { usb?: UsbLike }).usb;
+    if (usb?.getDevices) {
+      try {
+        const stored = await db.settings.get(USB_PRINTER_KEY);
+        const ids = stored?.value as { vendorId?: number; productId?: number } | undefined;
+        const devices = await usb.getDevices();
+        activeUsbDevice =
+          (ids ? devices.find((d) => d.vendorId === ids.vendorId && d.productId === ids.productId) : undefined) ??
+          devices[0] ??
+          null;
+      } catch {
+        // Ignore
+      }
+    }
+  }
+  if (!activeUsbDevice) {
+    throw new Error('No USB printer connected. Click "Connect USB Printer" in Printer Settings.');
+  }
+  const endpointNumber = await openAndClaimUsbPrinter(activeUsbDevice);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  await activeUsbDevice.transferOut(endpointNumber, copy);
+}
+
+/**
+ * Prompts the user to pick a Serial / COM port printer via WebSerial
+ * (supports both USB-Serial and Bluetooth Classic SPP virtual COM ports).
+ */
+export async function pairSerialPrinter(): Promise<SerialPortLike> {
+  const serial = (navigator as Navigator & { serial?: SerialLike }).serial;
+  if (!serial?.requestPort) {
+    throw new Error('WebSerial requires Chrome or Edge on desktop.');
+  }
+  const port = await serial.requestPort();
+  activeSerialPort = port;
+  return port;
+}
+
+export async function disconnectSerialPrinter(): Promise<void> {
+  const port = activeSerialPort;
+  activeSerialPort = null;
+  if (port) {
+    try {
+      await port.close();
+    } catch {
+      // Ignore if not currently open
+    }
+  }
+}
+
+async function printViaSerial(bytes: Uint8Array, baudRate = 9600): Promise<void> {
+  if (!activeSerialPort) {
+    const serial = (navigator as Navigator & { serial?: SerialLike }).serial;
+    if (serial?.getPorts) {
+      try {
+        const ports = await serial.getPorts();
+        activeSerialPort = ports[0] ?? null;
+      } catch {
+        // Ignore
+      }
+    }
+  }
+  if (!activeSerialPort) {
+    throw new Error('No Serial/COM printer selected. Click "Select Serial Port" in Printer Settings.');
+  }
+
+  try {
+    await activeSerialPort.open({ baudRate: Number(baudRate) || 9600 });
+  } catch {
+    // Port may already be open
+  }
+
+  const writer = activeSerialPort.writable?.getWriter();
+  if (!writer) {
+    throw new Error('Serial printer port is not writable.');
+  }
+  try {
+    await writer.write(bytes);
+  } finally {
+    writer.releaseLock();
+  }
+}
+
+/**
+ * Sends raw ESC/POS bytes to a LAN / Wi-Fi network thermal printer via HTTP POST or WebSocket.
+ */
+async function printViaLan(
+  bytes: Uint8Array,
+  lanIp: string,
+  lanPort = 9100,
+  protocol: 'http' | 'websocket' = 'http',
+): Promise<void> {
+  const host = (lanIp || '').trim();
+  if (!host) {
+    throw new Error('Enter the LAN / Wi-Fi printer IP address in Printer Settings.');
+  }
+  const port = Number(lanPort) || 9100;
+
+  const payload = new Uint8Array(bytes.byteLength);
+  payload.set(bytes);
+
+  if (protocol === 'websocket') {
+    await new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://${host}:${port}`);
+      const timer = setTimeout(() => {
+        ws.close();
+        reject(new Error(`Timed out connecting to ws://${host}:${port}`));
+      }, 5000);
+      ws.onopen = () => {
+        clearTimeout(timer);
+        ws.send(payload.buffer);
+        ws.close();
+        resolve();
+      };
+      ws.onerror = () => {
+        clearTimeout(timer);
+        reject(new Error(`Could not connect to WebSocket printer at ws://${host}:${port}`));
+      };
+    });
+    return;
+  }
+
+  const url = host.startsWith('http://') || host.startsWith('https://') ? host : `http://${host}:${port}/`;
+  await fetch(url, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: payload,
+  });
+}
+
+/**
+ * Reconnects to previously permitted Bluetooth / USB / Serial printers on startup.
  */
 export async function restorePrinterDevice(): Promise<void> {
+  // Restore WebUSB device if available
+  const usb = (navigator as Navigator & { usb?: UsbLike }).usb;
+  if (!activeUsbDevice && usb?.getDevices) {
+    try {
+      const storedUsb = await db.settings.get(USB_PRINTER_KEY);
+      const ids = storedUsb?.value as { vendorId?: number; productId?: number } | undefined;
+      if (ids) {
+        const devices = await usb.getDevices();
+        activeUsbDevice =
+          devices.find((d) => d.vendorId === ids.vendorId && d.productId === ids.productId) ?? null;
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  // Restore WebSerial port if available
+  const serial = (navigator as Navigator & { serial?: SerialLike }).serial;
+  if (!activeSerialPort && serial?.getPorts) {
+    try {
+      const ports = await serial.getPorts();
+      if (ports.length > 0) activeSerialPort = ports[0];
+    } catch {
+      // Ignore
+    }
+  }
+
   if (activeDevice) return;
   let deviceId: string | undefined;
   try {
@@ -304,12 +597,7 @@ async function writeChunks(
   }
 }
 
-/**
- * Sends raw ESC/POS bytes to the paired Bluetooth printer.
- * Keeps the GATT connection alive and falls back to 20-byte BLE ATT packets if
- * the printer rejects larger chunks.
- */
-export async function printRaw(bytes: Uint8Array): Promise<void> {
+async function printViaBluetooth(bytes: Uint8Array): Promise<void> {
   if (!activeDevice) {
     await restorePrinterDevice();
   }
@@ -333,7 +621,6 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
   try {
     await writeChunks(activeCharacteristic, bytes, 64, 15);
   } catch {
-    // Re-resolve characteristic and fall back to strict 20-byte BLE default MTU chunks.
     const freshServer = device.gatt.connected ? device.gatt : await device.gatt.connect();
     activeCharacteristic = await resolveWritableCharacteristic(freshServer);
     await writeChunks(activeCharacteristic, bytes, 20, 20);
@@ -341,9 +628,39 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
 }
 
 /**
- * Sends a short ESC/POS test slip to verify the paired thermal printer immediately.
+ * Sends raw ESC/POS bytes to the configured thermal printer (Bluetooth, USB, Serial, or LAN/Wi-Fi).
+ */
+export async function printRaw(bytes: Uint8Array): Promise<void> {
+  let settings = DEFAULT_PRINTER_SETTINGS;
+  try {
+    settings = await getPrinterSettings();
+  } catch {
+    // Use defaults when IndexedDB is unavailable in unit tests
+  }
+
+  const mode = settings.connectionType || 'bluetooth';
+
+  if (mode === 'usb') {
+    await printViaUsb(bytes);
+    return;
+  }
+  if (mode === 'serial') {
+    await printViaSerial(bytes, settings.serialBaudRate);
+    return;
+  }
+  if (mode === 'lan') {
+    await printViaLan(bytes, settings.lanIp, settings.lanPort, settings.lanProtocol);
+    return;
+  }
+
+  await printViaBluetooth(bytes);
+}
+
+/**
+ * Sends a short ESC/POS test slip to verify the active thermal printer immediately.
  */
 export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): Promise<void> {
+  const settings = await getPrinterSettings().catch(() => DEFAULT_PRINTER_SETTINGS);
   const encoder = new EscPosEncoder();
   encoder.initialize();
   encoder.align('center');
@@ -351,7 +668,7 @@ export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): 
   encoder.text(headerText);
   encoder.bold(false);
   encoder.text('--------------------------------');
-  encoder.text('Bluetooth Thermal Printer Test');
+  encoder.text(`Thermal Printer Test (${(settings.connectionType || 'bluetooth').toUpperCase()})`);
   encoder.text(new Date().toLocaleString());
   encoder.text('Status: CONNECTED & READY');
   encoder.text('--------------------------------');
@@ -361,9 +678,12 @@ export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): 
 }
 
 export async function getPrinterSettings(): Promise<PrinterSettings> {
-  const stored = await db.settings.get(PRINTER_SETTINGS_KEY);
-  const merged = { ...DEFAULT_PRINTER_SETTINGS, ...(stored?.value as Partial<PrinterSettings> | undefined) };
-  return merged;
+  try {
+    const stored = await db.settings.get(PRINTER_SETTINGS_KEY);
+    return { ...DEFAULT_PRINTER_SETTINGS, ...(stored?.value as Partial<PrinterSettings> | undefined) };
+  } catch {
+    return { ...DEFAULT_PRINTER_SETTINGS };
+  }
 }
 
 export async function savePrinterSettings(settings: PrinterSettings): Promise<void> {
