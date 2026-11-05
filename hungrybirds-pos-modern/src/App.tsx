@@ -343,9 +343,26 @@ function App() {
           onOpenOnlineOrders={() => setOnlineOrdersOpen(true)}
         />
 
-        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
-          <div className="xl:col-span-2 space-y-4">
+        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 pb-24 lg:pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+          <div className="lg:col-span-2 space-y-4">
             <MenuGrid onPick={pickItem} />
+
+            <div id="posCartMobileAnchor" className="lg:hidden">
+              <CartPanel
+                items={cart}
+                role={session.role}
+                charges={charges}
+                customer={customer}
+                loyaltyBalance={loyaltyBalance}
+                onChange={setCharges}
+                onCustomerChange={setCustomer}
+                notify={notify}
+                onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
+                onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
+                onHold={hold}
+                onCheckout={() => setPaying(true)}
+              />
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               <LiveStockPanel
@@ -370,7 +387,7 @@ function App() {
             </div>
           </div>
 
-          <aside className="xl:sticky xl:top-0">
+          <aside className="hidden lg:block lg:sticky lg:top-0">
             <CartPanel
               items={cart}
               role={session.role}
@@ -388,6 +405,46 @@ function App() {
           </aside>
         </main>
       </div>
+
+      {cart.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#000524] border-t border-[#795afa]/40 px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xl">
+          <button
+            type="button"
+            onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth' })}
+            className="text-left min-w-0"
+          >
+            <div className="text-[11px] font-medium text-[#c5b9fa]">
+              {cart.reduce((s, i) => s + i.qty, 0)} items · {charges.orderType.replace('_', ' ')}
+              {charges.tableNumber ? ` (${charges.tableNumber})` : ''}
+            </div>
+            <div className="font-display text-base font-semibold text-white tabular-nums">
+              {formatAmount(totals.grandTotal)}
+            </div>
+          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth' })}
+              className="px-3 h-9 rounded-[8px] border border-[#c5b9fa]/50 text-xs font-medium text-white hover:bg-white/10"
+            >
+              View Order
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (session.role === 'WAITER') {
+                  notify('Waiters cannot take payments. Ask a cashier or manager.');
+                  return;
+                }
+                setPaying(true);
+              }}
+              className="px-4 h-9 rounded-[8px] bg-[#2941e0] hover:bg-[#1f35c4] text-xs font-medium text-white"
+            >
+              Checkout
+            </button>
+          </div>
+        </div>
+      )}
 
       {paying && (
         <PaymentModal
@@ -555,7 +612,7 @@ function SyncBadge() {
 
   if (status.state === 'off') {
     return (
-      <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-gray-400" title="Sign in with a cloud account to sync across devices">
+      <span className="flex items-center gap-1 text-[10px] font-medium text-[#616f75]" title="Sign in with a cloud account to sync across devices">
         <CloudOff className="w-3.5 h-3.5" /> Local only
       </span>
     );

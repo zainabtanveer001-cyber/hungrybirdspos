@@ -43,7 +43,7 @@ export function CartPanel({
   );
 
   return (
-    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e0edff] flex flex-col xl:max-h-[calc(100vh-5.75rem)]">
+    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e0edff] flex flex-col lg:max-h-[calc(100vh-5.75rem)]">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
         <h3 className="font-display text-lg font-medium text-[#000000]">Current Order</h3>
         <div className="flex bg-[#eff6ff] p-1 rounded-[10px] border border-[#e0edff] text-xs font-medium gap-1">

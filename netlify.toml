@@ -1,6 +1,6 @@
 [build]
-  publish = "."
-  command = ""
+  publish = "hungrybirds-pos-modern/dist"
+  command = "cd hungrybirds-pos-modern && npm install && npm run build"
 
 [[headers]]
   for = "/*"
