@@ -42,9 +42,20 @@ export function formatBillTimestamp(value: string | number | Date): string {
  * canvas and packs it into 1-bit monochrome ESC/POS raster bytes (168x120 px).
  * Returns null in non-browser environments (e.g., Node unit tests).
  */
-export function buildLogoRaster(): { width: number; height: number; bytes: Uint8Array } | null {
+/**
+ * Renders the circular monochrome "HUNGRY BIRDS RESTAURANT" rooster stamp
+ * onto a full-line-width offscreen canvas (560 dots = 70 bytes/row on 80mm;
+ * 368 dots = 46 bytes/row on 58mm) with the stamp drawn at horizontal center (cx = width / 2).
+ * Because many ESC/POS thermal printers ignore `ESC a 1` (center align) for `GS v 0` raster
+ * graphics and always start at dot 0, padding the raster row symmetrically to the full printable
+ * line width guarantees the logo prints dead-center on both printers that ignore `ESC a 1` and
+ * printers that honor `ESC a 1`.
+ */
+export function buildLogoRaster(
+  paperWidth: '58mm' | '80mm' = '80mm',
+): { width: number; height: number; bytes: Uint8Array } | null {
   if (typeof document === 'undefined') return null;
-  const width = 168; // 21 bytes per row (multiple of 8)
+  const width = paperWidth === '80mm' ? 560 : 368; // 70 bytes/row (80mm) or 46 bytes/row (58mm)
   const height = 120;
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -52,7 +63,7 @@ export function buildLogoRaster(): { width: number; height: number; bytes: Uint8
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  // White background
+  // White background across the full printable width
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
 
@@ -109,9 +120,9 @@ export function buildLogoRaster(): { width: number; height: number; bytes: Uint8
   ctx.fillText('★', cx - 58, cy + 1);
   ctx.fillText('★', cx + 58, cy + 1);
 
-  // Center rooster silhouette (facing left with arched tail feathers on right)
+  // Center rooster silhouette (optically centered at cx - 3 since tail extends to +28 and beak to -22)
   ctx.save();
-  ctx.translate(cx, cy);
+  ctx.translate(cx - 3, cy);
   ctx.beginPath();
   // Head & neck (left)
   ctx.moveTo(-18, -8);
@@ -203,7 +214,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   }
 
   // 1. Top Circular Rooster Stamp Logo
-  const logo = buildLogoRaster();
+  const logo = buildLogoRaster(settings.paperWidth);
   if (logo) {
     encoder.align('center');
     encoder.rasterImage(logo.width, logo.height, logo.bytes);
@@ -598,13 +609,14 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${escapeHtml(sale.id)}</title><style>
   @page { size: ${settings.paperWidth} auto; margin: 2mm; }
   * { box-sizing: border-box; }
-  html, body { width: ${width}; margin: 0; padding: 0; color: #000; background: #fff; }
+  html, body { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0; color: #000; background: #fff; }
   body { font: ${FONT_PT[settings.receiptFontSize] ?? '11pt'}/1.35 "Courier New", Courier, monospace; }
-  main { width: ${width}; padding: 0 1mm 3mm; }
-  header { text-align: center; padding-bottom: 2mm; }
-  .stamp-wrap { display: flex; justify-content: center; margin-bottom: 2mm; }
-  .tall-title { font-size: 1.45em; transform: scaleY(1.35); transform-origin: center; margin: 1mm 0; font-weight: normal; }
-  header h1 { margin: 1.5mm 0 1mm; font-size: 1.45em; font-weight: normal; transform: scaleY(1.35); }
+  main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0 1mm 3mm; }
+  header { width: 100%; text-align: center; padding-bottom: 2mm; }
+  .stamp-wrap { width: 100%; display: flex; justify-content: center; align-items: center; text-align: center; margin: 0 auto 2mm; }
+  .stamp-wrap svg { display: block; margin: 0 auto; }
+  .tall-title { font-size: 1.45em; transform: scaleY(1.35); transform-origin: center; margin: 1mm 0; font-weight: normal; text-align: center; }
+  header h1 { margin: 1.5mm 0 1mm; font-size: 1.45em; font-weight: normal; transform: scaleY(1.35); text-align: center; }
   p { margin: 0; }
   .title { display: none; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
@@ -634,7 +646,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   ${kitchen}
   <header>
     <div class="stamp-wrap">
-      <svg width="128" height="92" viewBox="0 0 168 120" xmlns="http://www.w3.org/2000/svg">
+      <svg width="128" height="92" viewBox="0 0 168 120" style="display:block;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
         <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" stroke-width="2.5"/>
         <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" stroke-width="1.2"/>
         <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" stroke-width="1.5"/>
@@ -642,9 +654,11 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
         <text x="84" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1.5">RESTAURANT</text>
         <text x="26" y="64" text-anchor="middle" font-size="11">★</text>
         <text x="142" y="64" text-anchor="middle" font-size="11">★</text>
-        <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000"/>
-        <line x1="80" y1="72" x2="78" y2="82" stroke="#000" stroke-width="2"/>
-        <line x1="87" y1="72" x2="88" y2="82" stroke="#000" stroke-width="2"/>
+        <g transform="translate(-3, 0)">
+          <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000"/>
+          <line x1="80" y1="72" x2="78" y2="82" stroke="#000" stroke-width="2"/>
+          <line x1="87" y1="72" x2="88" y2="82" stroke="#000" stroke-width="2"/>
+        </g>
       </svg>
     </div>
     <div class="tall-title">Customer Copy</div>

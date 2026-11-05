@@ -269,32 +269,32 @@ function App() {
 
   return (
     <div className="h-screen overflow-hidden bg-ui-bg flex flex-col">
-      <header className="bg-white px-4 sm:px-6 h-14 flex justify-between items-center gap-2 sticky top-0 z-40 border-b border-[#d4d4d8] shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="bg-white px-2.5 sm:px-6 h-14 flex justify-between items-center gap-1.5 sm:gap-3 sticky top-0 z-40 border-b border-[#d4d4d8] shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
           <button
             type="button"
             onClick={() => setNavOpen(true)}
             aria-label="Open navigation"
-            className="lg:hidden w-9 h-9 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
+            className="lg:hidden w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
           >
             <Menu className="w-4 h-4" aria-hidden />
           </button>
-          <h1 className="font-display text-xl font-medium tracking-normal flex items-center gap-2.5">
-            <img src="/logo.svg" alt="" className="w-8 h-8" />
-            <span className="text-[#000000]">Hungry Birds</span>
+          <h1 className="font-display text-sm sm:text-xl font-medium tracking-normal flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+            <img src="/logo.svg" alt="" className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />
+            <span className="text-[#000000] truncate">Hungry Birds</span>
           </h1>
-          <span className="text-xs px-3 py-1 rounded-[88px] bg-[#eff6ff] font-medium text-[#2941e0]">
+          <span className="hidden sm:inline-flex text-xs px-3 py-1 rounded-[88px] bg-[#eff6ff] font-medium text-[#2941e0] shrink-0">
             {session.role}
           </span>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <button
             type="button"
             onClick={() => setKdsOpen(true)}
             title="Open Kitchen Display System (F8)"
-            className="bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] px-3.5 h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1.5"
+            className="bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] px-2.5 sm:px-3.5 h-8 sm:h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1 sm:gap-1.5 shrink-0"
           >
-            <ChefHat className="w-4 h-4" aria-hidden /> KDS
+            <ChefHat className="w-4 h-4 shrink-0" aria-hidden /> <span>KDS</span>
           </button>
           <SyncBadge />
           <span className="hidden lg:inline text-xs text-[#526066]">
@@ -307,9 +307,9 @@ function App() {
               setSession(null);
               setCart([]);
             }}
-            className="bg-white hover:bg-red-50 text-[#000000] hover:text-red-600 border border-[#b4c4cc] px-4 h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1.5"
+            className="bg-white hover:bg-red-50 text-[#000000] hover:text-red-600 border border-[#b4c4cc] px-2.5 sm:px-4 h-8 sm:h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1 sm:gap-1.5 shrink-0"
           >
-            <LogOut className="w-3.5 h-3.5" /> Logout
+            <LogOut className="w-3.5 h-3.5 shrink-0" /> <span>Logout</span>
           </button>
         </div>
       </header>
@@ -612,8 +612,8 @@ function SyncBadge() {
 
   if (status.state === 'off') {
     return (
-      <span className="flex items-center gap-1 text-[10px] font-medium text-[#616f75]" title="Sign in with a cloud account to sync across devices">
-        <CloudOff className="w-3.5 h-3.5" /> Local only
+      <span className="flex items-center gap-1 text-[10px] font-medium text-[#616f75] shrink-0" title="Sign in with a cloud account to sync across devices">
+        <CloudOff className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Local only</span>
       </span>
     );
   }
@@ -623,12 +623,12 @@ function SyncBadge() {
       type="button"
       onClick={() => void syncNow()}
       title={error ? `Sync error: ${status.error}` : status.lastSync ? `Last synced ${new Date(status.lastSync).toLocaleTimeString()}` : 'Syncing'}
-      className={`flex items-center gap-1 text-[10px] font-bold px-3 min-h-11 rounded-lg border ${
+      className={`flex items-center gap-1 text-[10px] font-bold px-2 sm:px-3 h-8 sm:h-9 rounded-lg border shrink-0 ${
         error ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'
       }`}
     >
-      <RefreshCw className={`w-3.5 h-3.5 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
-      {error ? 'Sync issue' : status.state === 'syncing' ? 'Syncing' : 'Synced'}
+      <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
+      <span className="hidden sm:inline">{error ? 'Sync issue' : status.state === 'syncing' ? 'Syncing' : 'Synced'}</span>
     </button>
   );
 }

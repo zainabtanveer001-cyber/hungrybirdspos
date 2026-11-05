@@ -550,7 +550,7 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
             <section className="p-3 rounded-xl border border-dashed border-gray-300 bg-gray-50">
               <SectionTitle>Preview · {settings.paperWidth}</SectionTitle>
               <div
-                className={`bg-white border border-gray-200 rounded-lg p-3 ${receiptFontClass(settings.receiptFontSize)} font-mono text-gray-800`}
+                className={`mx-auto bg-white border border-gray-200 rounded-lg p-3 ${receiptFontClass(settings.receiptFontSize)} font-mono text-gray-800`}
                 style={{ width: settings.paperWidth === '58mm' ? 220 : 300 }}
               >
                 {settings.printKitchenTicket && (
@@ -563,6 +563,22 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                     <div className="my-3 border-t border-dashed border-gray-400" />
                   </>
                 )}
+                <div className="flex justify-center mb-1.5">
+                  <svg width="96" height="68" viewBox="0 0 168 120" className="block mx-auto" xmlns="http://www.w3.org/2000/svg">
+                    <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" strokeWidth="2.5" />
+                    <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" strokeWidth="1.2" />
+                    <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" strokeWidth="1.5" />
+                    <text x="84" y="21" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1">HUNGRY BIRDS</text>
+                    <text x="84" y="105" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1.5">RESTAURANT</text>
+                    <text x="26" y="64" textAnchor="middle" fontSize="11">★</text>
+                    <text x="142" y="64" textAnchor="middle" fontSize="11">★</text>
+                    <g transform="translate(-3, 0)">
+                      <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000" />
+                      <line x1="80" y1="72" x2="78" y2="82" stroke="#000" strokeWidth="2" />
+                      <line x1="87" y1="72" x2="88" y2="82" stroke="#000" strokeWidth="2" />
+                    </g>
+                  </svg>
+                </div>
                 <div className="text-center font-semibold">Customer Copy</div>
                 <div className="text-center font-bold pb-0.5">
                   {settings.headerText || RESTAURANT.name}

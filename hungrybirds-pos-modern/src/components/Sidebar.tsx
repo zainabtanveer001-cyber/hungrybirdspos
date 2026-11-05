@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutGrid, Globe, Archive, Bike, Users, BarChart3, TrendingUp,
   Boxes, Truck, Receipt, UserCog, Wallet, Clock, Printer, ScrollText,
-  ShieldCheck, ChevronLeft, ChevronRight, ChefHat,
+  ShieldCheck, ChevronLeft, ChevronRight, ChefHat, LogOut,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/db';
@@ -166,19 +166,33 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
           })}
         </nav>
 
-        {!collapsed && (
+        {!collapsed ? (
           <div className="mx-1 mt-4 rounded-2xl bg-[#000524] p-3 text-xs leading-relaxed text-white">
+            <div className="font-display font-medium text-white">Hungry Birds POS</div>
+            <div className="text-[#c5b9fa]">
+              Signed in as <span className="font-medium text-white">{username}</span> · {role}
+            </div>
             <button
               type="button"
-              onClick={onSignOut}
-              className="block font-display font-medium text-white hover:text-[#c5b9fa] text-left"
+              onClick={() => {
+                onSignOut();
+                if (!window.matchMedia('(min-width: 1024px)').matches) onClose();
+              }}
+              className="mt-2.5 w-full h-9 rounded-[8px] bg-white/10 hover:bg-red-500/30 border border-[#795afa]/50 hover:border-red-400 text-white text-xs font-medium flex items-center justify-center gap-2 transition"
             >
-              Hungry Birds POS
+              <LogOut className="w-3.5 h-3.5" aria-hidden /> Logout
             </button>
-            <span className="text-[#c5b9fa]">
-              Signed in as <span className="font-medium text-white">{username}</span> · {role}
-            </span>
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onSignOut}
+            title="Logout"
+            aria-label="Logout"
+            className="mx-auto mt-4 w-10 h-10 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-red-50 text-[#000000] hover:text-red-600 flex items-center justify-center transition"
+          >
+            <LogOut className="w-4 h-4" aria-hidden />
+          </button>
         )}
       </aside>
     </>
