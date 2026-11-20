@@ -57,9 +57,14 @@ export function InventoryModal({ onClose, notify }: {
     const patch = editing[item.id] || {};
     const name = (patch.name ?? item.name).trim();
     const stock = normalizeQuantity(patch.stock ?? item.stock);
-    const cost = normalizeQuantity(patch.cost ?? item.cost) ?? 0;
+    const rawCost = patch.cost !== undefined ? String(patch.cost).trim() : String(item.cost ?? '');
+    const cost = rawCost ? normalizeQuantity(rawCost) : 0;
     if (!name || stock === null) {
       notify('Ingredient name and stock quantity cannot be empty.');
+      return;
+    }
+    if (cost === null) {
+      notify('Cost must be a non-negative number.');
       return;
     }
     const prevStock = Number(item.stock) || 0;

@@ -102,7 +102,7 @@ export async function recordRefund(
       .filter((line) => line.qty > 0);
 
     const status: 'FULL' | 'PARTIAL' = result.fullyRefunded ? 'FULL' : 'PARTIAL';
-    await db.sales.update(saleId, {
+    const patch: Partial<Sale> = {
       items,
       refundedAmount: Number(sale.refundedAmount || 0) + result.amount,
       refundStatus: status,
@@ -110,7 +110,24 @@ export async function recordRefund(
         ...(sale.refunds || []),
         { timestamp: new Date().toISOString(), by: user, reason: trimmedReason, amount: result.amount, items: refundedItems },
       ],
-    });
+    };
+    // If this sale's ingredient cost was already locked at shift close, scale down
+    // the locked cost proportionally to the remaining unrefunded item value.
+    if (sale.lockedCost !== undefined) {
+      const beforeVal = (sale.items || []).reduce(
+        (sum, line) => sum + remainingQty(line) * (Number(line.price) || 0),
+        0,
+      );
+      const afterVal = items.reduce(
+        (sum, line) => sum + remainingQty(line) * (Number(line.price) || 0),
+        0,
+      );
+      patch.lockedCost =
+        status === 'FULL' || beforeVal <= 0
+          ? 0
+          : roundAmount((Number(sale.lockedCost) || 0) * (afterVal / beforeVal));
+    }
+    await db.sales.update(saleId, patch);
 
     for (const line of refundedItems) {
       for (const recipe of await db.recipes.where('menuItemId').equals(line.menuItemId || line.id).toArray()) {

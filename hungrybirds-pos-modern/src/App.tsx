@@ -365,7 +365,7 @@ function App() {
           <div className="lg:col-span-2 space-y-4">
             <MenuGrid onPick={pickItem} />
 
-            <div id="posCartMobileAnchor" className="lg:hidden">
+            <div id="posCartMobileAnchor" className="lg:hidden scroll-mb-24 scroll-mt-4">
               <CartPanel
                 items={cart}
                 role={session.role}

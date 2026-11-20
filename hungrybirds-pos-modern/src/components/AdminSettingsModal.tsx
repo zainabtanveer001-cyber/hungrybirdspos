@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, ImagePlus, Pencil, Plus, Search, Trash2, Upload, X, Cloud } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
@@ -517,7 +517,7 @@ function OwnerPinSection({ username, notify }: { username: string; notify: (m: s
   const [pin, setPin] = useState('');
   const [configured, setConfigured] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     void hasOwnerPin().then(setConfigured);
   }, []);
 

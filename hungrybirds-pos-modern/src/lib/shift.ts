@@ -24,12 +24,28 @@ export async function getClosedShiftManualCosts(): Promise<ClosedShiftManualCost
   }
 }
 
+function startOfTodayIso(): string {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+}
+
+/** Initializes `shiftStartTime` once during app startup (outside Dexie `liveQuery`). */
+export async function ensureShiftStart(): Promise<string> {
+  const stored = await db.settings.get(SHIFT_START);
+  if (stored?.value) return String(stored.value);
+  const start = startOfTodayIso();
+  await db.settings.put({ key: SHIFT_START, value: start });
+  return start;
+}
+
+/**
+ * Strictly read-only: safe to call inside Dexie `liveQuery` callbacks (never writes
+ * to IndexedDB, avoiding `ReadOnlyError` on fresh installs).
+ */
 export async function getShiftStart(): Promise<string> {
   const stored = await db.settings.get(SHIFT_START);
   if (stored?.value) return String(stored.value);
-  const now = new Date().toISOString();
-  await db.settings.put({ key: SHIFT_START, value: now });
-  return now;
+  return startOfTodayIso();
 }
 
 export async function getOpeningCash(): Promise<number> {

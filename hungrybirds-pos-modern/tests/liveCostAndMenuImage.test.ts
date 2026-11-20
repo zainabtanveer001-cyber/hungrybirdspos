@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { compressImageFile, scaleImageDimensions } from '../src/lib/menu';
 import { applyStockDelta } from '../src/lib/inventory';
-import { computeSaleLiveCost, computeShiftUsage } from '../src/lib/shift';
+import { computeSaleLiveCost, computeShiftUsage, getShiftStart } from '../src/lib/shift';
+import { db } from '../src/lib/db';
 import type { InventoryItem, Recipe, Sale } from '../src/lib/db/types';
 
 describe('menu image upload & compression helpers', () => {
@@ -122,5 +123,20 @@ describe('live shift inventory costing & manual stock deltas', () => {
     };
 
     expect(computeSaleLiveCost(partiallyRefundedSale, recipes, inventoryById)).toBe(400);
+  });
+
+  it('keeps getShiftStart strictly read-only so Dexie liveQuery never throws ReadOnlyError (BUG-010)', async () => {
+    const getSpy = vi.spyOn(db.settings, 'get').mockResolvedValue(undefined);
+    const putSpy = vi.spyOn(db.settings, 'put').mockImplementation(() => {
+      throw new Error('ReadOnlyError: put must not be called inside liveQuery');
+    });
+    try {
+      const iso = await getShiftStart();
+      expect(Number.isNaN(Date.parse(iso))).toBe(false);
+      expect(putSpy).not.toHaveBeenCalled();
+    } finally {
+      getSpy.mockRestore();
+      putSpy.mockRestore();
+    }
   });
 });

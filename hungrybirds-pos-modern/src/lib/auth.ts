@@ -2,6 +2,7 @@ import { db } from './db';
 import { sha256 } from './crypto';
 import { forgetToken, rememberToken } from './sync';
 import { configManager } from './config';
+import { ensureShiftStart } from './shift';
 import type { User, UserRole } from './db/types';
 
 // Firebase REST instead of the SDK: the legacy app only needs three calls
@@ -109,6 +110,7 @@ export function initializeApp(): Promise<void> {
   bootstrap ??= (async () => {
     await ensureDefaultUsers();
     await ensureDefaultCategories();
+    await ensureShiftStart();
   })();
   return bootstrap;
 }
