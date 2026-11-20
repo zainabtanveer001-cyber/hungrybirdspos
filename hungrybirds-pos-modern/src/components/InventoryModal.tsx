@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Download, Plus, Search, Trash2 } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
-import { getLowStockThreshold, newInventoryId, normalizeQuantity, setLowStockThreshold } from '../lib/inventory';
+import { getLowStockThreshold, newInventoryId, normalizeQuantity, recordShiftStockDelta, setLowStockThreshold } from '../lib/inventory';
 import { pushInventory } from '../lib/sync';
 import { formatAmount } from '../lib/format';
 import { downloadCsv, datedFilename } from '../lib/export';
@@ -62,7 +62,12 @@ export function InventoryModal({ onClose, notify }: {
       notify('Ingredient name and stock quantity cannot be empty.');
       return;
     }
+    const prevStock = Number(item.stock) || 0;
+    const stockChange = stock - prevStock;
     await db.inventory.update(item.id, { name, stock, unit: (patch.unit ?? item.unit).trim() || 'pcs', cost });
+    if (stockChange !== 0) {
+      await recordShiftStockDelta(item.id, stockChange);
+    }
     pushInventory(item.id);
     setEditing((current) => {
       const next = { ...current };

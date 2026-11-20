@@ -1,9 +1,28 @@
 import { db } from './db';
 import { logAudit } from './audit';
-import type { Sale } from './db/types';
+import { clearShiftStockDeltas, getShiftStockDeltas } from './inventory';
+import { isApproved } from './suppliers';
+import type { Expense, InventoryItem, Recipe, Sale } from './db/types';
 
 const SHIFT_START = 'shiftStartTime';
 const OPENING_CASH = 'shiftOpeningCash';
+export const CLOSED_SHIFT_MANUAL_COSTS_KEY = 'closedShiftManualCosts';
+
+export interface ClosedShiftManualCost {
+  closedAt: string;
+  cost: number;
+}
+
+export async function getClosedShiftManualCosts(): Promise<ClosedShiftManualCost[]> {
+  const stored = await db.settings.get(CLOSED_SHIFT_MANUAL_COSTS_KEY);
+  if (!stored?.value) return [];
+  try {
+    const parsed = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
+    return Array.isArray(parsed) ? (parsed as ClosedShiftManualCost[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 export async function getShiftStart(): Promise<string> {
   const stored = await db.settings.get(SHIFT_START);
@@ -25,21 +44,145 @@ export async function setOpeningCash(amount: number): Promise<number> {
   return value;
 }
 
-/** Ends the shift: new start time, opening cash cleared for the next session. */
-export async function closeShift(user: string): Promise<string> {
-  const now = new Date().toISOString();
-  await db.settings.put({ key: SHIFT_START, value: now });
-  await db.settings.delete(OPENING_CASH);
-  await logAudit('SHIFT_CLOSE', `Shift closed at ${new Date(now).toLocaleString()}`, user);
-  return now;
-}
-
 export interface IngredientUsage {
   name: string;
   unit: string;
+  recipeQty: number;
+  manualQty: number;
   qtyConsumed: number;
   costPerUnit: number;
   costConsumed: number;
+}
+
+/**
+ * Computes a single sale's ingredient cost at the current live inventory unit prices.
+ * Excludes refunded quantities (`qty - refundedQty`) that were returned to stock.
+ */
+export function computeSaleLiveCost(
+  sale: Sale,
+  recipes: Recipe[],
+  inventoryById: Map<string, InventoryItem>,
+): number {
+  let cost = 0;
+  for (const line of sale.items || []) {
+    const effectiveQty = Math.max(0, (Number(line.qty) || 0) - (Number(line.refundedQty) || 0));
+    if (effectiveQty <= 0) continue;
+    const itemId = line.menuItemId || line.id;
+    for (const recipe of recipes) {
+      if (recipe.menuItemId !== itemId) continue;
+      const item = inventoryById.get(recipe.inventoryId);
+      const unitCost = Number(item?.cost) || 0;
+      cost += (Number(recipe.qtyRequired) || 0) * effectiveQty * unitCost;
+    }
+  }
+  return cost;
+}
+
+/**
+ * Aggregates live ingredient usage and cost across shift sales and net manual stock
+ * reductions during the active shift, priced at each ingredient's current unit cost.
+ */
+export function computeShiftUsage(
+  shiftSales: Sale[],
+  recipes: Recipe[],
+  inventory: InventoryItem[],
+  manualDeltas: Record<string, number> = {},
+): { ingredients: IngredientUsage[]; consumedCost: number; manualCost: number } {
+  const inventoryById = new Map(inventory.map((item) => [item.id, item]));
+  const usage = new Map<string, IngredientUsage>();
+  let consumedCost = 0;
+  let manualCost = 0;
+
+  const ensureRow = (inventoryId: string): IngredientUsage => {
+    const existing = usage.get(inventoryId);
+    if (existing) return existing;
+    const item = inventoryById.get(inventoryId);
+    const row: IngredientUsage = {
+      name: item?.name || inventoryId,
+      unit: item?.unit || '',
+      recipeQty: 0,
+      manualQty: 0,
+      qtyConsumed: 0,
+      costPerUnit: Number(item?.cost) || 0,
+      costConsumed: 0,
+    };
+    usage.set(inventoryId, row);
+    return row;
+  };
+
+  for (const sale of shiftSales) {
+    for (const line of sale.items || []) {
+      const effectiveQty = Math.max(0, (Number(line.qty) || 0) - (Number(line.refundedQty) || 0));
+      if (effectiveQty <= 0) continue;
+      const itemId = line.menuItemId || line.id;
+      for (const recipe of recipes.filter((r) => r.menuItemId === itemId)) {
+        const row = ensureRow(recipe.inventoryId);
+        const qty = (Number(recipe.qtyRequired) || 0) * effectiveQty;
+        row.recipeQty += qty;
+        row.qtyConsumed += qty;
+        const addedCost = qty * row.costPerUnit;
+        row.costConsumed += addedCost;
+        consumedCost += addedCost;
+      }
+    }
+  }
+
+  for (const [inventoryId, rawManualQty] of Object.entries(manualDeltas)) {
+    const manualQty = Math.max(0, Number(rawManualQty) || 0);
+    if (manualQty <= 0) continue;
+    const row = ensureRow(inventoryId);
+    row.manualQty += manualQty;
+    row.qtyConsumed += manualQty;
+    const addedCost = manualQty * row.costPerUnit;
+    row.costConsumed += addedCost;
+    consumedCost += addedCost;
+    manualCost += addedCost;
+  }
+
+  return { ingredients: [...usage.values()], consumedCost, manualCost };
+}
+
+/**
+ * Ends the shift: snapshots (locks) current ingredient costs onto the shift's sales
+ * and manual stock usage so future inventory price edits only affect new shifts,
+ * then resets the shift start time and opening cash.
+ */
+export async function closeShift(user: string): Promise<string> {
+  const now = new Date().toISOString();
+  const [startedAt, sales, inventory, recipes, stockDeltas, closedManual] = await Promise.all([
+    getShiftStart(),
+    db.sales.toArray(),
+    db.inventory.toArray(),
+    db.recipes.toArray(),
+    getShiftStockDeltas(),
+    getClosedShiftManualCosts(),
+  ]);
+
+  const from = new Date(startedAt).getTime();
+  const shiftSales = sales.filter((s: Sale) => new Date(s.timestamp).getTime() >= from);
+  const inventoryById = new Map(inventory.map((item) => [item.id, item]));
+  const { manualCost } = computeShiftUsage(shiftSales, recipes, inventory, stockDeltas);
+
+  await db.transaction('rw', db.sales, db.settings, async () => {
+    for (const sale of shiftSales) {
+      if (sale.id != null && sale.lockedCost === undefined) {
+        const lockedCost = computeSaleLiveCost(sale, recipes, inventoryById);
+        await db.sales.update(sale.id, { lockedCost });
+      }
+    }
+    if (manualCost > 0) {
+      await db.settings.put({
+        key: CLOSED_SHIFT_MANUAL_COSTS_KEY,
+        value: JSON.stringify([...closedManual, { closedAt: now, cost: manualCost }]),
+      });
+    }
+    await clearShiftStockDeltas();
+    await db.settings.put({ key: SHIFT_START, value: now });
+    await db.settings.delete(OPENING_CASH);
+  });
+
+  await logAudit('SHIFT_CLOSE', `Shift closed at ${new Date(now).toLocaleString()}`, user);
+  return now;
 }
 
 export interface ShiftReport {
@@ -63,22 +206,26 @@ export interface ShiftReport {
   ingredients: IngredientUsage[];
   consumedCost: number;
   grossProfit: number;
+  shiftExpenses: number;
+  netProfit: number;
 }
 
 export async function buildShiftReport(): Promise<ShiftReport> {
-  const [startedAt, openingCash, sales, inventory, recipes] = await Promise.all([
+  const [startedAt, openingCash, sales, inventory, recipes, expenses, stockDeltas] = await Promise.all([
     getShiftStart(),
     getOpeningCash(),
     db.sales.toArray(),
     db.inventory.toArray(),
     db.recipes.toArray(),
+    db.expenses.toArray(),
+    getShiftStockDeltas(),
   ]);
 
   const from = new Date(startedAt).getTime();
   const shiftSales = sales.filter((s: Sale) => new Date(s.timestamp).getTime() >= from);
   const sum = (pick: (sale: Sale) => number) => shiftSales.reduce((total, sale) => total + pick(sale), 0);
 
-  const totalSales = sum((s) => Number(s.total) || 0);
+  const totalSales = sum((s) => Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)));
   const cashCollected = sum((sale) =>
     (sale.payments || []).reduce((total, payment) => {
       if ((payment.method || 'Cash') !== 'Cash') return total;
@@ -99,30 +246,12 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     staffDiscounts.set(user, (staffDiscounts.get(user) || 0) + amount);
   }
 
-  const inventoryById = new Map(inventory.map((item) => [item.id, item]));
-  const usage = new Map<string, IngredientUsage>();
-  let consumedCost = 0;
-
-  for (const sale of shiftSales) {
-    for (const line of sale.items || []) {
-      const itemId = line.menuItemId || line.id;
-      for (const recipe of recipes.filter((r) => r.menuItemId === itemId)) {
-        const item = inventoryById.get(recipe.inventoryId);
-        const row = usage.get(recipe.inventoryId) || {
-          name: item?.name || recipe.inventoryId,
-          unit: item?.unit || '',
-          qtyConsumed: 0,
-          costPerUnit: Number(item?.cost) || 0,
-          costConsumed: 0,
-        };
-        const qty = (Number(recipe.qtyRequired) || 0) * (Number(line.qty) || 0);
-        row.qtyConsumed += qty;
-        row.costConsumed += qty * row.costPerUnit;
-        consumedCost += qty * row.costPerUnit;
-        usage.set(recipe.inventoryId, row);
-      }
-    }
-  }
+  const { ingredients, consumedCost } = computeShiftUsage(shiftSales, recipes, inventory, stockDeltas);
+  const shiftExpenses = expenses
+    .filter((e: Expense) => isApproved(e) && new Date(e.timestamp).getTime() >= from)
+    .reduce((total, e) => total + (Number(e.amount) || 0), 0);
+  const grossProfit = totalSales - consumedCost;
+  const netProfit = grossProfit - shiftExpenses;
 
   return {
     startedAt,
@@ -132,9 +261,9 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     packingCharges: sum((s) => Number(s.packingCharge) || 0),
     tax: sum((s) => Number(s.taxAmount) || 0),
     otherCharges: sum((s) => Number(s.otherCharge) || 0),
-    dineIn: sum((s) => (s.orderType === 'DINE_IN' ? Number(s.total) || 0 : 0)),
-    takeaway: sum((s) => (s.orderType === 'TAKEAWAY' ? Number(s.total) || 0 : 0)),
-    delivery: sum((s) => (s.orderType === 'DELIVERY' ? Number(s.total) || 0 : 0)),
+    dineIn: sum((s) => (s.orderType === 'DINE_IN' ? Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)) : 0)),
+    takeaway: sum((s) => (s.orderType === 'TAKEAWAY' ? Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)) : 0)),
+    delivery: sum((s) => (s.orderType === 'DELIVERY' ? Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)) : 0)),
     cashCollected,
     changeGiven,
     netCash: cashCollected - changeGiven,
@@ -142,8 +271,10 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     discountsByStaff: [...staffDiscounts].map(([user, amount]) => ({ user, amount })),
     totalDiscounts,
     discountedOrderCount,
-    ingredients: [...usage.values()],
+    ingredients,
     consumedCost,
-    grossProfit: totalSales - consumedCost,
+    grossProfit,
+    shiftExpenses,
+    netProfit,
   };
 }

@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
-import { Download, Pencil, Plus, Search, Trash2, Upload, X, Cloud } from 'lucide-react';
+import { Download, ImagePlus, Pencil, Plus, Search, Trash2, Upload, X, Cloud } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
-import { deleteCategory, deleteMenuItem, saveCategory, saveMenuItem, usedInSales } from '../lib/menu';
+import { compressImageFile, deleteCategory, deleteMenuItem, saveCategory, saveMenuItem, usedInSales } from '../lib/menu';
 import type { RecipeDraft } from '../lib/menu';
 import { collectBackup, importBackup } from '../lib/backup';
 import { downloadJson } from '../lib/export';
@@ -45,7 +45,25 @@ export function AdminSettingsModal({ username, notify, onClose }: {
   const [recipeRows, setRecipeRows] = useState<RecipeDraft[]>([]);
   const [importReport, setImportReport] = useState<string[] | null>(null);
   const [showCloudSetup, setShowCloudSetup] = useState(false);
+  const [compressingImage, setCompressingImage] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const imageInput = useRef<HTMLInputElement>(null);
+
+  async function handleDishImageFile(file: File | undefined) {
+    if (!file) return;
+    setCompressingImage(true);
+    try {
+      const compressed = await compressImageFile(file);
+      setDraft((d) => ({ ...d, imageUrl: compressed }));
+      const approxKb = Math.max(1, Math.round((compressed.length * 0.75) / 1024));
+      notify(`Photo compressed (~${approxKb} KB) and ready for "${draft.name.trim() || 'dish'}".`);
+    } catch (err) {
+      notify((err as Error).message || 'Could not process that image.');
+    } finally {
+      setCompressingImage(false);
+      if (imageInput.current) imageInput.current.value = '';
+    }
+  }
 
   const categoryName = useMemo(() => {
     const map = new Map<string, string>();
@@ -275,14 +293,64 @@ export function AdminSettingsModal({ username, notify, onClose }: {
             </select>
           </div>
 
-          <input
-            type="url"
-            value={draft.imageUrl}
-            onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
-            placeholder="Image URL (optional)"
-            aria-label="Dish image URL"
-            className={`${INPUT} w-full`}
-          />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button
+              type="button"
+              onClick={() => imageInput.current?.click()}
+              disabled={compressingImage}
+              className="bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-50"
+            >
+              <ImagePlus className="w-3.5 h-3.5" aria-hidden />
+              {compressingImage ? 'Compressing…' : draft.imageUrl ? 'Change Photo' : 'Upload Photo'}
+            </button>
+            <input
+              ref={imageInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              aria-label="Upload dish photo from device"
+              onChange={(e) => void handleDishImageFile(e.target.files?.[0])}
+            />
+            <input
+              type="url"
+              value={draft.imageUrl.startsWith('data:image/') ? '' : draft.imageUrl}
+              onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
+              placeholder={
+                draft.imageUrl.startsWith('data:image/')
+                  ? 'Compressed local photo attached (paste a web URL to replace)'
+                  : 'Or paste an image URL (optional)'
+              }
+              aria-label="Dish image URL"
+              className={`${INPUT} flex-1`}
+            />
+          </div>
+
+          {draft.imageUrl && (
+            <div className="flex items-center gap-2.5 p-2 rounded-xl bg-purple-50/60 border border-purple-200">
+              <img
+                src={draft.imageUrl}
+                alt="Dish preview"
+                className="w-12 h-12 rounded-lg object-cover border border-purple-200 shrink-0 bg-white"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-purple-900 truncate">
+                  {draft.imageUrl.startsWith('data:image/')
+                    ? `Compressed local photo (~${Math.max(1, Math.round((draft.imageUrl.length * 0.75) / 1024))} KB)`
+                    : 'External image URL'}
+                </p>
+                <p className="text-[10px] text-purple-700 truncate">
+                  Shown in place of the Menu card placeholder
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, imageUrl: '' }))}
+                className="text-[10px] font-bold text-red-600 hover:bg-red-100 px-2.5 py-1.5 rounded-lg shrink-0"
+              >
+                Remove photo
+              </button>
+            </div>
+          )}
 
           <div className="border-t border-gray-100 pt-2 space-y-1.5">
             <div className="flex items-center justify-between">

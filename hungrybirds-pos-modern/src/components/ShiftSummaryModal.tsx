@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
 import { buildShiftReport, closeShift } from '../lib/shift';
-import type { ShiftReport } from '../lib/shift';
+import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
 import { Modal } from './Modal';
 
@@ -10,11 +9,7 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
   notify: (message: string) => void;
   onClosed: () => void;
 }) {
-  const [report, setReport] = useState<ShiftReport | null>(null);
-
-  useEffect(() => {
-    buildShiftReport().then(setReport);
-  }, []);
+  const report = useLive(() => buildShiftReport(), []) ?? null;
 
   async function close() {
     if (!window.confirm('End the current shift? Active shift revenue tracking resets and opening cash is cleared.')) return;
@@ -81,7 +76,11 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
                   <div className="min-w-0">
                     <p className="font-bold text-gray-800 truncate">{row.name}</p>
                     <p className="text-[10px] text-gray-500">
-                      {row.qtyConsumed.toFixed(2)} {row.unit} • {formatAmount(row.costPerUnit)}/unit
+                      {row.qtyConsumed.toFixed(2)} {row.unit}
+                      {row.manualQty > 0
+                        ? ` (recipe ${row.recipeQty.toFixed(2)}, manual ${row.manualQty.toFixed(2)})`
+                        : ''}{' '}
+                      • {formatAmount(row.costPerUnit)}/unit
                     </p>
                   </div>
                   <span className={`font-black shrink-0 ${row.costConsumed > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
@@ -109,10 +108,15 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
             )}
           </div>
           <Row label="Total discounts given" value={`- ${formatAmount(report?.totalDiscounts ?? 0)}`} valueClass="text-red-600" />
-          <Row label="Raw material cost consumed" value={formatAmount(report?.consumedCost ?? 0)} valueClass="text-red-700" />
-          <div className={`flex justify-between text-sm font-bold pt-1 ${(report?.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          <Row label="Raw material cost consumed (live)" value={formatAmount(report?.consumedCost ?? 0)} valueClass="text-red-700" />
+          <div className={`flex justify-between text-xs font-bold pt-1 ${(report?.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
             <span>Gross profit / (loss)</span>
             <strong className="tabular-nums">{formatAmount(report?.grossProfit ?? 0)}</strong>
+          </div>
+          <Row label="Approved shift expenses" value={`- ${formatAmount(report?.shiftExpenses ?? 0)}`} valueClass="text-amber-700" />
+          <div className={`flex justify-between text-sm font-bold pt-1 border-t border-gray-100 ${(report?.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+            <span>Net shift profit / (loss)</span>
+            <strong className="tabular-nums">{formatAmount(report?.netProfit ?? 0)}</strong>
           </div>
         </section>
       </div>

@@ -3,6 +3,74 @@ import { logAudit } from './audit';
 import { pushCategory, pushMenu } from './sync';
 import type { Category, MenuItem, Recipe } from './db/types';
 
+export const MAX_IMAGE_DIMENSION = 800;
+export const IMAGE_JPEG_QUALITY = 0.72;
+export const MAX_COMPRESSED_IMAGE_BYTES = 650 * 1024;
+
+/** Scales image dimensions to fit within `maxDimension` while preserving aspect ratio. */
+export function scaleImageDimensions(
+  width: number,
+  height: number,
+  maxDimension = MAX_IMAGE_DIMENSION,
+): { width: number; height: number } {
+  const w = Math.max(1, Math.round(Number(width) || 1));
+  const h = Math.max(1, Math.round(Number(height) || 1));
+  if (w <= maxDimension && h <= maxDimension) return { width: w, height: h };
+  const scale = maxDimension / Math.max(w, h);
+  return {
+    width: Math.max(1, Math.round(w * scale)),
+    height: Math.max(1, Math.round(h * scale)),
+  };
+}
+
+/**
+ * Reads a local image file, downscales it on an offscreen canvas, and encodes
+ * a compressed JPEG data URL that stays under Firestore's per-field size cap.
+ */
+export function compressImageFile(
+  file: File,
+  maxDimension = MAX_IMAGE_DIMENSION,
+  initialQuality = IMAGE_JPEG_QUALITY,
+): Promise<string> {
+  if (!file || !file.type.startsWith('image/')) {
+    return Promise.reject(new Error('Please choose a valid image file.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error || new Error('Failed to read image file.'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to decode image file.'));
+      img.onload = () => {
+        const { width, height } = scaleImageDimensions(img.width, img.height, maxDimension);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context unavailable for image compression.'));
+          return;
+        }
+        // Fill white background so transparent PNGs do not render black in JPEG.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const qualities = [initialQuality, 0.55, 0.4];
+        let dataUrl = canvas.toDataURL('image/jpeg', initialQuality);
+        for (const q of qualities) {
+          dataUrl = canvas.toDataURL('image/jpeg', q);
+          if (dataUrl.length <= MAX_COMPRESSED_IMAGE_BYTES) break;
+        }
+        resolve(dataUrl);
+      };
+      img.src = String(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export function newCategoryId(): string {
   return `CAT_${Date.now()}`;
 }

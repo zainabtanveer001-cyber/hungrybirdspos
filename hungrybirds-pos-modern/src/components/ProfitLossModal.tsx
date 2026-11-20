@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { getPnl } from '../lib/analytics';
-import type { PnlReport } from '../lib/analytics';
+import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
 import { Modal } from './Modal';
 
@@ -11,17 +11,7 @@ export function ProfitLossModal({ onClose }: { onClose: () => void }) {
   const today = new Date();
   const [start, setStart] = useState(iso(today));
   const [end, setEnd] = useState(iso(today));
-  const [report, setReport] = useState<PnlReport | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    getPnl(start, end).then((next) => {
-      if (active) setReport(next);
-    });
-    return () => {
-      active = false;
-    };
-  }, [start, end]);
+  const report = useLive(() => getPnl(start, end), [start, end]) ?? null;
 
   function preset(range: 'today' | 'month') {
     const now = new Date();
@@ -63,11 +53,16 @@ export function ProfitLossModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
           <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
             <p className="text-[10px] font-black uppercase tracking-wider text-emerald-800">Sales</p>
             <p className="text-lg font-black text-emerald-900 tabular-nums">{formatAmount(report?.sales ?? 0)}</p>
             <p className="text-[10px] text-emerald-700">{report?.orderCount ?? 0} orders</p>
+          </div>
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200">
+            <p className="text-[10px] font-black uppercase tracking-wider text-rose-800">Inventory cost (COGS)</p>
+            <p className="text-lg font-black text-rose-900 tabular-nums">{formatAmount(report?.cogs ?? 0)}</p>
+            <p className="text-[10px] text-rose-700">Live in shift · locked at shift end</p>
           </div>
           <div className="p-3 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">Approved expenses</p>
@@ -81,13 +76,13 @@ export function ProfitLossModal({ onClose }: { onClose: () => void }) {
             <p className={`text-lg font-black tabular-nums ${net < 0 ? 'text-red-700' : 'text-teal-900'}`}>
               {formatAmount(net)}
             </p>
-            <p className={`text-[10px] ${net < 0 ? 'text-red-600' : 'text-teal-700'}`}>Sales − expenses</p>
+            <p className={`text-[10px] ${net < 0 ? 'text-red-600' : 'text-teal-700'}`}>Sales − COGS − expenses</p>
           </div>
         </div>
 
         <p className="text-[11px] text-gray-500">
-          Stock received from suppliers is not counted as an expense here — it is captured when recorded in
-          Expenses or on the Suppliers ledger.
+          Ingredient costs for the active shift update live on the go whenever you update inventory unit costs
+          or reduce stock, and lock automatically when the shift is closed.
         </p>
       </div>
     </Modal>

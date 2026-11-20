@@ -1,4 +1,6 @@
 import { db } from './db';
+import { getShiftStockDeltas } from './inventory';
+import { computeSaleLiveCost, getClosedShiftManualCosts, getShiftStart } from './shift';
 import { isApproved } from './suppliers';
 import type { Expense, Sale } from './db/types';
 
@@ -181,6 +183,8 @@ export async function getAnalytics(period: Period, categoryId?: string): Promise
 
 export interface PnlReport {
   sales: number;
+  cogs: number;
+  grossProfit: number;
   expenses: number;
   net: number;
   orderCount: number;
@@ -199,7 +203,15 @@ export function parseLocalDateBoundary(dateStr: string, endOfDay = false): numbe
 }
 
 export async function getPnl(startDate: string, endDate: string): Promise<PnlReport> {
-  const [sales, expenses] = await Promise.all([db.sales.toArray(), db.expenses.toArray()]);
+  const [sales, expenses, inventory, recipes, shiftStart, stockDeltas, closedManual] = await Promise.all([
+    db.sales.toArray(),
+    db.expenses.toArray(),
+    db.inventory.toArray(),
+    db.recipes.toArray(),
+    getShiftStart(),
+    getShiftStockDeltas(),
+    getClosedShiftManualCosts(),
+  ]);
   const from = parseLocalDateBoundary(startDate, false);
   const to = parseLocalDateBoundary(endDate, true);
   const between = (stamp: string) => {
@@ -207,11 +219,49 @@ export async function getPnl(startDate: string, endDate: string): Promise<PnlRep
     return at >= from && at <= to;
   };
 
+  const inventoryById = new Map(inventory.map((item) => [item.id, item]));
   const inRange = sales.filter((s) => between(s.timestamp));
-  const totalSales = inRange.reduce((sum, s) => sum + amount(s), 0);
+  const totalSales = inRange.reduce(
+    (sum, s) => sum + Math.max(0, amount(s) - (Number(s.refundedAmount) || 0)),
+    0,
+  );
+
+  // Closed-shift sales use their locked cost snapshot; live-shift sales dynamically
+  // recalculate from the latest inventory unit costs until the shift ends.
+  let cogs = inRange.reduce((sum, sale) => {
+    if (sale.lockedCost !== undefined) return sum + (Number(sale.lockedCost) || 0);
+    return sum + computeSaleLiveCost(sale, recipes, inventoryById);
+  }, 0);
+
+  // Add locked manual stock costs from closed shifts in the date range.
+  for (const record of closedManual) {
+    if (between(record.closedAt)) {
+      cogs += Number(record.cost) || 0;
+    }
+  }
+
+  // Add live manual stock reductions from the currently open shift if it overlaps [from, to].
+  const shiftStartMs = new Date(shiftStart).getTime();
+  if (Date.now() >= from && shiftStartMs <= to) {
+    for (const [inventoryId, rawQty] of Object.entries(stockDeltas)) {
+      const qty = Math.max(0, Number(rawQty) || 0);
+      if (qty <= 0) continue;
+      const unitCost = Number(inventoryById.get(inventoryId)?.cost) || 0;
+      cogs += qty * unitCost;
+    }
+  }
+
   const totalExpenses = expenses
     .filter((e: Expense) => isApproved(e) && between(e.timestamp))
     .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  return { sales: totalSales, expenses: totalExpenses, net: totalSales - totalExpenses, orderCount: inRange.length };
+  const grossProfit = totalSales - cogs;
+  return {
+    sales: totalSales,
+    cogs,
+    grossProfit,
+    expenses: totalExpenses,
+    net: grossProfit - totalExpenses,
+    orderCount: inRange.length,
+  };
 }

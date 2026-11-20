@@ -142,6 +142,11 @@ export interface Sale {
   refundedAmount?: number;
   refundStatus?: 'FULL' | 'PARTIAL';
   refunds?: RefundRecord[];
+  /**
+   * Ingredient cost snapshotted when the shift containing this sale is closed.
+   * While undefined (shift still live), cost recalculates dynamically from current inventory unit costs.
+   */
+  lockedCost?: number;
   /** Firestore doc id once the sale has been pushed (append-only in the cloud). */
   cloudId?: string;
   onlineOrderId?: string | null;

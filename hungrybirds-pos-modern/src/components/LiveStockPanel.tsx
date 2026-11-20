@@ -3,7 +3,8 @@ import { AlertTriangle, Boxes, Lock, Plus, Minus } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { adjustStock, getLowStockThreshold } from '../lib/inventory';
-import { normalizeCharge } from '../lib/format';
+import { buildShiftReport } from '../lib/shift';
+import { formatAmount, normalizeCharge } from '../lib/format';
 import { OwnerPinModal } from './OwnerPinModal';
 import type { InventoryItem } from '../lib/db/types';
 
@@ -21,6 +22,7 @@ export function LiveStockPanel({ canManage, username, onManage }: {
   const [prompting, setPrompting] = useState(false);
   const items = useLive(() => db.inventory.toArray(), []);
   const threshold = useLive(() => getLowStockThreshold(), []) ?? 5;
+  const shift = useLive(() => buildShiftReport(), []);
 
   const lowStock = (items ?? []).filter((i) => Number(i.stock) <= threshold);
 
@@ -70,42 +72,69 @@ export function LiveStockPanel({ canManage, username, onManage }: {
             </button>
           </div>
         ) : (
-          <div className="space-y-1.5 text-xs max-h-60 overflow-y-auto custom-scrollbar pr-1">
-            {!items?.length ? (
-              <p className="text-gray-400 text-center py-2">No raw inventory found.</p>
-            ) : (
-              items.map((item) => (
-                <div key={item.id} className="p-2 bg-gray-50 rounded border border-gray-200">
-                  <div className="flex justify-between items-center gap-2">
-                    <div className="min-w-0">
-                      <p className="font-bold text-gray-800 truncate">{item.name}</p>
-                      <p className="text-[11px] text-gray-500">
-                        Cost/unit: Rs {normalizeCharge(item.cost || 0).toFixed(2)} • Unit: {item.unit}
-                      </p>
+          <div className="space-y-2.5 text-xs">
+            <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-[#eff6ff]/70 border border-[#e0edff] text-center">
+              <div>
+                <span className="block text-[10px] text-[#526066]">Shift Sales</span>
+                <strong className="font-bold text-xs text-[#000000] tabular-nums">
+                  {formatAmount(shift?.totalSales ?? 0)}
+                </strong>
+              </div>
+              <div>
+                <span className="block text-[10px] text-[#526066]">Live Cost</span>
+                <strong className="font-bold text-xs text-red-600 tabular-nums">
+                  {formatAmount(shift?.consumedCost ?? 0)}
+                </strong>
+              </div>
+              <div>
+                <span className="block text-[10px] text-[#526066]">Live P&amp;L</span>
+                <strong
+                  className={`font-bold text-xs tabular-nums ${
+                    (shift?.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'
+                  }`}
+                >
+                  {formatAmount(shift?.netProfit ?? 0)}
+                </strong>
+              </div>
+            </div>
+
+            <div className="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+              {!items?.length ? (
+                <p className="text-gray-400 text-center py-2">No raw inventory found.</p>
+              ) : (
+                items.map((item) => (
+                  <div key={item.id} className="p-2 bg-gray-50 rounded border border-gray-200">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 truncate">{item.name}</p>
+                        <p className="text-[11px] text-gray-500">
+                          Cost/unit: Rs {normalizeCharge(item.cost || 0).toFixed(2)} • Unit: {item.unit}
+                        </p>
+                      </div>
+                      <span className={`font-extrabold text-xs shrink-0 ${Number(item.stock) <= threshold ? 'text-red-600' : 'text-emerald-700'}`}>
+                        {Number(item.stock).toFixed(2)} {item.unit}
+                      </span>
                     </div>
-                    <span className={`font-extrabold text-xs shrink-0 ${Number(item.stock) <= threshold ? 'text-red-600' : 'text-emerald-700'}`}>
-                      {Number(item.stock).toFixed(2)} {item.unit}
-                    </span>
+                    <div className="flex items-center gap-1 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => bump(item, 1)}
+                        className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-emerald-200 flex items-center gap-0.5"
+                      >
+                        <Plus className="w-3 h-3" aria-hidden />1
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => bump(item, -1)}
+                        className="bg-red-100 text-red-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-red-200 flex items-center gap-0.5"
+                      >
+                        <Minus className="w-3 h-3" aria-hidden />1
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 mt-1">
-                    <button
-                      type="button"
-                      onClick={() => bump(item, 1)}
-                      className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-emerald-200 flex items-center gap-0.5"
-                    >
-                      <Plus className="w-3 h-3" aria-hidden />1
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => bump(item, -1)}
-                      className="bg-red-100 text-red-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-red-200 flex items-center gap-0.5"
-                    >
-                      <Minus className="w-3 h-3" aria-hidden />1
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         )}
 
