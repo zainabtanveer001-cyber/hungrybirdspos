@@ -186,10 +186,22 @@ export interface PnlReport {
   orderCount: number;
 }
 
+export function parseLocalDateBoundary(dateStr: string, endOfDay = false): number {
+  if (!dateStr) return endOfDay ? Infinity : -Infinity;
+  const parts = dateStr.split('-').map(Number);
+  if (parts.length === 3 && parts.every(Number.isFinite)) {
+    const [y, m, d] = parts;
+    return endOfDay
+      ? new Date(y, m - 1, d, 23, 59, 59, 999).getTime()
+      : new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+  }
+  return endOfDay ? new Date(dateStr).setHours(23, 59, 59, 999) : new Date(dateStr).setHours(0, 0, 0, 0);
+}
+
 export async function getPnl(startDate: string, endDate: string): Promise<PnlReport> {
   const [sales, expenses] = await Promise.all([db.sales.toArray(), db.expenses.toArray()]);
-  const from = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : -Infinity;
-  const to = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : Infinity;
+  const from = parseLocalDateBoundary(startDate, false);
+  const to = parseLocalDateBoundary(endDate, true);
   const between = (stamp: string) => {
     const at = new Date(stamp).getTime();
     return at >= from && at <= to;

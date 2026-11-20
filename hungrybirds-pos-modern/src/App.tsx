@@ -137,6 +137,28 @@ function App() {
     notify(`Held order #${id}${charges.tableNumber ? ` (${charges.tableNumber})` : ''}.`);
   }, [cart, charges, customer, notify, resetOrder, session?.username]);
 
+  const startCheckout = useCallback(async () => {
+    if (!cart.length) return;
+    if (session?.role === 'WAITER') {
+      notify('Waiters cannot take payments. Ask a cashier or manager.');
+      return;
+    }
+    if (charges.orderType === 'DELIVERY' && !customer.phone?.trim()) {
+      notify('Delivery orders need a customer phone number.');
+      return;
+    }
+    if (charges.orderType === 'DELIVERY' && totals.subtotal - totals.discountAmount < MIN_DELIVERY_ORDER) {
+      notify(`Minimum order total for delivery is ${formatAmount(MIN_DELIVERY_ORDER)}.`);
+      return;
+    }
+    const stockError = await verifyStock(cart);
+    if (stockError) {
+      notify(stockError);
+      return;
+    }
+    setPaying(true);
+  }, [cart, charges.orderType, customer.phone, notify, session?.role, totals.discountAmount, totals.subtotal]);
+
   useEffect(() => {
     if (!session) return;
     function onKeyDown(e: KeyboardEvent) {
@@ -153,11 +175,7 @@ function App() {
         document.getElementById('posMenuSearchInput')?.focus();
       } else if (e.key === 'F2' && cart.length > 0 && !paying) {
         e.preventDefault();
-        if (session?.role === 'WAITER') {
-          notify('Waiters cannot take payments. Ask a cashier or manager.');
-          return;
-        }
-        setPaying(true);
+        void startCheckout();
       } else if (e.key === 'F4' && cart.length > 0 && !paying) {
         e.preventDefault();
         void hold();
@@ -168,7 +186,7 @@ function App() {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [session, cart.length, paying, hold, notify]);
+  }, [session, cart.length, paying, hold, startCheckout]);
 
   async function closeOnlineOrder(saleId: number) {
     const order = activeOnlineOrder;
@@ -343,7 +361,7 @@ function App() {
           onOpenOnlineOrders={() => setOnlineOrdersOpen(true)}
         />
 
-        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 pb-24 lg:pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 pb-28 lg:pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
           <div className="lg:col-span-2 space-y-4">
             <MenuGrid onPick={pickItem} />
 
@@ -360,7 +378,7 @@ function App() {
                 onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
                 onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
                 onHold={hold}
-                onCheckout={() => setPaying(true)}
+                onCheckout={() => void startCheckout()}
               />
             </div>
 
@@ -400,51 +418,48 @@ function App() {
               onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
               onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
               onHold={hold}
-              onCheckout={() => setPaying(true)}
+              onCheckout={() => void startCheckout()}
             />
           </aside>
         </main>
       </div>
 
-      {cart.length > 0 && (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#000524] border-t border-[#795afa]/40 px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xl">
-          <button
-            type="button"
-            onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth' })}
-            className="text-left min-w-0"
-          >
-            <div className="text-[11px] font-medium text-[#c5b9fa]">
-              {cart.reduce((s, i) => s + i.qty, 0)} items · {charges.orderType.replace('_', ' ')}
-              {charges.tableNumber ? ` (${charges.tableNumber})` : ''}
-            </div>
-            <div className="font-display text-base font-semibold text-white tabular-nums">
-              {formatAmount(totals.grandTotal)}
-            </div>
-          </button>
-          <div className="flex items-center gap-2 shrink-0">
+      {cart.length > 0 && (() => {
+        const count = cart.reduce((s, i) => s + i.qty, 0);
+        return (
+          <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#000524] border-t border-[#795afa]/40 px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xl">
             <button
               type="button"
-              onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth' })}
-              className="px-3 h-9 rounded-[8px] border border-[#c5b9fa]/50 text-xs font-medium text-white hover:bg-white/10"
+              onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
+              className="text-left min-w-0"
             >
-              View Order
+              <div className="text-[11px] font-medium text-[#c5b9fa]">
+                {count} {count === 1 ? 'item' : 'items'} · {charges.orderType.replace('_', ' ')}
+                {charges.tableNumber ? ` (${charges.tableNumber})` : ''}
+              </div>
+              <div className="font-display text-base font-semibold text-white tabular-nums">
+                {formatAmount(totals.grandTotal)}
+              </div>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (session.role === 'WAITER') {
-                  notify('Waiters cannot take payments. Ask a cashier or manager.');
-                  return;
-                }
-                setPaying(true);
-              }}
-              className="px-4 h-9 rounded-[8px] bg-[#2941e0] hover:bg-[#1f35c4] text-xs font-medium text-white"
-            >
-              Checkout
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
+                className="px-3 h-9 rounded-[8px] border border-[#c5b9fa]/50 text-xs font-medium text-white hover:bg-white/10"
+              >
+                View Order
+              </button>
+              <button
+                type="button"
+                onClick={() => void startCheckout()}
+                className="px-4 h-9 rounded-[8px] bg-[#2941e0] hover:bg-[#1f35c4] text-xs font-medium text-white"
+              >
+                Checkout
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {paying && (
         <PaymentModal

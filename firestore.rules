@@ -7,11 +7,18 @@ service cloud.firestore {
             return request.auth != null;
         }
 
-        // Keep this list in sync with ADMIN_EMAILS in adminwebsite.js
+        // Keep this list in sync with ADMIN_EMAILS in adminwebsite.js.
+        // Also recognize a provisioned POS staff profile whose role is OWNER.
         function isAdmin() {
-            return isSignedIn() && request.auth.token.email in [
-                "owner@hungrybirds.com"
-            ];
+            return isSignedIn() && (
+                request.auth.token.email in [
+                    "owner@hungrybirds.com"
+                ]
+                || (
+                    exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', null) == 'OWNER'
+                )
+            );
         }
 
         // Staff accounts have a profile doc keyed by their auth uid (see app.js createEmployee)

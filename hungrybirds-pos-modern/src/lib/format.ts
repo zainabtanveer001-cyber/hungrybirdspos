@@ -1,7 +1,13 @@
 const currencyFormatter = new Intl.NumberFormat('en-PK', {
   style: 'currency',
   currency: 'PKR',
+  // Pin the digits: PKR's default minor digits differ between ICU/CLDR
+  // versions (Node 22.14 printed "Rs 1,300.00", newer runtimes "Rs 1,300"),
+  // so receipts and screens must not depend on the runtime's ICU build.
+  // Whole rupees print bare; fractional amounts always show two decimals.
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
+  trailingZeroDisplay: 'stripIfInteger',
 });
 
 export function formatAmount(amount: number): string {

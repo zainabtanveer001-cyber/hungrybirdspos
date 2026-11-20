@@ -35,14 +35,14 @@ module.exports = {
     {
       // Legacy monolithic files: functions are defined as window.functionName
       // and called directly — cross-references are expected, not errors.
-      files: ['hungrybirdspos/app.js', 'hungrybirdspos/db.js'],
+      files: ['app.js', 'db.js'],
       rules: {
         'no-unused-vars': 'off',
         'no-undef': 'warn',
       },
     },
     {
-      files: ['hungrybirdspos/sw.js'],
+      files: ['sw.js'],
       rules: {
         'no-unused-vars': 'off',
       },

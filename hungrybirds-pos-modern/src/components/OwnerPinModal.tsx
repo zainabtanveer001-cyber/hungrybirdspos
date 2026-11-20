@@ -36,6 +36,8 @@ export function OwnerPinModal({ action, onClose, onAuthorized }: {
     }
   }
 
+  const blockedNoPin = pinExists === false && !isOwner;
+
   return (
     <Modal
       title="Owner Authorization"
@@ -48,7 +50,7 @@ export function OwnerPinModal({ action, onClose, onAuthorized }: {
           <button
             type="button"
             onClick={submit}
-            disabled={busy || pinExists === null || !pin.trim()}
+            disabled={busy || pinExists === null || blockedNoPin || !pin.trim()}
             className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
           >
             Authorize
@@ -56,23 +58,33 @@ export function OwnerPinModal({ action, onClose, onAuthorized }: {
         </div>
       }
     >
-      <p className="text-sm text-gray-600 mb-4">{pinExists === false ? 'No owner PIN is set yet. The Owner creates one now (4–8 digits).' : action}</p>
-      <label htmlFor="ownerPin" className="block text-xs font-bold uppercase tracking-wide text-gray-600 mb-1.5">
-        {pinExists === false ? 'Create owner PIN' : 'Enter owner PIN'}
-      </label>
-      <input
-        id="ownerPin"
-        type="password"
-        inputMode="numeric"
-        autoFocus
-        value={pin}
-        onChange={(e) => {
-          setPin(e.target.value);
-          setError('');
-        }}
-        onKeyDown={(e) => e.key === 'Enter' && submit()}
-        className="w-full p-3 text-center tracking-[0.4em] font-black text-lg ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      />
+      <p className="text-sm text-gray-600 mb-4">
+        {pinExists === false
+          ? isOwner
+            ? 'No owner PIN is set yet. Create one now (4–8 digits).'
+            : 'No owner PIN has been configured yet. An Owner must sign in and set an owner PIN in Admin Settings before this action can be authorized.'
+          : action}
+      </p>
+      {!blockedNoPin && (
+        <>
+          <label htmlFor="ownerPin" className="block text-xs font-bold uppercase tracking-wide text-gray-600 mb-1.5">
+            {pinExists === false ? 'Create owner PIN' : 'Enter owner PIN'}
+          </label>
+          <input
+            id="ownerPin"
+            type="password"
+            inputMode="numeric"
+            autoFocus
+            value={pin}
+            onChange={(e) => {
+              setPin(e.target.value);
+              setError('');
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            className="w-full p-3 text-center tracking-[0.4em] font-black text-lg ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </>
+      )}
       {error && (
         <p role="alert" className="mt-2 text-xs font-bold text-red-600">
           {error}

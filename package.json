@@ -2,16 +2,16 @@
   "name": "rest_pos",
   "version": "1.0.0",
   "description": "Offline-capable POS PWA for restaurants",
-  "main": "hungrybirdspos/app.js",
+  "main": "app.js",
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
-    "lint:fix": "eslint --fix hungrybirdspos/app.js hungrybirdspos/db.js hungrybirdspos/sw.js",
-    "format": "prettier --write hungrybirdspos/",
+    "lint": "eslint app.js db.js sw.js",
+    "lint:fix": "eslint --fix app.js db.js sw.js",
+    "format": "prettier --write .",
     "type-check": "tsc --noEmit 2>&1 || true",
-    "build:css": "tailwindcss-cli -i ./hungrybirdspos/src/input.css -o ./tailwind.css --minify"
+    "build:css": "tailwindcss-cli -i ./tailwind.css -o ./tailwind.css --minify"
   },
   "repository": {
     "type": "git",

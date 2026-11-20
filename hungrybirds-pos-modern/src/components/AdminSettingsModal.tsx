@@ -12,6 +12,8 @@ import { CloudSetupModal } from './CloudSetupModal';
 import { StaffAccountsSection } from './StaffAccountsSection';
 import { LoyaltyRewardsSection } from './LoyaltyRewardsSection';
 import { readSession } from '../lib/auth';
+import { hasOwnerPin, isValidPin, setOwnerPin } from '../lib/ownerPin';
+import { logAudit } from '../lib/audit';
 import type { Category, MenuItem, Recipe } from '../lib/db/types';
 
 const INPUT = 'p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-w-0';
@@ -303,11 +305,12 @@ export function AdminSettingsModal({ username, notify, onClose }: {
           </div>
         </section>
 
+        {readSession()?.role === 'OWNER' && <OwnerPinSection username={username} notify={notify} />}
+
         {readSession()?.role === 'OWNER' && <StaffAccountsSection username={username} notify={notify} />}
 
         {readSession()?.role === 'OWNER' && (
-          <section className="space-y-3">
-            <h3 className="text-xs font-black uppercase tracking-wider text-gray-700">Loyalty Rewards</h3>
+          <section className="p-3 rounded-xl border border-gray-200 bg-white">
             <LoyaltyRewardsSection username={username} notify={notify} />
           </section>
         )}
@@ -439,6 +442,57 @@ function RecipeRows({ rows, onChange }: {
         </li>
       ))}
     </ul>
+  );
+}
+
+function OwnerPinSection({ username, notify }: { username: string; notify: (m: string) => void }) {
+  const [pin, setPin] = useState('');
+  const [configured, setConfigured] = useState(false);
+
+  useMemo(() => {
+    void hasOwnerPin().then(setConfigured);
+  }, []);
+
+  async function savePin() {
+    const trimmed = pin.trim();
+    if (!isValidPin(trimmed)) {
+      notify('Owner PIN must be 4–8 digits.');
+      return;
+    }
+    await setOwnerPin(trimmed);
+    await logAudit('OWNER_PIN_UPDATED', 'Owner authorization PIN updated', username);
+    setConfigured(true);
+    setPin('');
+    notify('Owner authorization PIN saved.');
+  }
+
+  return (
+    <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-2">
+      <div className="flex items-center justify-between">
+        <SectionTitle>Owner authorization PIN</SectionTitle>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${configured ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+          {configured ? 'Configured' : 'Not set'}
+        </span>
+      </div>
+      <p className="text-[11px] text-gray-500">
+        Required when a Manager voids, refunds, or edits a completed sale, and to unlock Live Stock.
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void savePin()}
+          placeholder={configured ? 'New PIN (4–8 digits)' : 'Create PIN (4–8 digits)'}
+          aria-label="Owner authorization PIN"
+          className={`${INPUT} flex-1`}
+        />
+        <button type="button" onClick={savePin} className={PRIMARY}>
+          {configured ? 'Update PIN' : 'Set PIN'}
+        </button>
+      </div>
+    </section>
   );
 }
 

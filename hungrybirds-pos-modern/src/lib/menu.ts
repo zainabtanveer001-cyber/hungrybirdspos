@@ -77,7 +77,7 @@ export async function saveMenuItem(
       name,
       price,
       categoryId: draft.categoryId,
-      imageUrl: draft.imageUrl || existing?.imageUrl || '',
+      imageUrl: draft.imageUrl !== undefined ? draft.imageUrl.trim() : (existing?.imageUrl || ''),
       modifierGroups: existing?.modifierGroups,
     };
     if (draft.description !== undefined) merged.description = draft.description.trim();

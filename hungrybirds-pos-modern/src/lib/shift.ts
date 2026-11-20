@@ -105,7 +105,8 @@ export async function buildShiftReport(): Promise<ShiftReport> {
 
   for (const sale of shiftSales) {
     for (const line of sale.items || []) {
-      for (const recipe of recipes.filter((r) => r.menuItemId === line.id)) {
+      const itemId = line.menuItemId || line.id;
+      for (const recipe of recipes.filter((r) => r.menuItemId === itemId)) {
         const item = inventoryById.get(recipe.inventoryId);
         const row = usage.get(recipe.inventoryId) || {
           name: item?.name || recipe.inventoryId,

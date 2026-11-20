@@ -65,7 +65,7 @@ export function CustomersModal({ onClose }: { onClose: () => void }) {
             >
               ▼
             </button>
-            {sortOrders === null && (
+            {sortOrders !== null && (
               <button
                 type="button"
                 onClick={() => setSortOrders(null)}
@@ -112,6 +112,7 @@ export function CustomersModal({ onClose }: { onClose: () => void }) {
 
 function CustomerHistory({ customer, onBack, onUpdate }: { customer: Customer; onBack: () => void; onUpdate: (c: Customer) => void }) {
   const sales = useLive(() => db.sales.toArray(), []) ?? [];
+  const [saved, setSaved] = useState(false);
 
   const orders = useMemo(
     () =>
@@ -120,6 +121,15 @@ function CustomerHistory({ customer, onBack, onUpdate }: { customer: Customer; o
         .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
     [sales, customer.phone],
   );
+
+  async function saveName() {
+    const trimmed = (customer.name || '').trim();
+    const updated = { ...customer, name: trimmed, updatedAt: new Date().toISOString() };
+    await db.customers.put(updated);
+    onUpdate(updated);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1800);
+  }
 
   return (
     <div className="space-y-3">
@@ -132,16 +142,21 @@ function CustomerHistory({ customer, onBack, onUpdate }: { customer: Customer; o
           <input
             type="text"
             value={customer.name || ''}
-            onChange={(e) => onUpdate({ ...customer, name: e.target.value })}
+            onChange={(e) => {
+              setSaved(false);
+              onUpdate({ ...customer, name: e.target.value });
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && void saveName()}
             placeholder="Customer name"
+            aria-label="Customer name"
             className="flex-1 p-1.5 text-sm border-0 ring-1 ring-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-9"
           />
           <button
             type="button"
-            onClick={() => onUpdate({ ...customer, name: customer.name || '' })}
-            className="text-[10px] px-2 py-1 bg-purple-100 text-purple-800 rounded-lg min-h-9"
+            onClick={saveName}
+            className="text-[10px] font-bold px-2.5 py-1 bg-purple-600 text-white hover:bg-purple-700 rounded-lg min-h-9"
           >
-            Save
+            {saved ? 'Saved' : 'Save'}
           </button>
         </div>
         <p className="text-xs text-gray-600">{customer.phone}</p>

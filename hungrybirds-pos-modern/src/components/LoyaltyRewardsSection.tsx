@@ -18,6 +18,26 @@ export function LoyaltyRewardsSection({ username, notify }: {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function resetForm() {
+    setEditingId(null);
+    setName('');
+    setDescription('');
+    setPointsRequired('');
+    setDiscountType('amount');
+    setDiscountValue('');
+  }
+
+  function startEdit(reward: LoyaltyReward) {
+    if (reward.id === undefined) return;
+    setEditingId(reward.id);
+    setName(reward.name);
+    setDescription(reward.description ?? '');
+    setPointsRequired(String(reward.pointsRequired ?? ''));
+    const isPercent = reward.discountPercent !== undefined && reward.discountAmount === undefined;
+    setDiscountType(isPercent ? 'percent' : 'amount');
+    setDiscountValue(String(isPercent ? (reward.discountPercent ?? '') : (reward.discountAmount ?? '')));
+  }
+
   useEffect(() => {
     if (editingId === null) {
       setName('');
@@ -90,10 +110,8 @@ export function LoyaltyRewardsSection({ username, notify }: {
     await db.loyaltyRewards.delete(reward.id);
     await logAudit('LOYALTY_REWARD_DELETED', `Deleted "${reward.name}"`, username);
     notify(`"${reward.name}" deleted.`);
-    if (editingId === reward.id) setEditingId(null);
+    if (editingId === reward.id) resetForm();
   }
-
-  const editing = editingId !== null ? rewards.find((r) => r.id === editingId) : null;
 
   return (
     <div className="space-y-3">
@@ -107,14 +125,16 @@ export function LoyaltyRewardsSection({ username, notify }: {
           <input
             type="text"
             placeholder="Reward name (e.g. Free Dessert)"
-            value={editingId === null ? name : (editing?.name ?? '')}
+            aria-label="Reward name"
+            value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full p-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-h-11"
           />
           <input
             type="text"
             placeholder="Description (optional)"
-            value={editingId === null ? description : (editing?.description ?? '')}
+            aria-label="Reward description"
+            value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="w-full p-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-h-11"
           />
@@ -122,14 +142,16 @@ export function LoyaltyRewardsSection({ username, notify }: {
             type="number"
             min={1}
             placeholder="Points required"
-            value={editingId === null ? pointsRequired : (editing?.pointsRequired ?? '')}
+            aria-label="Points required"
+            value={pointsRequired}
             onChange={(e) => setPointsRequired(e.target.value)}
             className="w-32 p-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-h-11"
           />
 
           <div className="flex gap-2 items-center">
             <select
-              value={editingId === null ? discountType : (editing?.discountAmount !== undefined ? 'amount' : 'percent')}
+              value={discountType}
+              aria-label="Reward discount type"
               onChange={(e) => setDiscountType(e.target.value as 'amount' | 'percent')}
               className="px-2 py-1.5 text-xs border-0 ring-1 ring-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 min-h-11"
             >
@@ -141,7 +163,8 @@ export function LoyaltyRewardsSection({ username, notify }: {
               min={0}
               step={discountType === 'percent' ? 1 : 0.01}
               placeholder="Value"
-              value={editingId === null ? discountValue : (editing ? (discountType === 'amount' ? (editing.discountAmount ?? '') : (editing.discountPercent ?? '')) : '')}
+              aria-label="Reward discount value"
+              value={discountValue}
               onChange={(e) => setDiscountValue(e.target.value)}
               className="w-24 p-2.5 text-sm border-0 ring-1 ring-gray-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-h-11"
             />
@@ -152,7 +175,7 @@ export function LoyaltyRewardsSection({ username, notify }: {
           {editingId !== null && (
             <button
               type="button"
-              onClick={() => setEditingId(null)}
+              onClick={resetForm}
               className="text-xs font-bold text-gray-600 hover:text-gray-800 mb-2 min-h-11 px-2"
             >
               Cancel edit
@@ -191,7 +214,7 @@ export function LoyaltyRewardsSection({ username, notify }: {
               <div className="flex gap-1 shrink-0">
                 <button
                   type="button"
-                  onClick={() => r.id !== undefined && setEditingId(r.id)}
+                  onClick={() => startEdit(r)}
                   className="text-xs px-2 py-1.5 text-purple-700 hover:bg-purple-50 rounded-lg min-h-11"
                   title="Edit"
                 >

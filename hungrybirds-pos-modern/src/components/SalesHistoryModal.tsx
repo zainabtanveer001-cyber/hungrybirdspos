@@ -214,7 +214,9 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
                           )}
                           {sale.refundStatus && (
                             <span className="ml-1 text-[10px] text-orange-700 font-bold bg-orange-50 px-1.5 py-0.5 rounded">
-                              {sale.refundStatus === 'FULL' ? `Refunded ${formatAmount(sale.refundedAmount ?? 0)}` : 'Part refunded'}
+                              {sale.refundStatus === 'FULL'
+                                ? `Refunded ${formatAmount(sale.refundedAmount ?? 0)}`
+                                : `Part refunded (${formatAmount(sale.refundedAmount ?? 0)})`}
                             </span>
                           )}
                         </p>
@@ -273,14 +275,16 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
                       >
                         <Share2 className="w-3 h-3" aria-hidden /> Share
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => withOwnerPin(() => onReopen(sale))}
-                        className="text-[10px] bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold px-2 py-1 rounded flex items-center gap-1"
-                        title="Re-open into the cart for editing"
-                      >
-                        <Pencil className="w-3 h-3" aria-hidden /> Edit
-                      </button>
+                      {canVoid && (
+                        <button
+                          type="button"
+                          onClick={() => withOwnerPin(() => onReopen(sale))}
+                          className="text-[10px] bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold px-2 py-1 rounded flex items-center gap-1"
+                          title="Re-open into the cart for editing"
+                        >
+                          <Pencil className="w-3 h-3" aria-hidden /> Edit
+                        </button>
+                      )}
                       {canRefund && refundableTotal(sale) > 0 && (
                         <button
                           type="button"

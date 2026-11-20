@@ -41,7 +41,9 @@ function formatAmount(amount) {
     return new Intl.NumberFormat('en-PK', {
       style: 'currency',
       currency: 'PKR',
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
+      trailingZeroDisplay: 'stripIfInteger',
     }).format(amount);
   } catch (e) {
     return `Rs ${Number(amount || 0).toFixed(2)}`;
