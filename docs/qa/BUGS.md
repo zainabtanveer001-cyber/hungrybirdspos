@@ -148,3 +148,52 @@ Evidence: `hungrybirds-pos-modern/src/lib/menu.ts:80` and `SalesHistoryModal.tsx
 Environment: `b4aa1cf` / `qa/release-gate`.
 Status: verified (fixed in `menu.ts` and `SalesHistoryModal.tsx`)
 ```
+
+---
+
+```
+BUG-010 [S1 critical]
+Title: `getShiftStart()` writes to `db.settings` inside Dexie `liveQuery`, throwing `ReadOnlyError` on fresh installs and freezing live shift cost/P&L at `Rs 0` while preventing `closeShift()` from locking sales
+Steps to reproduce:
+  1. Open a fresh IndexedDB origin where `shiftStartTime` does not yet exist in `db.settings`, sign in as `owner`.
+  2. Observe console error `"Live query failed: [object Object]"` immediately on login (`LiveStockPanel` subscribes via `useLive(() => buildShiftReport(), [])`).
+  3. Complete a sale and update ingredient cost/stock: observe `Live Stock`, `Shift Summary`, and `Profit & Loss` remain `Rs 0` (`Shift start` resets to current clock time), and closing the shift fails to lock the sale's `lockedCost` because `getShiftStart()` initializes `startedAt = now` at close time.
+Expected vs actual:
+  Expected: Zero console errors; `Live Stock`, `Shift Summary`, and `Profit & Loss` update live immediately on sales, unit cost edits, and manual stock `+/-` adjustments, and `closeShift()` locks all shift sales and manual costs so subsequent cost edits do not alter closed shifts.
+  Actual: `db.settings.put()` inside `getShiftStart()` threw Dexie `ReadOnlyError` inside `liveQuery`.
+Evidence: Browser QA run 1 on `:5174` (Steps 1, 5, 6, 7, 8 — `"Live query failed: [object Object]"`); re-verified fixed on clean `:5175` origin (Steps 1–6 — 0 console errors, live updates `Rs 300 -> Rs 400 -> Rs 600`, locked at `Rs 600` after cost change to `Rs 500`) + unit test in `tests/liveCostAndMenuImage.test.ts`.
+Environment: `0d9a349` / `qa/release-gate`, Webview Browser `1366x768`.
+Status: verified (fixed in `shift.ts`, `auth.ts`, `refunds.ts`, and `tests/liveCostAndMenuImage.test.ts`)
+```
+
+---
+
+```
+BUG-011 [S2 high]
+Title: Mobile `390×844` `View Order` button scrolls `#posCartMobileAnchor` flush with the bottom of the viewport, leaving `Hold` and `Checkout & Print` occluded behind the fixed sticky bottom bar
+Steps to reproduce:
+  1. Resize viewport to `390×844`, add 1 dish to cart, and tap `View Order` on the fixed sticky bottom bar.
+  2. Inspect positions of `Hold` and `Checkout & Print` relative to the `.z-30` fixed bottom bar (`y: 782.70..844.00`).
+Expected vs actual:
+  Expected: `Hold` and `Checkout & Print` scroll cleanly above the fixed sticky bottom bar with clear vertical margin.
+  Actual: `scrollIntoView({ block: 'end' })` without `scroll-margin-bottom` landed `Hold` and `Checkout & Print` at `y: 783.54..827.54`, directly behind the fixed bar (`y: 782.70..844.00`).
+Evidence: Browser QA run 1 on `:5174` Step 11 (`Hold`/`Checkout & Print` occluded); re-verified fixed on `:5175` Step 7 (`Hold` & `Checkout & Print` `bottom: 731.14px` vs sticky bar `top: 782.70px`, `51.56px` clearance, `final_step_166.png`).
+Environment: `0d9a349` / `qa/release-gate`, Webview Browser `390x844`.
+Status: verified (fixed via `scroll-mb-24 scroll-mt-4` on `#posCartMobileAnchor` in `hungrybirds-pos-modern/src/App.tsx`)
+```
+
+---
+
+```
+BUG-012 [S3 medium]
+Title: `OwnerPinSection` calls async `setConfigured` inside `useMemo` instead of `useEffect`, and `InventoryModal` silently converts negative unit cost to `0` on edit instead of rejecting it
+Steps to reproduce:
+  1. Open `Inventory`, edit an existing ingredient's cost to `-5`, and click `Save`.
+  2. Inspect `OwnerPinSection` in `AdminSettingsModal.tsx`.
+Expected vs actual:
+  Expected: Negative cost input on edit displays toast `"Cost must be a non-negative number."` and preserves the previous cost; `OwnerPinSection` fetches PIN state inside `useEffect`.
+  Actual: `normalizeQuantity('-5') ?? 0` silently saved `0`; `OwnerPinSection` ran an async side effect inside `useMemo`.
+Evidence: `AdminSettingsModal.tsx:520` and `InventoryModal.tsx:60`; re-verified fixed on `:5175` Step 2 (`"Cost must be a non-negative number."`, cost preserved at `150`).
+Environment: `0d9a349` / `qa/release-gate`, Webview Browser `1366x768`.
+Status: verified (fixed in `AdminSettingsModal.tsx` and `InventoryModal.tsx`)
+```

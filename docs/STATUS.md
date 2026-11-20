@@ -30,14 +30,19 @@
   - Added shift manual stock reduction tracking (`applyStockDelta`, `recordShiftStockDelta`, `clearShiftStockDeltas` in `src/lib/inventory.ts` and `InventoryModal.tsx`).
   - Added live recipe & manual stock cost calculation (`computeSaleLiveCost`, `computeShiftUsage` in `src/lib/shift.ts` and `getPnl` in `src/lib/analytics.ts`) that dynamically re-prices active-shift recipe usage (excluding refunded quantities) and manual stock reductions at the latest inventory unit cost, and locks/snapshots costs (`Sale.lockedCost` and `closedShiftManualCosts`) when `closeShift()` is called.
   - Updated `LiveStockPanel.tsx`, `ShiftSummaryModal.tsx`, and `ProfitLossModal.tsx` to subscribe via `useLive` so cost and P&L update in real time on the go.
-  - Added unit tests in `hungrybirds-pos-modern/tests/liveCostAndMenuImage.test.ts` (6 tests).
+  - Added unit tests in `hungrybirds-pos-modern/tests/liveCostAndMenuImage.test.ts` (7 tests).
+- **Post-Feature `/qa-testing` Verification & Bug Fixes (`BUG-010`..`BUG-012`):**
+  - `BUG-010` [S1]: Made `getShiftStart()` strictly read-only (never calls `db.settings.put()` inside Dexie `liveQuery`), initialized `shiftStartTime` in `initializeApp()`, and proportionally scaled `sale.lockedCost` when closed-shift sales are later refunded (`refunds.ts`). Verified in browser on clean `:5175` origin with **0 console errors**.
+  - `BUG-011` [S2]: Added `scroll-mb-24 scroll-mt-4` on `#posCartMobileAnchor` (`App.tsx`) so mobile `390×844` `View Order` leaves `51.56px` clearance above the sticky bottom bar.
+  - `BUG-012` [S3]: Replaced `useMemo` with `useEffect` in `OwnerPinSection` (`AdminSettingsModal.tsx`) and enforced non-negative cost validation on edit in `InventoryModal.tsx`.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **62 passed (62)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`dist/assets/index-*.js` and `dist/assets/index-*.css` built in 2.07s, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`).
+- `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **63 passed (63)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`dist/assets/index-*.js` and `dist/assets/index-*.css` built in 4.03s, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `20` warnings).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
+- **Live Browser QA (`http://localhost:5174/` & fresh `http://localhost:5175/`):** All 24 test cases (`TC-001`..`TC-024`) **PASS**, **0** open S1/S2 bugs, **0** browser console errors.
 
 ## 3. Known Gaps & Deferred Items
 - **Offline fallback default credentials (`AUD-005`):** Fresh offline installs seed `owner`, `manager`, `cashier`, and `waiter` with password `1234` (SHA-256) in local IndexedDB for offline fallback when Firebase is unreachable. Cloud authentication always takes precedence when online.
