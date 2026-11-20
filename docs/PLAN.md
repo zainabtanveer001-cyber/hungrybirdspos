@@ -26,3 +26,11 @@
   - Acceptance: Unit & regression tests added for every fix; all suites (`npm test`, `npm run lint`, `npm run build`) green.
 - [x] **Slice 5 — Gate Sign-off Documentation**
   - Finalize `docs/qa/TEST_PLAN.md`, `docs/qa/BUGS.md`, `docs/audit/AUDIT_REPORT.md`, and `docs/STATUS.md` with commit hashes, command outputs, and exit-criteria verdict.
+- [x] **Slice 6 — Per-Dish Local Photo Upload & Client-Side Compression**
+  - Add `scaleImageDimensions()` and `compressImageFile()` in `src/lib/menu.ts` (canvas downscaling to max `800×800` px and JPEG compression under `650 KB` for Firestore sync compatibility).
+  - Add `"Upload Photo"` file picker, live compressed preview card with KB badge, and `"Remove photo"` action in `src/components/AdminSettingsModal.tsx` so uploaded dish photos replace the `"Menu"` placeholder box on dish cards in `MenuGrid.tsx`.
+- [x] **Slice 7 — Live Shift Inventory Costing, P&L Reactivity & Shift-End Cost Locking**
+  - Track net manual stock reductions during the active shift (`applyStockDelta`, `recordShiftStockDelta` in `src/lib/inventory.ts` and `InventoryModal.tsx`).
+  - Re-price active-shift recipe usage (excluding refunded quantities) and manual stock reductions live at the latest inventory unit cost (`computeSaleLiveCost`, `computeShiftUsage` in `src/lib/shift.ts` and `getPnl` in `src/lib/analytics.ts`), and lock/snapshot costs (`Sale.lockedCost` and `closedShiftManualCosts`) when `closeShift()` is called.
+  - Subscribe `LiveStockPanel.tsx`, `ShiftSummaryModal.tsx`, and `ProfitLossModal.tsx` via `useLive` so cost and P&L update in real time on the go.
+  - Add unit tests in `tests/liveCostAndMenuImage.test.ts` (6 tests).

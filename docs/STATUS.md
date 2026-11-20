@@ -23,10 +23,18 @@
   - `AUD-002` [High]: Fixed RBAC gating on sale re-open and Owner PIN setup/authorization (`BUG-003`).
   - `AUD-003` [Medium]: Updated `isAdmin()` in `firestore.rules` to recognize authenticated users with `role == 'OWNER'` in `/users/{uid}`.
   - `AUD-004` [Medium]: Added `X-Frame-Options = "DENY"`, `Permissions-Policy`, and `frame-ancestors 'none'` to `netlify.toml` and `vercel.json`; disabled production source maps (`sourcemap: false`) in `hungrybirds-pos-modern/vite.config.ts`.
+- **Feature Slice 6 — Local Menu Image Upload & Compression:**
+  - Added `scaleImageDimensions()` and `compressImageFile()` in `hungrybirds-pos-modern/src/lib/menu.ts` (resizes to max `800×800` px on `<canvas>` with white background fill for transparent PNGs and compresses to JPEG under `650 KB` for Firestore sync compatibility).
+  - Updated `AdminSettingsModal.tsx` with an `"Upload Photo"` file picker, live compressed preview card showing KB size, and `"Remove photo"` action so uploaded dish photos replace the `"Menu"` placeholder box on dish cards in `MenuGrid.tsx`.
+- **Feature Slice 7 — Live Shift Inventory Costing, P&L Reactivity & Shift-End Cost Locking:**
+  - Added shift manual stock reduction tracking (`applyStockDelta`, `recordShiftStockDelta`, `clearShiftStockDeltas` in `src/lib/inventory.ts` and `InventoryModal.tsx`).
+  - Added live recipe & manual stock cost calculation (`computeSaleLiveCost`, `computeShiftUsage` in `src/lib/shift.ts` and `getPnl` in `src/lib/analytics.ts`) that dynamically re-prices active-shift recipe usage (excluding refunded quantities) and manual stock reductions at the latest inventory unit cost, and locks/snapshots costs (`Sale.lockedCost` and `closedShiftManualCosts`) when `closeShift()` is called.
+  - Updated `LiveStockPanel.tsx`, `ShiftSummaryModal.tsx`, and `ProfitLossModal.tsx` to subscribe via `useLive` so cost and P&L update in real time on the go.
+  - Added unit tests in `hungrybirds-pos-modern/tests/liveCostAndMenuImage.test.ts` (6 tests).
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **10 passed (10)** test files, **56 passed (56)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`dist/assets/index-*.js` and `dist/assets/index-*.css` built in 4.73s, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **62 passed (62)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`dist/assets/index-*.js` and `dist/assets/index-*.css` built in 2.07s, no `.map` file exposed).
 - `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).

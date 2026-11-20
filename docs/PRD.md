@@ -19,7 +19,7 @@
 - **Must:** Persist active session in `sessionStorage` and clear session + sync token on Logout.
 
 ### US-2: Menu, Categories, Modifiers & Recipes
-- **Must:** Allow Owner to create/delete food categories and create/edit/delete menu items with price, category, optional image URL, and recipe ingredient deductions.
+- **Must:** Allow Owner to create/delete food categories and create/edit/delete menu items with price, category, optional image URL or **local device photo upload (auto-compressed on `<canvas>` to JPEG under Firestore's sync limit and displayed on that dish's card in place of the `"Menu"` placeholder box)**, and recipe ingredient deductions.
 - **Must:** Support dish search (`/` shortcut) and category filtering on the counter screen.
 - **Must:** Support modifier groups (required/optional, single/multi-select) and merge identical modifier combinations into a single cart line while keeping different combinations separate.
 
@@ -58,9 +58,10 @@
 ### US-10: Staff Management, Attendance, Leaves & Payroll
 - **Must:** Manage employee records, daily attendance (`PRESENT`, `ABSENT`, `LATE`, `HALF_DAY`), leave requests/approvals, salary advances, and monthly payroll calculation (`baseSalary - pendingAdvances`) with atomic advance settlement.
 
-### US-11: Shift Summary, Opening Cash, Analytics & P&L
+### US-11: Shift Summary, Opening Cash, Analytics & Live Shift Cost / P&L
 - **Must:** Track shift start time, opening cash, cash collected, change given, expected drawer cash, discounts by staff, and ingredient cost consumed during the shift.
-- **Must:** Provide Sales Analytics (today/week/month buckets, top items, top customers) and date-range Profit & Loss (`Sales - Approved Expenses`).
+- **Must:** Dynamically recalculate active-shift ingredient cost (both recipe usage from sales and net manual stock reductions via Live Stock `+/-` or Inventory edits) at the latest inventory unit cost **live on the go** across the main screen's `LiveStockPanel`, `ShiftSummaryModal`, and `ProfitLossModal` until the shift is ended (`closeShift`), at which point the shift's ingredient costs are snapshotted (`lockedCost`) so future inventory cost edits do not rewrite historical shifts.
+- **Must:** Provide Sales Analytics (today/week/month buckets, top items, top customers) and date-range Profit & Loss (`Sales − Inventory Cost (COGS) − Approved Expenses`).
 
 ### US-12: Receipt Printing, Backup/Restore & Mobile Responsive UI
 - **Must:** Generate ESC/POS thermal receipts (with centered monochrome logo stamp, kitchen ticket option, 58mm/80mm width) across Bluetooth, USB, Serial, and LAN printers, falling back cleanly to escaped HTML browser printing.
