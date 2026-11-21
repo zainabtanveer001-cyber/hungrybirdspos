@@ -1,6 +1,7 @@
 import { db } from './db';
 import { logAudit } from './audit';
 import { clearShiftStockDeltas, getShiftStockDeltas } from './inventory';
+import { collectModifierIngredientUsage } from './modifiers';
 import { isApproved } from './suppliers';
 import type { Expense, InventoryItem, Recipe, Sale } from './db/types';
 
@@ -91,6 +92,11 @@ export function computeSaleLiveCost(
       cost += (Number(recipe.qtyRequired) || 0) * effectiveQty * unitCost;
     }
   }
+  for (const [inventoryId, modQty] of collectModifierIngredientUsage(sale.items || [], true)) {
+    const item = inventoryById.get(inventoryId);
+    const unitCost = Number(item?.cost) || 0;
+    cost += modQty * unitCost;
+  }
   return cost;
 }
 
@@ -140,6 +146,14 @@ export function computeShiftUsage(
         row.costConsumed += addedCost;
         consumedCost += addedCost;
       }
+    }
+    for (const [inventoryId, modQty] of collectModifierIngredientUsage(sale.items || [], true)) {
+      const row = ensureRow(inventoryId);
+      row.recipeQty += modQty;
+      row.qtyConsumed += modQty;
+      const addedCost = modQty * row.costPerUnit;
+      row.costConsumed += addedCost;
+      consumedCost += addedCost;
     }
   }
 

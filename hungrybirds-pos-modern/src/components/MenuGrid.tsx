@@ -10,6 +10,7 @@ const ALL = 'ALL';
 interface MenuGridProps {
   onPick: (item: MenuItem) => void;
   onDecrement?: (item: MenuItem) => void;
+  hasAutoModifiers?: (item: MenuItem) => boolean;
   cartQtyByMenuId?: Record<string, number>;
   lastAddedMenuId?: string | null;
 }
@@ -17,6 +18,7 @@ interface MenuGridProps {
 export function MenuGrid({
   onPick,
   onDecrement,
+  hasAutoModifiers,
   cartQtyByMenuId = {},
   lastAddedMenuId = null,
 }: MenuGridProps) {
@@ -131,7 +133,9 @@ export function MenuGrid({
                   {group.items.map((item) => {
                     const inCartQty = cartQtyByMenuId[item.id] || 0;
                     const justAdded = lastAddedMenuId === item.id;
-                    const hasModifiers = Boolean(item.modifierGroups?.length);
+                    const hasModifiers = hasAutoModifiers
+                      ? hasAutoModifiers(item)
+                      : Boolean(item.modifierGroups?.length);
                     return (
                       <article
                         key={item.id}

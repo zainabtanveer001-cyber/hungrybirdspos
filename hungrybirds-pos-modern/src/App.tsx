@@ -4,8 +4,9 @@ import { db } from './lib/db';
 import { useLive } from './lib/useLive';
 import { initializeApp, readSession, signOut } from './lib/auth';
 import { getSyncStatus, startSync, stopSync, subscribeToSync, syncNow } from './lib/sync';
-import { addToCart, calculateCartTotals, countCartByMenuId, decrementByMenuId, setQty } from './lib/cart';
+import { addToCart, calculateCartTotals, countCartByMenuId, decrementByMenuId, replaceCartLineModifiers, setQty } from './lib/cart';
 import type { CartCharges } from './lib/cart';
+import { getModifierLibrary, resolveDishModifierGroups } from './lib/modifiers';
 import { getCustomer } from './lib/customers';
 import { holdOrder } from './lib/held';
 import { setOrderStatus } from './lib/onlineOrders';
@@ -38,9 +39,13 @@ import { AdminSettingsModal } from './components/AdminSettingsModal';
 import { OnlineOrdersModal } from './components/OnlineOrdersModal';
 import { KitchenDisplayModal } from './components/KitchenDisplayModal';
 import { useOrderAlert } from './hooks/useOrderAlert';
-import type { CartItem, CustomerInfo, MenuItem, OnlineOrder, PaymentDetail, Sale, User, UserRole } from './lib/db/types';
+import type { CartItem, CustomerInfo, MenuItem, ModifierGroup, OnlineOrder, PaymentDetail, Sale, User, UserRole } from './lib/db/types';
 
 type Session = { username: string; role: UserRole };
+
+type ModifierSession =
+  | { mode: 'add'; item: MenuItem; groups: ModifierGroup[] }
+  | { mode: 'edit'; item: MenuItem; groups: ModifierGroup[]; line: CartItem };
 
 const EMPTY_CHARGES: CartCharges = {
   orderType: 'DINE_IN',
@@ -59,7 +64,9 @@ function App() {
   const [charges, setCharges] = useState<CartCharges>(EMPTY_CHARGES);
   const [customer, setCustomer] = useState<CustomerInfo>({});
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
-  const [modifying, setModifying] = useState<MenuItem | null>(null);
+  const [modifying, setModifying] = useState<ModifierSession | null>(null);
+  const modifierLibrary = useLive(() => getModifierLibrary(), []) ?? [];
+  const menuItems = useLive(() => db.menu.toArray(), []) ?? [];
   const [paying, setPaying] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [heldOpen, setHeldOpen] = useState(false);
@@ -144,11 +151,29 @@ function App() {
   );
 
   function pickItem(item: MenuItem) {
-    if (item.modifierGroups?.length) {
-      setModifying(item);
+    const groups = resolveDishModifierGroups(item, modifierLibrary, 'pick');
+    if (groups.length > 0) {
+      setModifying({ mode: 'add', item, groups });
       return;
     }
     addCartItem({ id: item.id, menuItemId: item.id, name: item.name, price: item.price, qty: 1 });
+  }
+
+  function editCartLineModifiers(line: CartItem) {
+    const canonicalId = line.menuItemId || line.id;
+    const found = menuItems.find((m) => m.id === canonicalId);
+    const modSum = (line.modifiers ?? []).reduce((sum, m) => sum + (Number(m.price) || 0), 0);
+    const baseName = line.modifiers?.length
+      ? line.name.replace(/\s*\([^)]*\)$/, '').trim() || line.name
+      : line.name;
+    const baseItem: MenuItem = found ?? {
+      id: canonicalId,
+      categoryId: '',
+      name: baseName,
+      price: Math.max(0, (Number(line.price) || 0) - modSum),
+    };
+    const groups = resolveDishModifierGroups(baseItem, modifierLibrary, 'edit');
+    setModifying({ mode: 'edit', item: baseItem, groups, line });
   }
 
   const resetOrder = useCallback(() => {
@@ -488,6 +513,7 @@ function App() {
             <MenuGrid
               onPick={pickItem}
               onDecrement={decrementMenuItem}
+              hasAutoModifiers={(item) => resolveDishModifierGroups(item, modifierLibrary, 'pick').length > 0}
               cartQtyByMenuId={cartQtyByMenuId}
               lastAddedMenuId={lastAddedMenuId}
             />
@@ -505,6 +531,7 @@ function App() {
                 notify={notify}
                 onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
                 onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
+                onEditModifiers={editCartLineModifiers}
                 onClear={clearCart}
                 onHold={hold}
                 onCheckout={() => void startCheckout()}
@@ -547,6 +574,7 @@ function App() {
               notify={notify}
               onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
               onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
+              onEditModifiers={editCartLineModifiers}
               onClear={clearCart}
               onHold={hold}
               onCheckout={() => void startCheckout()}
@@ -739,11 +767,28 @@ function App() {
 
       {modifying && (
         <ModifierModal
-          item={modifying}
+          item={modifying.item}
+          groups={modifying.groups}
+          mode={modifying.mode}
+          initialSelections={modifying.mode === 'edit' ? modifying.line.modifiers : undefined}
+          initialNote={modifying.mode === 'edit' ? modifying.line.note : undefined}
+          currentQty={modifying.mode === 'edit' ? modifying.line.qty : 1}
           notify={notify}
           onCancel={() => setModifying(null)}
-          onAdd={(cartItem) => {
-            addCartItem(cartItem);
+          onConfirm={(cartItem, splitOne) => {
+            if (modifying.mode === 'add') {
+              addCartItem(cartItem);
+            } else {
+              setCart((current) =>
+                replaceCartLineModifiers(current, modifying.line.id, cartItem, splitOne),
+              );
+              setLastAddedLineId(cartItem.id);
+              if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+              addedTimerRef.current = setTimeout(() => {
+                setLastAddedLineId(null);
+              }, 950);
+              notify(`Updated ${cartItem.name}.`);
+            }
             setModifying(null);
           }}
         />

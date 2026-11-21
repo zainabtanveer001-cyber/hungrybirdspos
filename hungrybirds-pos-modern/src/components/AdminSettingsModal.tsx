@@ -11,10 +11,11 @@ import { Modal } from './Modal';
 import { CloudSetupModal } from './CloudSetupModal';
 import { StaffAccountsSection } from './StaffAccountsSection';
 import { LoyaltyRewardsSection } from './LoyaltyRewardsSection';
+import { DishModifierEditor, ModifierLibrarySection } from './ModifierGroupsSection';
 import { readSession } from '../lib/auth';
 import { hasOwnerPin, isValidPin, setOwnerPin } from '../lib/ownerPin';
 import { logAudit } from '../lib/audit';
-import type { Category, MenuItem, Recipe } from '../lib/db/types';
+import type { Category, MenuItem, ModifierGroup, Recipe } from '../lib/db/types';
 
 const INPUT = 'p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-inner min-w-0';
 const PRIMARY = 'bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-3 py-2.5 rounded-xl';
@@ -43,6 +44,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
   const [draft, setDraft] = useState<Draft>(BLANK);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [recipeRows, setRecipeRows] = useState<RecipeDraft[]>([]);
+  const [dishModifierGroups, setDishModifierGroups] = useState<ModifierGroup[]>([]);
   const [importReport, setImportReport] = useState<string[] | null>(null);
   const [showCloudSetup, setShowCloudSetup] = useState(false);
   const [compressingImage, setCompressingImage] = useState(false);
@@ -88,6 +90,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
     setDraft(BLANK);
     setEditingId(null);
     setRecipeRows([]);
+    setDishModifierGroups([]);
   }
 
   function startEdit(item: MenuItem) {
@@ -99,6 +102,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
       imageUrl: item.imageUrl || '',
     });
     setRecipeRows((recipesByItem.get(item.id) || []).map((r) => ({ inventoryId: r.inventoryId, qtyRequired: String(r.qtyRequired) })));
+    setDishModifierGroups(item.modifierGroups ? item.modifierGroups.map((g) => ({ ...g, options: [...(g.options || [])] })) : []);
   }
 
   async function addCategory() {
@@ -122,7 +126,12 @@ export function AdminSettingsModal({ username, notify, onClose }: {
 
   async function submit() {
     try {
-      await saveMenuItem(draft, recipeRows, username, editingId ?? undefined);
+      await saveMenuItem(
+        { ...draft, modifierGroups: dishModifierGroups },
+        recipeRows,
+        username,
+        editingId ?? undefined,
+      );
       notify(editingId ? `${draft.name.trim()} updated.` : `${draft.name.trim()} added to the menu.`);
       resetForm();
     } catch (err) {
@@ -366,12 +375,16 @@ export function AdminSettingsModal({ username, notify, onClose }: {
             <RecipeRows rows={recipeRows} onChange={setRecipeRows} />
           </div>
 
+          <DishModifierEditor groups={dishModifierGroups} onChange={setDishModifierGroups} />
+
           <div className="flex justify-end pt-1">
             <button type="button" onClick={submit} className={PRIMARY}>
               {editingId ? 'Save Changes' : 'Add to Menu'}
             </button>
           </div>
         </section>
+
+        <ModifierLibrarySection username={username} notify={notify} />
 
         {readSession()?.role === 'OWNER' && <OwnerPinSection username={username} notify={notify} />}
 
@@ -421,6 +434,9 @@ export function AdminSettingsModal({ username, notify, onClose }: {
                         {categoryName.get(item.categoryId) || 'Uncategorized'}
                         {' · '}
                         {lines.length} ingredient{lines.length === 1 ? '' : 's'}
+                        {item.modifierGroups?.length
+                          ? ` · ${item.modifierGroups.length} modifier group${item.modifierGroups.length === 1 ? '' : 's'}`
+                          : ''}
                       </p>
                     </div>
                     <div className="flex gap-1 shrink-0">

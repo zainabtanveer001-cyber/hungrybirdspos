@@ -100,7 +100,7 @@ export function KitchenDisplayModal({ onClose, notify }: {
       encoder.align('left');
       for (const item of ticket.items) {
         const mods = (item.modifiers || []).map((m) => m.name).join(', ');
-        const name = mods ? `${item.name} (${mods})` : item.name;
+        const name = mods && !item.name.includes(`(${mods})`) ? `${item.name} (${mods})` : item.name;
         encoder.text(`${item.qty}x ${name}${item.note ? ` - ${item.note}` : ''}`);
       }
       encoder.text('--------------------------------');

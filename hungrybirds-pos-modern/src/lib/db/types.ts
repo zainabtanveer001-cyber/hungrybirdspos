@@ -104,6 +104,9 @@ export interface ModifierSelection {
   group: string;
   name: string;
   price: number;
+  /** Optional inventory deduction snapshot when this extra is linked to raw stock. */
+  inventoryId?: string;
+  qtyRequired?: number;
 }
 
 export interface PaymentDetail {
@@ -203,12 +206,21 @@ export interface ModifierGroup {
   name: string;
   required?: boolean;
   multiple?: boolean;
+  /** Available via Cart "Extras" on every menu item. */
+  global?: boolean;
+  /** Category IDs this reusable group automatically applies to. */
+  categoryIds?: string[];
+  /** When true, tapping a matching dish opens the modifier picker immediately. */
+  promptOnPick?: boolean;
   options: ModifierOption[];
 }
 
 export interface ModifierOption {
   name: string;
   price: number;
+  /** Optional raw inventory ingredient deducted per unit sold when this extra is chosen. */
+  inventoryId?: string;
+  qtyRequired?: number;
 }
 
 export interface Recipe {

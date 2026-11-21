@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed, Check } from 'lucide-react';
+import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed, Check, SlidersHorizontal } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { calculateCartTotals, cartItemCount } from '../lib/cart';
@@ -18,7 +18,7 @@ const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T1
 
 export function CartPanel({
   items, role, charges, customer, loyaltyBalance, lastAddedLineId = null, onChange, onCustomerChange,
-  onQtyChange, onRemove, onClear, onCheckout, onHold, notify,
+  onQtyChange, onRemove, onEditModifiers, onClear, onCheckout, onHold, notify,
 }: {
   items: CartItem[];
   role: UserRole;
@@ -30,6 +30,7 @@ export function CartPanel({
   onCustomerChange: (customer: CustomerInfo) => void;
   onQtyChange: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
+  onEditModifiers?: (line: CartItem) => void;
   onClear: () => void;
   onCheckout: () => void;
   onHold: () => void;
@@ -210,14 +211,28 @@ export function CartPanel({
                     : 'border-[#e0edff] bg-white'
                 }`}
               >
-                <div className="min-w-0">
-                  <div className="font-medium text-sm text-[#000000] truncate">{item.name}</div>
-                  <div className="text-xs text-[#526066] flex items-center gap-1.5 tabular-nums">
+                <div className="min-w-0 flex-1">
+                  <div className="font-medium text-sm text-[#000000] leading-snug break-words">{item.name}</div>
+                  {item.note && (
+                    <div className="text-[11px] italic text-[#526066] mt-0.5 truncate">Note: {item.note}</div>
+                  )}
+                  <div className="text-xs text-[#526066] flex flex-wrap items-center gap-1.5 mt-1 tabular-nums">
                     <span>{formatAmount(item.price)}</span>
                     {justAdded && (
                       <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-full">
                         <Check className="w-3 h-3" aria-hidden /> Added
                       </span>
+                    )}
+                    {onEditModifiers && (
+                      <button
+                        type="button"
+                        onClick={() => onEditModifiers(item)}
+                        aria-label={`Add or edit extras for ${item.name}`}
+                        className="inline-flex items-center gap-1 px-2 min-h-7 rounded-[6px] text-[11px] font-semibold bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] transition-colors"
+                      >
+                        <SlidersHorizontal className="w-3 h-3" aria-hidden />
+                        {item.modifiers?.length || item.note ? 'Edit extras' : '+ Extras'}
+                      </button>
                     )}
                   </div>
                 </div>

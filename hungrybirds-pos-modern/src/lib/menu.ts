@@ -1,7 +1,8 @@
 import { db } from './db';
 import { logAudit } from './audit';
 import { pushCategory, pushMenu } from './sync';
-import type { Category, MenuItem, Recipe } from './db/types';
+import { sanitizeModifierGroups } from './modifiers';
+import type { Category, MenuItem, ModifierGroup, Recipe } from './db/types';
 
 export const MAX_IMAGE_DIMENSION = 800;
 export const IMAGE_JPEG_QUALITY = 0.72;
@@ -112,6 +113,7 @@ export interface MenuItemDraft {
   imageUrl?: string;
   description?: string;
   available?: boolean;
+  modifierGroups?: ModifierGroup[];
 }
 
 export interface RecipeDraft {
@@ -139,6 +141,8 @@ export async function saveMenuItem(
 
   await db.transaction('rw', db.menu, db.recipes, async () => {
     const existing = existingId ? await db.menu.get(existingId) : undefined;
+    const cleanedGroups =
+      draft.modifierGroups !== undefined ? sanitizeModifierGroups(draft.modifierGroups) : undefined;
     const merged: MenuItem = {
       ...(existing ?? {}),
       id,
@@ -146,7 +150,12 @@ export async function saveMenuItem(
       price,
       categoryId: draft.categoryId,
       imageUrl: draft.imageUrl !== undefined ? draft.imageUrl.trim() : (existing?.imageUrl || ''),
-      modifierGroups: existing?.modifierGroups,
+      modifierGroups:
+        cleanedGroups !== undefined
+          ? cleanedGroups.length > 0
+            ? cleanedGroups
+            : undefined
+          : existing?.modifierGroups,
     };
     if (draft.description !== undefined) merged.description = draft.description.trim();
     merged.available = draft.available ?? existing?.available ?? true;

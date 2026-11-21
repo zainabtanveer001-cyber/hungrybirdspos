@@ -1,20 +1,34 @@
 import { db } from './db';
 import { logAudit } from './audit';
 import { upsertCustomer } from './customers';
+import { collectModifierIngredientUsage } from './modifiers';
 import { deleteSale, pushSale, pushStock } from './sync';
 import type { CartItem, OrderType, PaymentDetail, Sale, CustomerInfo } from './db/types';
 
 export const MIN_DELIVERY_ORDER = 500;
 
 export async function verifyStock(items: CartItem[]): Promise<string | null> {
+  const requiredByInventory = new Map<string, number>();
+
   for (const cartItem of items) {
     const recipes = await db.recipes.where('menuItemId').equals(cartItem.menuItemId || cartItem.id).toArray();
     for (const recipe of recipes) {
-      const ingredient = await db.inventory.get(recipe.inventoryId);
-      if (!ingredient) continue;
-      if ((Number(ingredient.stock) || 0) < recipe.qtyRequired * cartItem.qty) {
-        return `${ingredient.name} is out of stock or insufficient quantity.`;
+      const qty = (Number(recipe.qtyRequired) || 0) * (Number(cartItem.qty) || 0);
+      if (qty > 0) {
+        requiredByInventory.set(recipe.inventoryId, (requiredByInventory.get(recipe.inventoryId) || 0) + qty);
       }
+    }
+  }
+
+  for (const [inventoryId, modQty] of collectModifierIngredientUsage(items, false)) {
+    requiredByInventory.set(inventoryId, (requiredByInventory.get(inventoryId) || 0) + modQty);
+  }
+
+  for (const [inventoryId, needed] of requiredByInventory) {
+    const ingredient = await db.inventory.get(inventoryId);
+    if (!ingredient) continue;
+    if ((Number(ingredient.stock) || 0) < needed) {
+      return `${ingredient.name} is out of stock or insufficient quantity.`;
     }
   }
   return null;
@@ -80,6 +94,15 @@ export async function recordSale(input: SaleInput): Promise<number> {
       }
     }
 
+    for (const [inventoryId, modQty] of collectModifierIngredientUsage(sale.items, false)) {
+      const ingredient = await db.inventory.get(inventoryId);
+      if (!ingredient) continue;
+      await db.inventory.update(inventoryId, {
+        stock: Math.max(0, (Number(ingredient.stock) || 0) - modQty),
+      });
+      touchedStock.add(inventoryId);
+    }
+
     if (sale.orderType === 'DELIVERY' && sale.deliveryInfo?.phone) {
       await db.deliveries.add({
         saleId,
@@ -106,7 +129,7 @@ export async function recordSale(input: SaleInput): Promise<number> {
   return saleId;
 }
 
-/** Returns recipe-linked stock for items being voided or re-opened into the cart. */
+/** Returns recipe- and modifier-linked stock for items being voided or re-opened into the cart. */
 export async function restoreInventory(items: CartItem[]): Promise<void> {
   for (const cartItem of items) {
     const recipes = await db.recipes
@@ -120,6 +143,13 @@ export async function restoreInventory(items: CartItem[]): Promise<void> {
         stock: (Number(ingredient.stock) || 0) + recipe.qtyRequired * cartItem.qty,
       });
     }
+  }
+  for (const [inventoryId, modQty] of collectModifierIngredientUsage(items, false)) {
+    const ingredient = await db.inventory.get(inventoryId);
+    if (!ingredient) continue;
+    await db.inventory.update(inventoryId, {
+      stock: (Number(ingredient.stock) || 0) + modQty,
+    });
   }
 }
 

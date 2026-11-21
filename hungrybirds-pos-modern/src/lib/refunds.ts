@@ -1,6 +1,7 @@
 import { db } from './db';
 import { logAudit } from './audit';
 import { roundAmount } from './format';
+import { collectModifierIngredientUsage } from './modifiers';
 import type { CartItem, Sale } from './db/types';
 
 export interface RefundLine {
@@ -137,6 +138,13 @@ export async function recordRefund(
           stock: (Number(ingredient.stock) || 0) + recipe.qtyRequired * line.qty,
         });
       }
+    }
+    for (const [inventoryId, modQty] of collectModifierIngredientUsage(refundedItems, false)) {
+      const ingredient = await db.inventory.get(inventoryId);
+      if (!ingredient) continue;
+      await db.inventory.update(inventoryId, {
+        stock: (Number(ingredient.stock) || 0) + modQty,
+      });
     }
 
     return { ...result, status };
