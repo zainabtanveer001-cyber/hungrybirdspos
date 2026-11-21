@@ -9,23 +9,32 @@ import { Modal } from './Modal';
 import type { CartItem, OnlineOrder, OnlineOrderStatus, OrderType } from '../lib/db/types';
 
 const STATUS_TONE: Record<OnlineOrderStatus, string> = {
-  PENDING: 'bg-blue-100 text-blue-800 border-blue-200',
-  ACCEPTED: 'bg-amber-100 text-amber-800 border-amber-200',
-  PREPARING: 'bg-amber-100 text-amber-800 border-amber-200',
-  OUT_FOR_DELIVERY: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  COMPLETED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  REJECTED: 'bg-red-100 text-red-700 border-red-200',
+  PENDING: 'bg-[#eff6ff] text-[#5b3ee0] border-[#c5b9fa]',
+  ACCEPTED: 'bg-amber-50 text-amber-900 border-amber-300',
+  PREPARING: 'bg-amber-50 text-amber-900 border-amber-300',
+  OUT_FOR_DELIVERY: 'bg-[#eff6ff] text-[#2941e0] border-[#e0edff]',
+  COMPLETED: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+  REJECTED: 'bg-red-50 text-red-700 border-red-200',
 };
 
-export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
+export function OnlineOrdersModal({
+  username,
+  notify,
+  onClose,
+  onAccept,
+  hasCartItems = false,
+}: {
   username: string;
   notify: (message: string) => void;
   onClose: () => void;
   onAccept: (items: CartItem[], order: OnlineOrder) => void;
+  hasCartItems?: boolean;
 }) {
   const orders = useLive(() => db.onlineOrders.orderBy('createdAt').reverse().toArray(), []) ?? [];
   const [showHistory, setShowHistory] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [confirmOverwriteId, setConfirmOverwriteId] = useState<number | null>(null);
 
   const { pending, inProgress, closed } = useMemo(() => ({
     pending: orders.filter((o) => o.status === 'PENDING'),
@@ -33,11 +42,16 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
     closed: orders.filter((o) => !isActive(o)),
   }), [orders]);
 
-  async function accept(order: OnlineOrder) {
+  async function accept(order: OnlineOrder, force = false) {
     if (!order.id) return;
+    if (hasCartItems && !force) {
+      setConfirmOverwriteId(order.id);
+      return;
+    }
     const items = await resolveOrderToCart(order);
     onAccept(items, order);
     await setOrderStatus(order.id, 'ACCEPTED', username);
+    setConfirmOverwriteId(null);
     notify(`Order #${order.id} loaded into the cart.`);
     onClose();
   }
@@ -50,11 +64,9 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
     notify(`Order #${order.id}: ${STATUS_LABEL[next]}.`);
   }
 
-  async function reject(order: OnlineOrder) {
+  async function reject(order: OnlineOrder, reason: string) {
     if (!order.id) return;
-    const reason = window.prompt(`Reject order #${order.id}? Reason (optional):`, '');
-    if (reason === null) return;
-    await rejectOrder(order.id, reason, username);
+    await rejectOrder(order.id, reason.trim(), username);
     notify(`Order #${order.id} rejected.`);
   }
 
@@ -64,37 +76,44 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
       onClose={onClose}
       wide
       footer={
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setAdding((v) => !v)}
-              className="flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-2 rounded-xl hover:bg-indigo-100"
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#2941e0] bg-[#eff6ff] border border-[#e0edff] px-3 min-h-9 rounded-[8px] hover:bg-[#e0edff] transition"
             >
               <Plus className="w-3.5 h-3.5" aria-hidden /> {adding ? 'Hide form' : 'Record website order'}
             </button>
             <button
               type="button"
+              disabled={syncing}
               onClick={async () => {
-                const changed = await syncNow();
-                notify(changed ? 'Online order inbox refreshed.' : 'Everything is already up to date.');
+                setSyncing(true);
+                try {
+                  const changed = await syncNow();
+                  notify(changed ? 'Online order inbox refreshed.' : 'Everything is already up to date.');
+                } finally {
+                  setSyncing(false);
+                }
               }}
-              className="flex items-center gap-1 text-[11px] font-bold text-gray-600 bg-gray-100 px-3 py-2 rounded-xl hover:bg-gray-200"
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#273238] bg-white border border-[#788991] px-3 min-h-9 rounded-[8px] hover:bg-[#eff6ff] disabled:opacity-50 transition"
             >
-              <RefreshCw className="w-3.5 h-3.5" aria-hidden /> Sync now
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} aria-hidden />
+              {syncing ? 'Syncing…' : 'Sync now'}
             </button>
           </div>
           <button
             type="button"
             onClick={() => setShowHistory((v) => !v)}
-            className="text-[11px] font-bold text-gray-600 bg-gray-100 px-3 py-2 rounded-xl hover:bg-gray-200"
+            className="text-xs font-semibold text-[#273238] bg-white border border-[#788991] px-3 min-h-9 rounded-[8px] hover:bg-[#eff6ff] transition tabular-nums"
           >
             {showHistory ? 'Hide' : 'Show'} history ({closed.length})
           </button>
         </div>
       }
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         {adding && (
           <NewOrderForm
             onCreate={async (order) => {
@@ -107,29 +126,35 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
         )}
 
         {pending.length === 0 && inProgress.length === 0 ? (
-          <div className="text-center py-8">
-            <Inbox className="w-8 h-8 text-gray-300 mx-auto mb-2" aria-hidden />
-            <p className="text-gray-400 text-xs">No active online orders.</p>
-            <p className="text-[10px] text-gray-400 mt-1 max-w-sm mx-auto">
-              Website orders arrive here automatically. Use “Record website order” for one that came
-              in by phone.
+          <div className="text-center py-8 space-y-1.5">
+            <Inbox className="w-8 h-8 text-[#616f75] mx-auto" aria-hidden />
+            <p className="text-[#273238] text-sm font-medium">No active online orders.</p>
+            <p className="text-xs text-[#616f75] max-w-sm mx-auto">
+              Website orders arrive here automatically. Use “Record website order” for one that came in by phone.
             </p>
           </div>
         ) : (
           <>
             {pending.length > 0 && (
-              <section className="space-y-2">
-                <SectionTitle className="text-blue-700">New orders ({pending.length})</SectionTitle>
+              <section className="space-y-2.5">
+                <SectionTitle className="text-[#5b3ee0]">New orders ({pending.length})</SectionTitle>
                 {pending.map((order) => (
-                  <OrderCard key={order.id} order={order} onAccept={accept} onReject={reject} />
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    confirmOverwrite={confirmOverwriteId === order.id}
+                    onCancelOverwrite={() => setConfirmOverwriteId(null)}
+                    onAccept={(o, force) => void accept(o, force)}
+                    onReject={(o, reason) => void reject(o, reason)}
+                  />
                 ))}
               </section>
             )}
             {inProgress.length > 0 && (
-              <section className="space-y-2">
-                <SectionTitle className="text-amber-700">In progress ({inProgress.length})</SectionTitle>
+              <section className="space-y-2.5">
+                <SectionTitle className="text-amber-900">In progress ({inProgress.length})</SectionTitle>
                 {inProgress.map((order) => (
-                  <OrderCard key={order.id} order={order} onAdvance={advance} />
+                  <OrderCard key={order.id} order={order} onAdvance={(o) => void advance(o)} />
                 ))}
               </section>
             )}
@@ -137,24 +162,24 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
         )}
 
         {showHistory && (
-          <section className="space-y-2 pt-2 border-t border-gray-100">
+          <section className="space-y-2 pt-3 border-t border-[#e0edff]">
             <SectionTitle>History ({closed.length})</SectionTitle>
             {closed.length === 0 ? (
-              <p className="text-[11px] text-gray-400">Nothing completed or rejected yet.</p>
+              <p className="text-xs text-[#616f75]">Nothing completed or rejected yet.</p>
             ) : (
               <ul className="space-y-1.5 max-h-52 overflow-y-auto custom-scrollbar pr-1">
                 {closed.map((order) => (
-                  <li key={order.id} className="p-2 bg-white border border-gray-200 rounded-lg flex items-center justify-between gap-2">
+                  <li key={order.id} className="p-2.5 bg-white border border-[#e0edff] rounded-[10px] flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-[11px] font-bold text-gray-800 truncate">
+                      <p className="text-xs font-semibold text-[#000000] truncate">
                         #{order.id} · {order.customer?.name || 'Website customer'}
                       </p>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-[#526066] tabular-nums">
                         {order.items?.length || 0} item(s) · {formatAmount(order.total)}
                         {order.rejectReason ? ` · ${order.rejectReason}` : ''}
                       </p>
                     </div>
-                    <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0 ${STATUS_TONE[order.status]}`}>
+                    <span className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-[88px] border shrink-0 ${STATUS_TONE[order.status]}`}>
                       {STATUS_LABEL[order.status]}
                     </span>
                   </li>
@@ -168,85 +193,162 @@ export function OnlineOrdersModal({ username, notify, onClose, onAccept }: {
   );
 }
 
-function OrderCard({ order, onAccept, onAdvance, onReject }: {
+function OrderCard({
+  order,
+  confirmOverwrite = false,
+  onCancelOverwrite,
+  onAccept,
+  onAdvance,
+  onReject,
+}: {
   order: OnlineOrder;
-  onAccept?: (order: OnlineOrder) => void;
+  confirmOverwrite?: boolean;
+  onCancelOverwrite?: () => void;
+  onAccept?: (order: OnlineOrder, force?: boolean) => void;
   onAdvance?: (order: OnlineOrder) => void;
-  onReject?: (order: OnlineOrder) => void;
+  onReject?: (order: OnlineOrder, reason: string) => void;
 }) {
+  const [rejecting, setRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
   const next = nextStatus(order);
   const isPending = order.status === 'PENDING';
 
   return (
-    <article className={`p-3 rounded-xl border space-y-2 ${isPending ? 'bg-blue-50/60 border-blue-200' : 'bg-amber-50/60 border-amber-200'}`}>
+    <article
+      className={`p-3.5 rounded-2xl border space-y-2.5 ${
+        isPending ? 'bg-[#eff6ff]/70 border-[#5b3ee0]' : 'bg-amber-50/70 border-amber-300'
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs font-bold text-gray-800 flex flex-wrap items-center gap-1">
-            #{order.id} {order.customer?.name || 'Website customer'}
-            <span className="text-[9px] font-bold bg-white/70 border border-gray-200 px-1.5 py-0.5 rounded">
+          <p className="text-sm font-semibold text-[#000000] flex flex-wrap items-center gap-1.5">
+            <span className="tabular-nums">#{order.id}</span>
+            <span>{order.customer?.name || 'Website customer'}</span>
+            <span className="text-[11px] font-semibold bg-white border border-[#e0edff] text-[#273238] px-2 py-0.5 rounded-[88px]">
               {order.orderType.replace('_', ' ')}
             </span>
           </p>
-          <p className="text-[10px] text-gray-500">
+          <p className="text-xs text-[#526066] mt-0.5 tabular-nums">
             {order.customer?.phone || 'No phone'} · {new Date(order.createdAt).toLocaleTimeString()}
           </p>
         </div>
-        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded border shrink-0 ${STATUS_TONE[order.status]}`}>
+        <span className={`text-[11px] font-semibold uppercase px-2.5 py-0.5 rounded-[88px] border shrink-0 ${STATUS_TONE[order.status]}`}>
           {STATUS_LABEL[order.status]}
         </span>
       </div>
 
-      <ul className="bg-white border border-gray-200 rounded-lg p-2 space-y-0.5">
+      <ul className="bg-white border border-[#e0edff] rounded-[10px] p-2.5 space-y-1">
         {(order.items || []).map((line, index) => (
-          <li key={`${line.id}-${index}`} className="flex justify-between gap-2 text-[11px] text-gray-700">
+          <li key={`${line.id}-${index}`} className="flex justify-between gap-2 text-xs text-[#273238]">
             <span className="truncate">{line.name}{line.note ? ` — ${line.note}` : ''}</span>
-            <span className="tabular-nums shrink-0">×{line.qty}</span>
+            <span className="tabular-nums font-semibold shrink-0">×{line.qty}</span>
           </li>
         ))}
       </ul>
 
-      {order.customer?.address && <p className="text-[10px] text-gray-500">{order.customer.address}</p>}
-      {order.note && <p className="text-[10px] text-gray-500 italic">{order.note}</p>}
+      {order.customer?.address && <p className="text-xs text-[#526066]">{order.customer.address}</p>}
+      {order.note && <p className="text-xs text-[#526066] italic">{order.note}</p>}
 
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="text-xs font-black text-blue-800 tabular-nums">{formatAmount(order.total)}</span>
-        <div className="flex gap-1.5">
-          {isPending && onAccept && (
+      {rejecting ? (
+        <div className="pt-2 border-t border-[#e0edff] flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+          <input
+            type="text"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Reason for rejection (optional)"
+            aria-label={`Rejection reason for order #${order.id}`}
+            autoFocus
+            className="flex-1 px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] placeholder:text-[#616f75] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+          />
+          <div className="flex gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => onAccept(order)}
-              className="text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg flex items-center gap-1"
+              onClick={() => {
+                setRejecting(false);
+                setRejectReason('');
+              }}
+              className="px-3 min-h-9 rounded-[8px] text-xs font-semibold border border-[#788991] bg-white text-[#273238] hover:bg-[#eff6ff]"
             >
-              <Check className="w-3 h-3" aria-hidden /> Accept to cart
+              Cancel
             </button>
-          )}
-          {isPending && onReject && (
             <button
               type="button"
-              onClick={() => onReject(order)}
-              className="text-[11px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-2.5 py-1.5 rounded-lg"
+              onClick={() => {
+                onReject?.(order, rejectReason);
+                setRejecting(false);
+                setRejectReason('');
+              }}
+              className="px-3 min-h-9 rounded-[8px] text-xs font-semibold bg-red-600 hover:bg-red-700 text-white"
             >
-              Reject
+              Confirm Reject
             </button>
-          )}
-          {!isPending && next && onAdvance && (
-            <button
-              type="button"
-              onClick={() => onAdvance(order)}
-              className="text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg"
-            >
-              {next === 'PREPARING' ? 'Start preparing'
-                : next === 'OUT_FOR_DELIVERY' ? 'Assign to rider'
-                : 'Mark delivered'}
-            </button>
-          )}
+          </div>
         </div>
-      </div>
+      ) : confirmOverwrite ? (
+        <div className="pt-2 border-t border-[#e0edff] flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs font-semibold text-[#273238]">
+            Replace existing items in your cart?
+          </span>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={onCancelOverwrite}
+              className="px-3 min-h-9 rounded-[8px] text-xs font-semibold border border-[#788991] bg-white text-[#273238] hover:bg-[#eff6ff]"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => onAccept?.(order, true)}
+              className="px-3 min-h-9 rounded-[8px] text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+            >
+              Yes, load order
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <span className="font-display text-sm font-bold text-[#2941e0] tabular-nums">{formatAmount(order.total)}</span>
+          <div className="flex gap-2">
+            {isPending && onAccept && (
+              <button
+                type="button"
+                onClick={() => onAccept(order, false)}
+                className="text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white px-3 min-h-9 rounded-[8px] flex items-center gap-1.5 transition"
+              >
+                <Check className="w-3.5 h-3.5" aria-hidden /> Accept to cart
+              </button>
+            )}
+            {isPending && onReject && (
+              <button
+                type="button"
+                onClick={() => setRejecting(true)}
+                className="text-xs font-semibold bg-red-50 text-red-700 border border-red-300 hover:bg-red-100 px-3 min-h-9 rounded-[8px] transition"
+              >
+                Reject
+              </button>
+            )}
+            {!isPending && next && onAdvance && (
+              <button
+                type="button"
+                onClick={() => onAdvance(order)}
+                className="text-xs font-semibold bg-[#2941e0] hover:bg-[#1f35c4] text-white px-3 min-h-9 rounded-[8px] transition"
+              >
+                {next === 'PREPARING' ? 'Start preparing'
+                  : next === 'OUT_FOR_DELIVERY' ? 'Assign to rider'
+                  : 'Mark delivered'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </article>
   );
 }
 
-const INPUT = 'p-2 text-xs ring-1 ring-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-w-0';
+const INPUT =
+  'px-3 h-10 text-xs border border-[#788991] rounded-[10px] bg-white text-[#000000] placeholder:text-[#616f75] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] min-w-0';
 
 function NewOrderForm({ onCreate, onCancel }: {
   onCreate: (order: OnlineOrder) => Promise<void>;
@@ -283,18 +385,30 @@ function NewOrderForm({ onCreate, onCancel }: {
   }
 
   return (
-    <section className="p-3 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-2">
-      <SectionTitle className="text-indigo-800">Record a website order</SectionTitle>
+    <section className="p-3.5 rounded-2xl border border-[#e0edff] bg-[#eff6ff]/60 space-y-2.5">
+      <SectionTitle className="text-[#2941e0]">Record a website order</SectionTitle>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" aria-label="Customer name" className={INPUT} />
-        <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" aria-label="Customer phone" className={INPUT} />
-        <select value={orderType} onChange={(e) => setOrderType(e.target.value as OrderType)} aria-label="Order type" className={INPUT}>
-          <option value="DELIVERY">Delivery</option>
-          <option value="TAKEAWAY">Takeaway</option>
-          <option value="DINE_IN">Dine in</option>
-        </select>
+        <label className="block">
+          <span className="block text-xs font-medium text-[#273238] mb-1">Customer name</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Customer name" className={`${INPUT} w-full`} />
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-[#273238] mb-1">Phone</span>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0300 1234567" className={`${INPUT} w-full`} />
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-[#273238] mb-1">Order type</span>
+          <select value={orderType} onChange={(e) => setOrderType(e.target.value as OrderType)} className={`${INPUT} w-full`}>
+            <option value="DELIVERY">Delivery</option>
+            <option value="TAKEAWAY">Takeaway</option>
+            <option value="DINE_IN">Dine in</option>
+          </select>
+        </label>
       </div>
-      <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Delivery address (optional)" aria-label="Delivery address" className={`${INPUT} w-full`} />
+      <label className="block">
+        <span className="block text-xs font-medium text-[#273238] mb-1">Delivery address (optional)</span>
+        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Street, block, or landmark" className={`${INPUT} w-full`} />
+      </label>
 
       {picked.map((row, index) => (
         <div key={index} className="flex gap-1.5">
@@ -315,35 +429,37 @@ function NewOrderForm({ onCreate, onCancel }: {
             value={row.qty}
             onChange={(e) => setPicked((rows) => rows.map((r, i) => (i === index ? { ...r, qty: e.target.value } : r)))}
             aria-label={`Item ${index + 1} quantity`}
-            className={`${INPUT} w-16`}
+            className={`${INPUT} w-16 text-right tabular-nums`}
           />
           <button
             type="button"
             onClick={() => setPicked((rows) => (rows.length === 1 ? [{ menuItemId: '', qty: '1' }] : rows.filter((_, i) => i !== index)))}
             aria-label={`Remove item ${index + 1}`}
-            className="bg-white border border-gray-200 text-gray-500 hover:text-red-600 px-2 rounded-lg"
+            className="w-10 h-10 bg-white border border-[#788991] text-[#526066] hover:text-red-700 hover:border-red-300 rounded-[10px] flex items-center justify-center shrink-0"
           >
-            <X className="w-3 h-3" aria-hidden />
+            <X className="w-4 h-4" aria-hidden />
           </button>
         </div>
       ))}
 
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         <button
           type="button"
           onClick={() => setPicked((rows) => [...rows, { menuItemId: '', qty: '1' }])}
-          className="text-[10px] font-black text-indigo-700 hover:underline"
+          className="text-xs font-semibold text-[#2941e0] hover:underline py-1"
         >
           + Add line
         </button>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-black text-indigo-900 tabular-nums">{formatAmount(total)}</span>
-          <button type="button" onClick={onCancel} className="text-[11px] font-bold text-gray-600 px-2 py-1.5">Cancel</button>
+          <span className="text-sm font-bold text-[#000000] tabular-nums">{formatAmount(total)}</span>
+          <button type="button" onClick={onCancel} className="text-xs font-semibold text-[#273238] border border-[#788991] bg-white px-3 min-h-9 rounded-[8px] hover:bg-[#eff6ff]">
+            Cancel
+          </button>
           <button
             type="button"
             onClick={submit}
             disabled={!lines.length}
-            className="text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50"
+            className="text-xs font-semibold bg-[#2941e0] hover:bg-[#1f35c4] text-white px-3.5 min-h-9 rounded-[8px] disabled:opacity-45 transition"
           >
             Record order
           </button>
@@ -353,6 +469,6 @@ function NewOrderForm({ onCreate, onCancel }: {
   );
 }
 
-function SectionTitle({ children, className = 'text-gray-700' }: { children: React.ReactNode; className?: string }) {
-  return <p className={`text-[10px] font-black uppercase tracking-wider ${className}`}>{children}</p>;
+function SectionTitle({ children, className = 'text-[#273238]' }: { children: React.ReactNode; className?: string }) {
+  return <p className={`text-xs font-bold uppercase tracking-wide ${className}`}>{children}</p>;
 }

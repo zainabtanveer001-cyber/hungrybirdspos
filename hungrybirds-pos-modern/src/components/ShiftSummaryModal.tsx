@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { buildShiftReport, closeShift } from '../lib/shift';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
@@ -10,13 +11,20 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
   onClosed: () => void;
 }) {
   const report = useLive(() => buildShiftReport(), []) ?? null;
+  const [fallbackTime] = useState(() => Date.now());
+  const [confirmingClose, setConfirmingClose] = useState(false);
+  const [closing, setClosing] = useState(false);
 
-  async function close() {
-    if (!window.confirm('End the current shift? Active shift revenue tracking resets and opening cash is cleared.')) return;
-    await closeShift(username);
-    notify('Shift closed. Set opening cash for the new shift.');
-    onClose();
-    onClosed();
+  async function handleConfirmClose() {
+    setClosing(true);
+    try {
+      await closeShift(username);
+      notify('Shift closed. Set opening cash for the new shift.');
+      onClose();
+      onClosed();
+    } finally {
+      setClosing(false);
+    }
   }
 
   return (
@@ -24,16 +32,47 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
       title="Shift Summary"
       onClose={onClose}
       wide
+      closeDisabled={closing}
       footer={
-        <button type="button" onClick={close} className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-black py-2.5 rounded-xl">
-          Close Shift & Start New
-        </button>
+        confirmingClose ? (
+          <div className="space-y-2.5">
+            <p className="text-xs font-medium text-[#273238]">
+              End the current shift? Active-shift ingredient costs will lock permanently and opening cash will reset.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={closing}
+                onClick={() => setConfirmingClose(false)}
+                className="flex-1 h-10 rounded-[8px] border border-[#788991] bg-white text-[#000000] hover:bg-[#eff6ff] text-xs font-semibold transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={closing}
+                onClick={() => void handleConfirmClose()}
+                className="flex-[2] h-10 rounded-[8px] bg-red-600 hover:bg-red-700 text-white text-xs font-semibold disabled:opacity-50 transition"
+              >
+                {closing ? 'Closing shift…' : 'Confirm Close Shift'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmingClose(true)}
+            className="w-full h-11 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-[8px] transition"
+          >
+            Close Shift &amp; Start New
+          </button>
+        )
       }
     >
-      <div className="space-y-3">
-        <section className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-[11px] text-gray-600 space-y-0.5">
+      <div className="space-y-3.5">
+        <section className="p-3.5 rounded-2xl bg-[#f8fafd] border border-[#e0edff] text-xs text-[#526066] space-y-1">
           <Row label="Opened by" value={username} />
-          <Row label="Shift start" value={new Date(report?.startedAt ?? Date.now()).toLocaleString()} />
+          <Row label="Shift start" value={new Date(report?.startedAt ?? fallbackTime).toLocaleString()} />
           <Row label="Opening cash" value={formatAmount(report?.openingCash ?? 0)} />
           <Row label="Cash from customers" value={formatAmount(report?.cashCollected ?? 0)} />
           <Row label="Change given back" value={`-${formatAmount(report?.changeGiven ?? 0)}`} />
@@ -41,10 +80,10 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
           <Row label="Expected drawer cash" value={formatAmount(report?.expectedDrawerCash ?? 0)} strong />
         </section>
 
-        <section className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
-          <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Total shift revenue (after discounts)</p>
-          <p className="text-2xl font-black text-emerald-700 tabular-nums">{formatAmount(report?.totalSales ?? 0)}</p>
-          <p className="text-[11px] text-emerald-600">
+        <section className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-center">
+          <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wide">Total shift revenue (after discounts)</p>
+          <p className="font-display text-2xl font-bold text-emerald-800 tabular-nums mt-0.5">{formatAmount(report?.totalSales ?? 0)}</p>
+          <p className="text-xs text-emerald-800 mt-0.5">
             {report?.orderCount ?? 0} {report?.orderCount === 1 ? 'order' : 'orders'} completed
           </p>
         </section>
@@ -52,38 +91,38 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
         <section>
           <Caption>Revenue breakdown</Caption>
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Tile label="Dine in" value={report?.dineIn ?? 0} tone="bg-indigo-50 border-indigo-100 text-indigo-900" />
-            <Tile label="Takeaway" value={report?.takeaway ?? 0} tone="bg-amber-50 border-amber-100 text-amber-900" />
-            <Tile label="Delivery" value={report?.delivery ?? 0} tone="bg-blue-50 border-blue-100 text-blue-900" />
+            <Tile label="Dine in" value={report?.dineIn ?? 0} tone="bg-[#eff6ff] border-[#e0edff] text-[#2941e0]" />
+            <Tile label="Takeaway" value={report?.takeaway ?? 0} tone="bg-amber-50 border-amber-200 text-amber-900" />
+            <Tile label="Delivery" value={report?.delivery ?? 0} tone="bg-[#f8fafd] border-[#e0edff] text-[#273238]" />
           </div>
         </section>
 
-        <section className="pt-2 border-t border-gray-100 space-y-0.5 text-[11px] text-gray-600">
+        <section className="pt-3 border-t border-[#e0edff] space-y-1 text-xs text-[#526066]">
           <Caption>Checkout charges collected</Caption>
           <Row label="Packing charges" value={formatAmount(report?.packingCharges ?? 0)} />
           <Row label="Tax" value={formatAmount(report?.tax ?? 0)} />
           <Row label="Other charges" value={formatAmount(report?.otherCharges ?? 0)} />
         </section>
 
-        <section className="pt-2 border-t border-gray-100 space-y-1.5">
+        <section className="pt-3 border-t border-[#e0edff] space-y-2">
           <Caption>Inventory consumed this shift</Caption>
           {!report?.ingredients.length ? (
-            <p className="text-[11px] text-gray-400 py-2">No ingredient consumption recorded this shift.</p>
+            <p className="text-xs text-[#616f75] py-2">No ingredient consumption recorded this shift.</p>
           ) : (
             <ul className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
               {report.ingredients.map((row) => (
-                <li key={row.name} className="p-2 bg-white border border-gray-200 rounded-lg flex justify-between items-center text-[11px]">
+                <li key={row.name} className="p-2.5 bg-white border border-[#e0edff] rounded-[10px] flex justify-between items-center text-xs">
                   <div className="min-w-0">
-                    <p className="font-bold text-gray-800 truncate">{row.name}</p>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="font-semibold text-[#000000] truncate">{row.name}</p>
+                    <p className="text-xs text-[#526066] tabular-nums">
                       {row.qtyConsumed.toFixed(2)} {row.unit}
                       {row.manualQty > 0
                         ? ` (recipe ${row.recipeQty.toFixed(2)}, manual ${row.manualQty.toFixed(2)})`
                         : ''}{' '}
-                      • {formatAmount(row.costPerUnit)}/unit
+                      · {formatAmount(row.costPerUnit)}/unit
                     </p>
                   </div>
-                  <span className={`font-black shrink-0 ${row.costConsumed > 0 ? 'text-red-600' : 'text-emerald-700'}`}>
+                  <span className={`font-bold shrink-0 tabular-nums ${row.costConsumed > 0 ? 'text-red-700' : 'text-emerald-800'}`}>
                     {formatAmount(row.costConsumed)}
                   </span>
                 </li>
@@ -92,29 +131,29 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
           )}
         </section>
 
-        <section className="pt-2 border-t border-gray-100 space-y-1.5 text-[11px] text-gray-600">
+        <section className="pt-3 border-t border-[#e0edff] space-y-1.5 text-xs text-[#526066]">
           <Row label="Discounted orders" value={String(report?.discountedOrderCount ?? 0)} />
-          <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 space-y-1">
-            <p className="font-semibold text-gray-700">Discounts by staff</p>
+          <div className="bg-[#f8fafd] p-3 rounded-[10px] border border-[#e0edff] space-y-1">
+            <p className="font-semibold text-[#273238]">Discounts by staff</p>
             {!report?.discountsByStaff.length ? (
-              <p className="text-gray-500">No discounts were applied during this shift.</p>
+              <p className="text-[#616f75]">No discounts were applied during this shift.</p>
             ) : (
               report.discountsByStaff.map((row) => (
                 <div key={row.user} className="flex justify-between">
-                  <span>{row.user}</span>
-                  <strong className="text-red-600">{formatAmount(row.amount)}</strong>
+                  <span className="text-[#273238]">{row.user}</span>
+                  <strong className="text-red-700 tabular-nums">{formatAmount(row.amount)}</strong>
                 </div>
               ))
             )}
           </div>
-          <Row label="Total discounts given" value={`- ${formatAmount(report?.totalDiscounts ?? 0)}`} valueClass="text-red-600" />
+          <Row label="Total discounts given" value={`- ${formatAmount(report?.totalDiscounts ?? 0)}`} valueClass="text-red-700" />
           <Row label="Raw material cost consumed (live)" value={formatAmount(report?.consumedCost ?? 0)} valueClass="text-red-700" />
-          <div className={`flex justify-between text-xs font-bold pt-1 ${(report?.grossProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          <div className={`flex justify-between text-xs font-bold pt-1 ${(report?.grossProfit ?? 0) >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
             <span>Gross profit / (loss)</span>
             <strong className="tabular-nums">{formatAmount(report?.grossProfit ?? 0)}</strong>
           </div>
-          <Row label="Approved shift expenses" value={`- ${formatAmount(report?.shiftExpenses ?? 0)}`} valueClass="text-amber-700" />
-          <div className={`flex justify-between text-sm font-bold pt-1 border-t border-gray-100 ${(report?.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+          <Row label="Approved shift expenses" value={`- ${formatAmount(report?.shiftExpenses ?? 0)}`} valueClass="text-amber-900" />
+          <div className={`flex justify-between text-sm font-bold pt-2 border-t border-[#e0edff] ${(report?.netProfit ?? 0) >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
             <span>Net shift profit / (loss)</span>
             <strong className="tabular-nums">{formatAmount(report?.netProfit ?? 0)}</strong>
           </div>
@@ -125,7 +164,7 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
 }
 
 function Caption({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] font-black uppercase tracking-wider text-gray-700 mb-1">{children}</p>;
+  return <p className="text-xs font-bold uppercase tracking-wide text-[#273238] mb-1.5">{children}</p>;
 }
 
 function Row({ label, value, strong, valueClass }: {
@@ -135,18 +174,18 @@ function Row({ label, value, strong, valueClass }: {
   valueClass?: string;
 }) {
   return (
-    <div className={`flex justify-between gap-2 ${strong ? 'font-bold text-gray-800' : ''}`}>
+    <div className={`flex justify-between gap-2 ${strong ? 'font-bold text-[#000000] pt-1 border-t border-[#e0edff]' : ''}`}>
       <span>{label}:</span>
-      <strong className={`tabular-nums ${valueClass ?? ''}`}>{value}</strong>
+      <strong className={`tabular-nums ${valueClass ?? 'text-[#000000]'}`}>{value}</strong>
     </div>
   );
 }
 
 function Tile({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className={`border rounded-lg p-2 ${tone}`}>
-      <span className="block text-[10px] text-gray-500">{label}</span>
-      <strong className="tabular-nums text-xs">{formatAmount(value)}</strong>
+    <div className={`border rounded-[10px] p-2.5 ${tone}`}>
+      <span className="block text-xs text-[#526066]">{label}</span>
+      <strong className="tabular-nums text-sm font-bold">{formatAmount(value)}</strong>
     </div>
   );
 }

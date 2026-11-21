@@ -42,23 +42,29 @@ export function OwnerPinModal({ action, onClose, onAuthorized }: {
     <Modal
       title="Owner Authorization"
       onClose={onClose}
+      closeDisabled={busy}
       footer={
-        <div className="flex gap-3">
-          <button type="button" onClick={onClose} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="flex-1 h-11 rounded-[8px] font-medium border border-[#788991] bg-white text-[#000000] hover:bg-[#eff6ff] disabled:opacity-45 transition text-sm"
+          >
             Cancel
           </button>
           <button
             type="button"
             onClick={submit}
             disabled={busy || pinExists === null || blockedNoPin || !pin.trim()}
-            className="flex-1 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40"
+            className="flex-1 h-11 rounded-[8px] font-semibold bg-[#2941e0] text-white hover:bg-[#1f35c4] disabled:opacity-45 transition text-sm"
           >
-            Authorize
+            {busy ? 'Checking…' : 'Authorize'}
           </button>
         </div>
       }
     >
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-[#526066] mb-4 leading-relaxed">
         {pinExists === false
           ? isOwner
             ? 'No owner PIN is set yet. Create one now (4–8 digits).'
@@ -67,7 +73,7 @@ export function OwnerPinModal({ action, onClose, onAuthorized }: {
       </p>
       {!blockedNoPin && (
         <>
-          <label htmlFor="ownerPin" className="block text-xs font-bold uppercase tracking-wide text-gray-600 mb-1.5">
+          <label htmlFor="ownerPin" className="block text-xs font-semibold uppercase tracking-wide text-[#273238] mb-1.5">
             {pinExists === false ? 'Create owner PIN' : 'Enter owner PIN'}
           </label>
           <input
@@ -81,12 +87,12 @@ export function OwnerPinModal({ action, onClose, onAuthorized }: {
               setError('');
             }}
             onKeyDown={(e) => e.key === 'Enter' && submit()}
-            className="w-full p-3 text-center tracking-[0.4em] font-black text-lg ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full px-3 h-11 text-center tracking-[0.4em] font-bold text-lg border border-[#788991] rounded-[10px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0]"
           />
         </>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs font-bold text-red-600">
+        <p role="alert" className="mt-2.5 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-[10px] px-3 py-2">
           {error}
         </p>
       )}

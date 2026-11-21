@@ -44,50 +44,56 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
       title={`Refund Order #${sale.id}`}
       onClose={onClose}
       wide
+      closeDisabled={busy}
       footer={
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs text-gray-600">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-xs text-[#526066]">
             Refund total:{' '}
-            <strong className={`tabular-nums ${preview.amount > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+            <strong className={`tabular-nums ${preview.amount > 0 ? 'text-red-700' : 'text-[#616f75]'}`}>
               {formatAmount(preview.amount)}
             </strong>
           </div>
           <div className="flex gap-2">
-            <button type="button" onClick={onClose} className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="px-4 h-10 rounded-[8px] text-xs font-semibold border border-[#788991] bg-white text-[#000000] hover:bg-[#eff6ff] disabled:opacity-45 transition"
+            >
               Cancel
             </button>
             <button
               type="button"
               onClick={submit}
               disabled={busy || preview.amount <= 0 || !reason.trim()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-40"
+              className="flex items-center gap-1.5 px-4 h-10 rounded-[8px] text-xs font-semibold bg-amber-700 text-white hover:bg-amber-800 disabled:opacity-45 transition tabular-nums"
             >
-              <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Refund {formatAmount(preview.amount)}
+              <RotateCcw className="w-3.5 h-3.5" aria-hidden /> {busy ? 'Refunding…' : `Refund ${formatAmount(preview.amount)}`}
             </button>
           </div>
         </div>
       }
     >
-      <div className="space-y-3">
-        <p className="text-[11px] text-gray-500">
-          Original total {formatAmount(sale.total)}
+      <div className="space-y-3.5">
+        <p className="text-xs text-[#526066]">
+          Original total <strong className="text-[#000000] tabular-nums">{formatAmount(sale.total)}</strong>
           {!!sale.refundedAmount && ` · already refunded ${formatAmount(sale.refundedAmount)}`}
-          {sale.refundStatus && ` (${sale.refundStatus})`}. Refunded quantities go back into stock.
+          {sale.refundStatus && ` (${sale.refundStatus})`}. Refunded quantities return to stock automatically.
         </p>
 
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {(sale.items || []).map((line, index) => {
             const left = remainingQty(line);
             return (
               <li
                 key={`${line.id}-${index}`}
-                className={`flex items-center gap-2 p-2 rounded-lg border ${left === 0 ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200'}`}
+                className={`flex items-center gap-2.5 p-2.5 rounded-[10px] border ${left === 0 ? 'bg-[#f8fafd] border-[#e0edff]' : 'bg-white border-[#e0edff]'}`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className={`text-xs font-bold truncate ${left === 0 ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                  <p className={`text-sm font-medium truncate ${left === 0 ? 'text-[#616f75] line-through' : 'text-[#000000]'}`}>
                     {line.name}
                   </p>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-[#526066] tabular-nums">
                     {formatAmount(preview.units[index])} each
                     {preview.units[index] !== line.price && ' after discount'} ·{' '}
                     {left === 0 ? 'fully refunded' : `${left} of ${line.qty} refundable`}
@@ -99,10 +105,10 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
                   max={left}
                   value={qty[index] ?? ''}
                   onChange={(e) => setQty((current) => ({ ...current, [index]: e.target.value }))}
-                  disabled={left === 0}
+                  disabled={left === 0 || busy}
                   placeholder="0"
                   aria-label={`Refund quantity for ${line.name}`}
-                  className="w-16 p-1.5 text-xs text-right ring-1 ring-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:opacity-40 tabular-nums"
+                  className="w-20 px-2.5 h-10 text-sm text-right border border-[#788991] rounded-[10px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] disabled:opacity-45 tabular-nums"
                 />
               </li>
             );
@@ -110,21 +116,21 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
         </ul>
 
         <label className="block">
-          <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">
+          <span className="block text-xs font-medium text-[#273238] mb-1">
             Reason (required)
           </span>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={2}
+            disabled={busy}
             placeholder="e.g. Wrong item delivered"
-            aria-label="Refund reason"
-            className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+            className="w-full p-2.5 text-sm border border-[#788991] rounded-[10px] bg-white text-[#000000] placeholder:text-[#616f75] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] resize-none"
           />
         </label>
 
         {preview.fullyRefunded && preview.amount > 0 && (
-          <p className="text-[11px] font-bold text-red-600">
+          <p className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-[10px] px-3 py-2">
             This will fully refund the remaining balance of the order.
           </p>
         )}

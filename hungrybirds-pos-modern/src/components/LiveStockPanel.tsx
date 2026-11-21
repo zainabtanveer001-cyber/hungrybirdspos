@@ -42,7 +42,7 @@ export function LiveStockPanel({ canManage, username, onManage }: {
               <button
                 type="button"
                 onClick={() => setUnlocked(false)}
-                className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-[8px] font-medium border border-red-200 hover:bg-red-100"
+                className="text-xs bg-red-50 text-red-700 px-3 min-h-9 rounded-[8px] font-semibold border border-red-200 hover:bg-red-100 transition"
               >
                 Lock
               </button>
@@ -51,7 +51,7 @@ export function LiveStockPanel({ canManage, username, onManage }: {
               <button
                 type="button"
                 onClick={onManage}
-                className="text-xs text-[#2941e0] bg-[#eff6ff] hover:bg-[#e0edff] px-3 py-1 rounded-[8px] font-medium"
+                className="text-xs text-[#2941e0] bg-[#eff6ff] hover:bg-[#e0edff] px-3 min-h-9 rounded-[8px] font-semibold transition"
               >
                 Manage
               </button>
@@ -60,37 +60,37 @@ export function LiveStockPanel({ canManage, username, onManage }: {
         </div>
 
         {!unlocked ? (
-          <div className="text-center py-6 border border-[#e0edff] rounded-2xl bg-[#eff6ff]/40 space-y-2">
+          <div className="text-center py-6 border border-[#e0edff] rounded-2xl bg-[#eff6ff]/40 space-y-2.5">
             <Lock className="w-6 h-6 mx-auto text-[#526066]" aria-hidden />
             <p className="text-xs font-medium text-[#526066]">Stock Protected</p>
             <button
               type="button"
               onClick={() => setPrompting(true)}
-              className="bg-[#2941e0] text-white px-4 h-9 rounded-[8px] text-xs font-medium hover:bg-[#1f35c4] transition"
+              className="bg-[#2941e0] text-white px-4 h-10 rounded-[8px] text-xs font-semibold hover:bg-[#1f35c4] transition"
             >
               Authenticate to View
             </button>
           </div>
         ) : (
           <div className="space-y-2.5 text-xs">
-            <div className="grid grid-cols-3 gap-1.5 p-2 rounded-xl bg-[#eff6ff]/70 border border-[#e0edff] text-center">
+            <div className="grid grid-cols-3 gap-1.5 p-2.5 rounded-xl bg-[#eff6ff]/70 border border-[#e0edff] text-center">
               <div>
-                <span className="block text-[10px] text-[#526066]">Shift Sales</span>
+                <span className="block text-[11px] font-medium text-[#526066]">Shift Sales</span>
                 <strong className="font-bold text-xs text-[#000000] tabular-nums">
                   {formatAmount(shift?.totalSales ?? 0)}
                 </strong>
               </div>
               <div>
-                <span className="block text-[10px] text-[#526066]">Live Cost</span>
-                <strong className="font-bold text-xs text-red-600 tabular-nums">
+                <span className="block text-[11px] font-medium text-[#526066]">Live Cost</span>
+                <strong className="font-bold text-xs text-red-700 tabular-nums">
                   {formatAmount(shift?.consumedCost ?? 0)}
                 </strong>
               </div>
               <div>
-                <span className="block text-[10px] text-[#526066]">Live P&amp;L</span>
+                <span className="block text-[11px] font-medium text-[#526066]">Live P&amp;L</span>
                 <strong
                   className={`font-bold text-xs tabular-nums ${
-                    (shift?.netProfit ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-600'
+                    (shift?.netProfit ?? 0) >= 0 ? 'text-emerald-800' : 'text-red-700'
                   }`}
                 >
                   {formatAmount(shift?.netProfit ?? 0)}
@@ -100,35 +100,37 @@ export function LiveStockPanel({ canManage, username, onManage }: {
 
             <div className="space-y-1.5 max-h-60 overflow-y-auto custom-scrollbar pr-1">
               {!items?.length ? (
-                <p className="text-gray-400 text-center py-2">No raw inventory found.</p>
+                <p className="text-[#616f75] text-center py-3">No raw inventory found.</p>
               ) : (
                 items.map((item) => (
-                  <div key={item.id} className="p-2 bg-gray-50 rounded border border-gray-200">
+                  <div key={item.id} className="p-2.5 bg-[#f8fafd] rounded-[10px] border border-[#e0edff]">
                     <div className="flex justify-between items-center gap-2">
                       <div className="min-w-0">
-                        <p className="font-bold text-gray-800 truncate">{item.name}</p>
-                        <p className="text-[11px] text-gray-500">
-                          Cost/unit: Rs {normalizeCharge(item.cost || 0).toFixed(2)} • Unit: {item.unit}
+                        <p className="font-semibold text-[#000000] truncate">{item.name}</p>
+                        <p className="text-xs text-[#526066] tabular-nums">
+                          Cost/unit: Rs {normalizeCharge(item.cost || 0).toFixed(2)} · Unit: {item.unit}
                         </p>
                       </div>
-                      <span className={`font-extrabold text-xs shrink-0 ${Number(item.stock) <= threshold ? 'text-red-600' : 'text-emerald-700'}`}>
+                      <span className={`font-bold text-xs shrink-0 tabular-nums ${Number(item.stock) <= threshold ? 'text-red-700' : 'text-emerald-800'}`}>
                         {Number(item.stock).toFixed(2)} {item.unit}
                       </span>
                     </div>
-                    <div className="flex items-center gap-1 mt-1">
+                    <div className="flex items-center gap-1.5 mt-2">
                       <button
                         type="button"
                         onClick={() => bump(item, 1)}
-                        className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-emerald-200 flex items-center gap-0.5"
+                        aria-label={`Add 1 ${item.unit} of ${item.name}`}
+                        className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-semibold px-3 min-h-10 rounded-[8px] hover:bg-emerald-100 flex items-center gap-1 transition"
                       >
-                        <Plus className="w-3 h-3" aria-hidden />1
+                        <Plus className="w-3.5 h-3.5" aria-hidden />1
                       </button>
                       <button
                         type="button"
                         onClick={() => bump(item, -1)}
-                        className="bg-red-100 text-red-800 text-[10px] font-bold px-3 min-h-11 rounded hover:bg-red-200 flex items-center gap-0.5"
+                        aria-label={`Subtract 1 ${item.unit} of ${item.name}`}
+                        className="bg-red-50 border border-red-300 text-red-700 text-xs font-semibold px-3 min-h-10 rounded-[8px] hover:bg-red-100 flex items-center gap-1 transition"
                       >
-                        <Minus className="w-3 h-3" aria-hidden />1
+                        <Minus className="w-3.5 h-3.5" aria-hidden />1
                       </button>
                     </div>
                   </div>
@@ -139,10 +141,12 @@ export function LiveStockPanel({ canManage, username, onManage }: {
         )}
 
         {unlocked && lowStock.length > 0 && (
-          <p className="mt-2 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 flex items-start gap-1">
-            <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" aria-hidden />
-            {lowStock.length} item{lowStock.length === 1 ? '' : 's'} low on stock: {lowStock.slice(0, 3).map((i) => i.name).join(', ')}
-            {lowStock.length > 3 ? ` +${lowStock.length - 3} more` : ''}
+          <p className="mt-2.5 text-xs font-semibold text-amber-900 bg-amber-50 border border-amber-300 rounded-[10px] px-2.5 py-2 flex items-start gap-1.5">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+            <span>
+              {lowStock.length} item{lowStock.length === 1 ? '' : 's'} low on stock: {lowStock.slice(0, 3).map((i) => i.name).join(', ')}
+              {lowStock.length > 3 ? ` +${lowStock.length - 3} more` : ''}
+            </span>
           </p>
         )}
       </section>

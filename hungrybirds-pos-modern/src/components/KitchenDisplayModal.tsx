@@ -66,6 +66,8 @@ export function KitchenDisplayModal({ onClose, notify }: {
       })),
   ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
+  const activeCount = tickets.filter((t) => t.status !== 'SERVED').length;
+  const servedCount = tickets.filter((t) => t.status === 'SERVED').length;
   const visible = tickets.filter((t) =>
     filter === 'ACTIVE' ? t.status !== 'SERVED' : t.status === 'SERVED',
   );
@@ -114,41 +116,43 @@ export function KitchenDisplayModal({ onClose, notify }: {
   return (
     <Modal title="Kitchen Display System (KDS)" onClose={onClose} wide>
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 p-2.5 rounded-2xl border border-gray-200">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#eff6ff] p-2.5 rounded-2xl border border-[#e0edff]">
           <div className="flex items-center gap-2">
-            <ChefHat className="w-5 h-5 text-indigo-600" aria-hidden />
-            <span className="text-xs font-bold text-gray-800">
-              {tickets.filter((t) => t.status !== 'SERVED').length} active kitchen tickets
+            <ChefHat className="w-5 h-5 text-[#2941e0]" aria-hidden />
+            <span className="text-xs font-semibold text-[#273238] tabular-nums">
+              {activeCount} active kitchen {activeCount === 1 ? 'ticket' : 'tickets'}
             </span>
           </div>
-          <div className="flex gap-1.5">
+          <div role="group" aria-label="Kitchen ticket filter" className="flex gap-1.5">
             <button
               type="button"
               onClick={() => setFilter('ACTIVE')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              aria-pressed={filter === 'ACTIVE'}
+              className={`px-3 min-h-9 rounded-[8px] text-xs font-semibold transition tabular-nums ${
                 filter === 'ACTIVE'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  ? 'bg-[#2941e0] text-white'
+                  : 'bg-white text-[#273238] border border-[#788991] hover:bg-[#eff6ff]'
               }`}
             >
-              Active ({tickets.filter((t) => t.status !== 'SERVED').length})
+              Active ({activeCount})
             </button>
             <button
               type="button"
               onClick={() => setFilter('SERVED')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+              aria-pressed={filter === 'SERVED'}
+              className={`px-3 min-h-9 rounded-[8px] text-xs font-semibold transition tabular-nums ${
                 filter === 'SERVED'
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  ? 'bg-[#2941e0] text-white'
+                  : 'bg-white text-[#273238] border border-[#788991] hover:bg-[#eff6ff]'
               }`}
             >
-              Completed ({tickets.filter((t) => t.status === 'SERVED').length})
+              Completed ({servedCount})
             </button>
           </div>
         </div>
 
         {visible.length === 0 ? (
-          <div className="text-center py-12 text-gray-400 text-xs">
+          <div className="text-center py-12 text-[#616f75] text-sm">
             No {filter === 'ACTIVE' ? 'active' : 'completed'} kitchen tickets right now.
           </div>
         ) : (
@@ -159,73 +163,73 @@ export function KitchenDisplayModal({ onClose, notify }: {
               const ready = ticket.status === 'READY';
 
               return (
-                <div
+                <article
                   key={ticket.key}
-                  className={`rounded-2xl border p-3.5 flex flex-col justify-between gap-3 shadow-sm ${
+                  className={`rounded-2xl border p-3.5 flex flex-col justify-between gap-3 ${
                     ready
-                      ? 'bg-emerald-50/70 border-emerald-300'
+                      ? 'bg-emerald-50/80 border-emerald-700'
                       : urgent
-                        ? 'bg-red-50/70 border-red-300'
-                        : 'bg-white border-gray-200'
+                        ? 'bg-red-50/80 border-red-600'
+                        : 'bg-white border-[#e0edff]'
                   }`}
                 >
                   <div>
-                    <div className="flex items-start justify-between gap-2 border-b border-gray-200/80 pb-2 mb-2">
+                    <div className="flex items-start justify-between gap-2 border-b border-[#e0edff] pb-2.5 mb-2.5">
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-black text-sm text-gray-900">#{ticket.id}</span>
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase bg-blue-100 text-blue-800">
+                          <span className="font-display font-bold text-sm text-[#000000] tabular-nums">#{ticket.id}</span>
+                          <span className="px-2 py-0.5 rounded-[88px] text-[11px] font-semibold uppercase bg-[#eff6ff] text-[#2941e0]">
                             {ticket.orderType.replace('_', ' ')}
                           </span>
                           {ticket.tableNumber && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800">
+                            <span className="px-2 py-0.5 rounded-[88px] text-[11px] font-semibold bg-[#000524] text-white">
                               Table {ticket.tableNumber}
                             </span>
                           )}
                           {ticket.source === 'held' && (
-                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800">
+                            <span className="px-2 py-0.5 rounded-[88px] text-[11px] font-semibold bg-amber-50 border border-amber-300 text-amber-900">
                               Running Tab
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-gray-500 mt-0.5">
+                        <p className="text-xs text-[#526066] mt-1">
                           Server: {ticket.serverUser} · {new Date(ticket.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-[88px] text-[11px] font-bold tabular-nums shrink-0 ${
                           urgent
                             ? 'bg-red-600 text-white'
                             : elapsedMin >= 8
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-gray-100 text-gray-700'
+                              ? 'bg-amber-50 border border-amber-300 text-amber-900'
+                              : 'bg-[#eff6ff] text-[#273238]'
                         }`}
                       >
-                        <Clock className="w-3 h-3" aria-hidden />
-                        {elapsedMin}m
+                        <Clock className="w-3.5 h-3.5" aria-hidden />
+                        {urgent ? `${elapsedMin}m+` : `${elapsedMin}m`}
                       </span>
                     </div>
 
-                    <ul className="space-y-1.5 text-xs">
+                    <ul className="space-y-1.5 text-sm">
                       {ticket.items.map((item, idx) => (
-                        <li key={`${item.id}-${idx}`} className="flex items-start gap-2 font-semibold text-gray-800">
-                          <span className="inline-flex items-center justify-center min-w-6 px-1.5 py-0.5 rounded bg-gray-900 text-white text-[11px] font-black tabular-nums">
+                        <li key={`${item.id}-${idx}`} className="flex items-start gap-2 font-medium text-[#000000]">
+                          <span className="inline-flex items-center justify-center min-w-7 px-1.5 py-0.5 rounded-[6px] bg-[#000524] text-white text-xs font-bold tabular-nums shrink-0">
                             {item.qty}×
                           </span>
                           <div className="min-w-0">
                             <div>{item.name}</div>
-                            {item.note && <div className="text-[10px] italic text-red-600">Note: {item.note}</div>}
+                            {item.note && <div className="text-xs italic text-red-700">Note: {item.note}</div>}
                           </div>
                         </li>
                       ))}
                     </ul>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200/70">
+                  <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-[#e0edff]">
                     <button
                       type="button"
                       onClick={() => printKot(ticket)}
-                      className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 inline-flex items-center gap-1"
+                      className="px-3 min-h-9 rounded-[8px] text-xs font-semibold border border-[#788991] bg-white hover:bg-[#eff6ff] text-[#273238] inline-flex items-center gap-1.5 transition"
                     >
                       <Printer className="w-3.5 h-3.5" aria-hidden /> KOT
                     </button>
@@ -235,7 +239,7 @@ export function KitchenDisplayModal({ onClose, notify }: {
                         <button
                           type="button"
                           onClick={() => updateStatus(ticket, 'READY')}
-                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-amber-500 hover:bg-amber-600 text-white inline-flex items-center gap-1"
+                          className="px-3 min-h-9 rounded-[8px] text-xs font-semibold bg-amber-700 hover:bg-amber-800 text-white inline-flex items-center gap-1.5 transition"
                         >
                           <Flame className="w-3.5 h-3.5" aria-hidden /> Mark Ready
                         </button>
@@ -244,7 +248,7 @@ export function KitchenDisplayModal({ onClose, notify }: {
                         <button
                           type="button"
                           onClick={() => updateStatus(ticket, 'SERVED')}
-                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white inline-flex items-center gap-1"
+                          className="px-3 min-h-9 rounded-[8px] text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white inline-flex items-center gap-1.5 transition"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" aria-hidden /> Bump / Served
                         </button>
@@ -252,14 +256,14 @@ export function KitchenDisplayModal({ onClose, notify }: {
                         <button
                           type="button"
                           onClick={() => updateStatus(ticket, 'PREPARING')}
-                          className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-gray-200 hover:bg-gray-300 text-gray-700"
+                          className="px-3 min-h-9 rounded-[8px] text-xs font-semibold border border-[#788991] bg-white hover:bg-[#eff6ff] text-[#273238] transition"
                         >
                           Recall
                         </button>
                       )}
                     </div>
                   </div>
-                </div>
+                </article>
               );
             })}
           </div>

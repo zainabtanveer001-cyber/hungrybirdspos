@@ -16,17 +16,19 @@ import type { Sale, UserRole } from '../lib/db/types';
 
 const VISIBLE = 20;
 
-export function SalesHistoryModal({ role, username, onClose, onReopen, notify }: {
+export function SalesHistoryModal({ role, username, onClose, onReopen, notify, hasCartItems = false }: {
   role: UserRole;
   username: string;
   onClose: () => void;
   onReopen: (sale: Sale) => void;
   notify: (message: string) => void;
+  hasCartItems?: boolean;
 }) {
   const sales = useLive(() => db.sales.toArray(), []) ?? [];
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [confirming, setConfirming] = useState<number | null>(null);
+  const [confirmReopen, setConfirmReopen] = useState<number | null>(null);
   const [returnStock, setReturnStock] = useState(true);
   const [pinFor, setPinFor] = useState<(() => void) | null>(null);
   const [refundFor, setRefundFor] = useState<Sale | null>(null);
@@ -143,20 +145,20 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" aria-hidden />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#526066]" aria-hidden />
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search order #, customer or item..."
                 aria-label="Search sales"
-                className="w-full pl-10 pr-4 py-2.5 text-sm ring-1 ring-gray-200 rounded-2xl bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                className="w-full pl-10 pr-4 h-10 text-sm border border-[#788991] rounded-[10px] bg-white text-[#000000] placeholder:text-[#616f75] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0]"
               />
             </div>
             <button
               type="button"
               onClick={exportCsv}
-              className="shrink-0 px-3 py-2.5 text-xs font-bold rounded-2xl bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 flex items-center gap-1.5"
+              className="shrink-0 px-3.5 h-10 text-xs font-semibold rounded-[8px] bg-white text-[#273238] border border-[#788991] hover:bg-[#eff6ff] hover:border-[#2941e0] flex items-center gap-1.5 transition"
               title="Download all orders as a spreadsheet"
             >
               <Download className="w-3.5 h-3.5" aria-hidden /> CSV
@@ -165,12 +167,12 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
 
           {canVoid && visible.length > 0 && (
             <div className="flex items-center gap-3 text-xs">
-              <label className="flex items-center gap-1.5 font-bold text-gray-600">
+              <label className="flex items-center gap-2 font-semibold text-[#273238]">
                 <input
                   type="checkbox"
                   checked={selected.size === visible.length}
                   onChange={(e) => setSelected(e.target.checked ? new Set(visible.map((s) => s.id!)) : new Set())}
-                  className="rounded accent-indigo-600"
+                  className="rounded accent-[#2941e0] w-4 h-4"
                 />
                 Select all
               </label>
@@ -178,7 +180,7 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
                 <button
                   type="button"
                   onClick={() => requestVoid([...selected])}
-                  className="ml-auto bg-red-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-red-700 flex items-center gap-1"
+                  className="ml-auto bg-red-600 text-white font-semibold px-3 min-h-9 rounded-[8px] hover:bg-red-700 flex items-center gap-1.5 transition"
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden /> Void {selected.size}
                 </button>
@@ -187,121 +189,147 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify }:
           )}
 
           {visible.length === 0 ? (
-            <p className="text-gray-400 text-xs text-center py-6">No matching sales.</p>
+            <p className="text-[#616f75] text-sm text-center py-8">No matching sales.</p>
           ) : (
-            <div className="space-y-2 max-h-[55vh] overflow-y-auto custom-scrollbar pr-1">
+            <div className="space-y-2.5 max-h-[55vh] overflow-y-auto custom-scrollbar pr-1">
               {visible.map((sale) => (
-                <article key={sale.id} className="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-2">
+                <article key={sale.id} className="p-3.5 bg-[#f8fafd] border border-[#e0edff] rounded-2xl space-y-2.5">
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex items-start gap-2 min-w-0">
+                    <div className="flex items-start gap-2.5 min-w-0">
                       {canVoid && (
                         <input
                           type="checkbox"
                           checked={selected.has(sale.id!)}
                           onChange={() => toggle(sale.id!)}
                           aria-label={`Select order ${sale.id}`}
-                          className="mt-0.5 rounded accent-indigo-600"
+                          className="mt-1 rounded accent-[#2941e0] w-4 h-4"
                         />
                       )}
                       <div className="min-w-0">
-                        <p className="font-bold text-xs text-gray-800">
-                          Order #{sale.id}
-                          <span className="ml-1 text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
-                            {sale.orderType}
+                        <p className="font-semibold text-sm text-[#000000] flex flex-wrap items-center gap-1.5">
+                          <span className="tabular-nums">Order #{sale.id}</span>
+                          <span className="text-[11px] text-[#2941e0] font-semibold bg-[#eff6ff] px-2 py-0.5 rounded-[88px]">
+                            {sale.orderType.replace('_', ' ')}
                           </span>
                           {!!sale.discountPercent && (
-                            <span className="ml-1 text-[10px] text-red-500 font-bold">-{sale.discountPercent}%</span>
+                            <span className="text-[11px] text-red-700 font-semibold tabular-nums">-{sale.discountPercent}%</span>
                           )}
                           {sale.refundStatus && (
-                            <span className="ml-1 text-[10px] text-orange-700 font-bold bg-orange-50 px-1.5 py-0.5 rounded">
+                            <span className="text-[11px] text-amber-900 font-semibold bg-amber-50 border border-amber-300 px-2 py-0.5 rounded-[88px] tabular-nums">
                               {sale.refundStatus === 'FULL'
                                 ? `Refunded ${formatAmount(sale.refundedAmount ?? 0)}`
                                 : `Part refunded (${formatAmount(sale.refundedAmount ?? 0)})`}
                             </span>
                           )}
                         </p>
-                        <p className="text-[10px] text-gray-500">
-                          By: {sale.serverUser || 'Staff'} • {new Date(sale.timestamp).toLocaleString()}
+                        <p className="text-xs text-[#526066] mt-0.5">
+                          By: {sale.serverUser || 'Staff'} · {new Date(sale.timestamp).toLocaleString()}
                         </p>
-                        <p className="text-[10px] text-gray-500 truncate">
+                        <p className="text-xs text-[#526066] truncate mt-0.5">
                           {sale.items.map((i) => `${i.name} ×${i.qty}`).join(', ')}
                         </p>
                       </div>
                     </div>
-                    <p className="font-bold text-emerald-700 text-xs shrink-0">{formatAmount(sale.total)}</p>
+                    <p className="font-display font-bold text-emerald-800 text-sm shrink-0 tabular-nums">{formatAmount(sale.total)}</p>
                   </div>
 
                   {confirming === sale.id ? (
-                    <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t border-gray-200">
-                      <label className="flex items-center gap-1.5 text-[11px] font-bold text-gray-600 mr-auto">
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#e0edff]">
+                      <label className="flex items-center gap-2 text-xs font-medium text-[#273238] mr-auto">
                         <input
                           type="checkbox"
                           checked={returnStock}
                           onChange={(e) => setReturnStock(e.target.checked)}
-                          className="rounded accent-emerald-600"
+                          className="rounded accent-emerald-700 w-4 h-4"
                         />
                         Return ingredients to stock
                       </label>
                       <button
                         type="button"
                         onClick={() => requestVoid([sale.id!])}
-                        className="text-[10px] bg-red-600 text-white font-bold px-2.5 py-1.5 rounded"
+                        className="text-xs bg-red-600 hover:bg-red-700 text-white font-semibold px-3 min-h-9 rounded-[8px] transition"
                       >
                         Confirm void
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirming(null)}
-                        className="text-[10px] bg-gray-100 text-gray-700 font-bold px-2.5 py-1.5 rounded"
+                        className="text-xs bg-white border border-[#788991] text-[#273238] hover:bg-[#eff6ff] font-semibold px-3 min-h-9 rounded-[8px] transition"
                       >
                         Cancel
                       </button>
                     </div>
+                  ) : confirmReopen === sale.id ? (
+                    <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-[#e0edff]">
+                      <span className="text-xs font-semibold text-[#273238] mr-auto">
+                        Your cart is not empty. Overwrite it with Order #{sale.id}?
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmReopen(null)}
+                        className="text-xs bg-white border border-[#788991] text-[#273238] hover:bg-[#eff6ff] font-semibold px-3 min-h-9 rounded-[8px] transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmReopen(null);
+                          withOwnerPin(() => onReopen(sale));
+                        }}
+                        className="text-xs bg-amber-700 hover:bg-amber-800 text-white font-semibold px-3 min-h-9 rounded-[8px] transition"
+                      >
+                        Overwrite &amp; Edit
+                      </button>
+                    </div>
                   ) : (
-                    <div className="flex flex-wrap items-center justify-end gap-1.5 pt-1 border-t border-gray-200">
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 pt-2 border-t border-[#e0edff]">
                       <button
                         type="button"
                         onClick={() => print(sale)}
-                        className="text-[10px] bg-gray-100 text-gray-700 hover:bg-gray-200 font-bold px-2 py-1 rounded flex items-center gap-1 mr-auto"
+                        className="text-xs bg-white border border-[#788991] text-[#273238] hover:bg-[#eff6ff] font-semibold px-2.5 min-h-9 rounded-[8px] flex items-center gap-1 mr-auto transition"
                         title="Print this receipt"
                       >
-                        <Printer className="w-3 h-3" aria-hidden /> Print
+                        <Printer className="w-3.5 h-3.5" aria-hidden /> Print
                       </button>
                       <button
                         type="button"
                         onClick={() => share(sale)}
-                        className="text-[10px] bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-2 py-1 rounded flex items-center gap-1"
+                        className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-semibold px-2.5 min-h-9 rounded-[8px] flex items-center gap-1 transition"
                         title="Send the receipt on WhatsApp"
                       >
-                        <Share2 className="w-3 h-3" aria-hidden /> Share
+                        <Share2 className="w-3.5 h-3.5" aria-hidden /> Share
                       </button>
                       {canVoid && (
                         <button
                           type="button"
-                          onClick={() => withOwnerPin(() => onReopen(sale))}
-                          className="text-[10px] bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold px-2 py-1 rounded flex items-center gap-1"
+                          onClick={() => {
+                            if (hasCartItems) setConfirmReopen(sale.id!);
+                            else withOwnerPin(() => onReopen(sale));
+                          }}
+                          className="text-xs bg-amber-50 border border-amber-300 text-amber-900 hover:bg-amber-100 font-semibold px-2.5 min-h-9 rounded-[8px] flex items-center gap-1 transition"
                           title="Re-open into the cart for editing"
                         >
-                          <Pencil className="w-3 h-3" aria-hidden /> Edit
+                          <Pencil className="w-3.5 h-3.5" aria-hidden /> Edit
                         </button>
                       )}
                       {canRefund && refundableTotal(sale) > 0 && (
                         <button
                           type="button"
                           onClick={() => withOwnerPin(() => setRefundFor(sale), 'Refunding a completed sale needs owner authorization.')}
-                          className="text-[10px] bg-orange-50 text-orange-700 hover:bg-orange-100 font-bold px-2 py-1 rounded flex items-center gap-1"
+                          className="text-xs bg-[#eff6ff] border border-[#e0edff] text-[#2941e0] hover:bg-[#e0edff] font-semibold px-2.5 min-h-9 rounded-[8px] flex items-center gap-1 transition"
                           title="Refund items from this order"
                         >
-                          <RotateCcw className="w-3 h-3" aria-hidden /> Refund
+                          <RotateCcw className="w-3.5 h-3.5" aria-hidden /> Refund
                         </button>
                       )}
                       {canVoid && (
                         <button
                           type="button"
                           onClick={() => setConfirming(sale.id!)}
-                          className="text-[10px] bg-red-50 text-red-600 hover:bg-red-100 font-bold px-2 py-1 rounded flex items-center gap-1"
+                          className="text-xs bg-red-50 border border-red-200 text-red-700 hover:bg-red-100 font-semibold px-2.5 min-h-9 rounded-[8px] flex items-center gap-1 transition"
                         >
-                          <RotateCcw className="w-3 h-3" aria-hidden /> Void
+                          <Trash2 className="w-3.5 h-3.5" aria-hidden /> Void
                         </button>
                       )}
                     </div>

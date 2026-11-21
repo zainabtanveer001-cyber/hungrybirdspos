@@ -652,6 +652,7 @@ function App() {
         <OnlineOrdersModal
           username={session.username}
           notify={notify}
+          hasCartItems={cart.length > 0}
           onClose={() => setOnlineOrdersOpen(false)}
           onAccept={(items, order) => {
             setCart(items);
@@ -702,9 +703,9 @@ function App() {
           role={session.role}
           username={session.username}
           notify={notify}
+          hasCartItems={cart.length > 0}
           onClose={() => setSalesOpen(false)}
           onReopen={async (sale: Sale) => {
-            if (cart.length && !window.confirm('Your cart is not empty. Re-open this order and overwrite it?')) return;
             await reopenSale(sale, session.username);
             setCart(sale.items);
             setCharges({

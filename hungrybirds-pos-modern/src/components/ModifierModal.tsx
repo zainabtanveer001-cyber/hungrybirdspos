@@ -49,11 +49,19 @@ export function ModifierModal({ item, onCancel, onAdd, notify }: {
       title={`Customize: ${item.name}`}
       onClose={onCancel}
       footer={
-        <div className="flex gap-3">
-          <button type="button" onClick={onCancel} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">
+        <div className="flex gap-2.5">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 h-11 rounded-[8px] font-medium border border-[#788991] bg-white text-[#000000] hover:bg-[#eff6ff] transition text-sm"
+          >
             Cancel
           </button>
-          <button type="button" onClick={confirm} className="flex-1 py-3 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600">
+          <button
+            type="button"
+            onClick={confirm}
+            className="flex-[2] h-11 rounded-[8px] font-semibold bg-emerald-700 text-white hover:bg-emerald-800 transition text-sm tabular-nums"
+          >
             Add — {formatAmount(total)}
           </button>
         </div>
@@ -61,28 +69,32 @@ export function ModifierModal({ item, onCancel, onAdd, notify }: {
     >
       <div className="space-y-4">
         {groups.map((group) => (
-          <fieldset key={group.id} className="space-y-1.5">
-            <legend className="text-xs font-bold text-gray-700 mb-1">
-              {group.name} {group.required && <span className="text-red-500">*</span>}
+          <fieldset key={group.id} className="space-y-2">
+            <legend className="text-xs font-semibold text-[#273238] mb-1.5">
+              {group.name} {group.required && <span className="text-red-700">*</span>}
             </legend>
             {group.options.map((option, index) => {
               const checked = (picked[group.id] ?? []).includes(index);
               return (
                 <label
                   key={option.name}
-                  className="flex items-center justify-between gap-2 p-2 border border-gray-200 rounded-lg text-xs bg-gray-50 cursor-pointer hover:bg-white"
+                  className={`flex items-center justify-between gap-2 px-3 min-h-10 border rounded-[10px] text-sm cursor-pointer transition ${
+                    checked
+                      ? 'border-[#2941e0] bg-[#eff6ff] text-[#000000]'
+                      : 'border-[#e0edff] bg-[#f8fafd] text-[#273238] hover:bg-white'
+                  }`}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2.5">
                     <input
                       type={group.multiple ? 'checkbox' : 'radio'}
                       name={`modgroup_${group.id}`}
                       checked={checked}
                       onChange={() => toggle(group.id, index, !!group.multiple)}
-                      className="accent-indigo-600"
+                      className="accent-[#2941e0] w-4 h-4"
                     />
-                    {option.name}
+                    <span>{option.name}</span>
                   </span>
-                  <span className={`font-bold ${option.price >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                  <span className={`font-semibold tabular-nums text-xs ${option.price >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
                     {option.price >= 0 ? '+' : ''}
                     {formatAmount(option.price)}
                   </span>
