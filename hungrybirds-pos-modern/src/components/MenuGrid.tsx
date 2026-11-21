@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Plus, Search } from 'lucide-react';
+import { Check, Plus, Search, X } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
@@ -47,15 +47,26 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
     <div className="space-y-4">
       <div className="bg-white p-4 rounded-2xl border border-[#e0edff]">
         <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#616f75]" aria-hidden />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#526066]" aria-hidden />
           <input
             id="posMenuSearchInput"
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search menu items... (Press / to focus)"
-            className="w-full pl-10 pr-4 h-10 text-sm text-[#000000] border border-[#b4c4cc] rounded-[10px] bg-white focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] transition-all"
+            aria-label="Search menu items"
+            className="w-full pl-10 pr-10 h-10 text-sm text-[#000000] placeholder:text-[#616f75] border border-[#788991] rounded-[10px] bg-white focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] transition-all"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Clear menu search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-[8px] flex items-center justify-center text-[#526066] hover:bg-[#eff6ff] hover:text-[#2941e0] transition-colors"
+            >
+              <X className="w-4 h-4" aria-hidden />
+            </button>
+          )}
         </div>
       </div>
 
@@ -63,7 +74,7 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
         <h3 className="font-display text-xs font-medium uppercase tracking-normal text-[#526066] mb-3">
           Menu Categories
         </h3>
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" role="tablist" aria-label="Menu categories">
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" role="group" aria-label="Menu categories">
           <CategoryButton
             label="All Items"
             count={menu.length}
@@ -84,18 +95,29 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
 
       <div className="bg-white p-4 rounded-2xl border border-[#e0edff]">
         {grouped.length === 0 ? (
-          <p className="text-center text-[#616f75] py-6 text-sm">
-            {search.trim()
-              ? `No items match "${search.trim()}".`
-              : 'No dishes available. Add some in Owner Admin.'}
-          </p>
+          <div className="text-center py-6 space-y-2.5">
+            <p className="text-[#616f75] text-sm">
+              {search.trim()
+                ? `No items match "${search.trim()}".`
+                : 'No dishes available. Add some in Admin Settings.'}
+            </p>
+            {search.trim() && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="px-4 h-9 rounded-[8px] border border-[#788991] bg-white text-xs font-medium text-[#273238] hover:bg-[#eff6ff] hover:text-[#2941e0] transition"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
         ) : (
           <div className="space-y-5">
             {grouped.map((group) => (
               <section key={group.category.id}>
                 <h4 className="font-display text-base font-medium text-[#273238] mb-2.5 flex items-center gap-2">
                   <span>{group.category.name}</span>
-                  <span className="text-xs font-normal text-[#2941e0] bg-[#eff6ff] px-2.5 py-0.5 rounded-[88px]">
+                  <span className="text-xs font-medium text-[#2941e0] bg-[#eff6ff] px-2.5 py-0.5 rounded-[88px] tabular-nums">
                     {group.items.length}
                   </span>
                 </h4>
@@ -111,7 +133,7 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                         title={`Add ${item.name} to the order`}
                         className={`menu-item-card relative w-full text-left rounded-2xl border bg-white overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-[#2941e0] ${
                           justAdded
-                            ? '!border-emerald-500 ring-2 ring-emerald-400/70 animate-cart-pop'
+                            ? '!border-emerald-700 ring-2 ring-emerald-700/35 animate-cart-pop'
                             : inCartQty > 0
                               ? '!border-[#2941e0] ring-1 ring-[#2941e0]/30'
                               : 'border-[#e0edff]'
@@ -120,7 +142,7 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                         {justAdded && (
                           <span
                             role="status"
-                            className="absolute top-2 left-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-sm"
+                            className="absolute top-2 left-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[11px] font-bold shadow-sm"
                           >
                             <Check className="w-3 h-3" aria-hidden /> Added
                           </span>
@@ -128,8 +150,8 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                         {inCartQty > 0 && (
                           <span
                             aria-label={`${inCartQty} in cart`}
-                            className={`absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm tabular-nums ${
-                              justAdded ? 'bg-emerald-600 text-white' : 'bg-[#2941e0] text-white'
+                            className={`absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm tabular-nums ${
+                              justAdded ? 'bg-emerald-700 text-white' : 'bg-[#2941e0] text-white'
                             }`}
                           >
                             ×{inCartQty} in cart
@@ -154,9 +176,9 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                           <div className="flex items-center justify-between gap-2 mt-2">
                             <p className="text-[#2941e0] font-semibold text-sm tabular-nums">{formatAmount(item.price)}</p>
                             <span
-                              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors ${
+                              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors ${
                                 justAdded
-                                  ? 'bg-emerald-100 text-emerald-700'
+                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                                   : inCartQty > 0
                                     ? 'bg-[#2941e0] text-white'
                                     : 'bg-[#eff6ff] text-[#2941e0]'
@@ -191,16 +213,16 @@ function CategoryButton({ label, count, active, onClick }: {
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`px-4 h-9 rounded-[8px] text-sm whitespace-nowrap font-medium border transition-all duration-150 flex items-center gap-1.5 ${
+      className={`px-4 h-10 rounded-[8px] text-sm whitespace-nowrap font-medium border transition-all duration-150 flex items-center gap-1.5 ${
         active
           ? 'bg-[#2941e0] text-white border-[#2941e0]'
-          : 'bg-white text-[#273238] border-[#b4c4cc] hover:bg-[#eff6ff] hover:text-[#2941e0] hover:border-[#c5b9fa]'
+          : 'bg-white text-[#273238] border-[#788991] hover:bg-[#eff6ff] hover:text-[#2941e0] hover:border-[#2941e0]'
       }`}
     >
       <span>{label}</span>
       {count > 0 && (
         <span
-          className={`text-xs px-2 py-0.5 rounded-[88px] font-mono ${
+          className={`text-xs px-2 py-0.5 rounded-[88px] font-mono tabular-nums ${
             active ? 'bg-white/20 text-white' : 'bg-[#eff6ff] text-[#2941e0]'
           }`}
         >

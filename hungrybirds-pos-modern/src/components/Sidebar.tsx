@@ -115,7 +115,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
               if (window.matchMedia('(min-width: 1024px)').matches) setCollapsed((c) => !c);
               else onClose();
             }}
-            className="w-9 h-9 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] hover:text-[#2941e0] text-[#273238] flex items-center justify-center transition"
+            className="w-9 h-9 rounded-[8px] border border-[#788991] bg-white hover:bg-[#eff6ff] hover:text-[#2941e0] text-[#273238] flex items-center justify-center transition"
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -129,7 +129,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
             return (
               <div key={group.title}>
                 {!collapsed && (
-                  <p className="px-3 mb-1 text-xs font-medium text-[#616f75]">
+                  <p className="px-3 mb-1 text-xs font-medium text-[#526066]">
                     {group.title}
                   </p>
                 )}
@@ -143,7 +143,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                     }}
                     title={collapsed ? item.label : undefined}
                     aria-label={collapsed ? (item.badge ? `${item.label} (${item.badge})` : item.label) : undefined}
-                    className={`relative w-full rounded-[8px] px-3 py-2 text-left text-sm font-normal flex items-center gap-3 text-[#000000] hover:bg-[#eff6ff] hover:text-[#2941e0] transition-colors ${
+                    className={`relative w-full min-h-10 rounded-[8px] px-3 py-2 text-left text-sm font-normal flex items-center gap-3 text-[#000000] hover:bg-[#eff6ff] hover:text-[#2941e0] transition-colors ${
                       collapsed ? 'justify-center' : ''
                     } ${
                       item.label === 'Online orders' && item.badge && item.badge > 0
@@ -154,7 +154,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                     <item.icon
                       className={`w-4 h-4 shrink-0 ${
                         item.label === 'Online orders' && item.badge && item.badge > 0
-                          ? 'text-[#795afa]'
+                          ? 'text-[#5b3ee0]'
                           : 'text-[#526066]'
                       }`}
                       aria-hidden
@@ -162,9 +162,9 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                     {!collapsed && <span className="truncate">{item.label}</span>}
                     {collapsed && !!item.badge && (
                       <span
-                        className={`absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center ${
+                        className={`absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full text-[11px] font-bold leading-none flex items-center justify-center tabular-nums ${
                           item.label === 'Online orders'
-                            ? 'bg-[#795afa] text-white animate-pulse'
+                            ? 'bg-[#5b3ee0] text-white animate-pulse'
                             : 'bg-[#2941e0] text-white'
                         }`}
                       >
@@ -173,9 +173,9 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                     )}
                     {!collapsed && !!item.badge && (
                       <span
-                        className={`ml-auto rounded-[88px] px-2.5 py-0.5 text-xs font-medium ${
+                        className={`ml-auto rounded-[88px] px-2.5 py-0.5 text-xs font-semibold tabular-nums ${
                           item.label === 'Online orders' && item.badge > 0
-                            ? 'bg-[#795afa] text-white animate-pulse ring-2 ring-[#c5b9fa]'
+                            ? 'bg-[#5b3ee0] text-white animate-pulse ring-2 ring-[#c5b9fa]'
                             : 'bg-[#eff6ff] text-[#2941e0]'
                         }`}
                       >
@@ -201,7 +201,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                 onSignOut();
                 if (!window.matchMedia('(min-width: 1024px)').matches) onClose();
               }}
-              className="mt-2.5 w-full h-9 rounded-[8px] bg-white/10 hover:bg-red-500/30 border border-[#795afa]/50 hover:border-red-400 text-white text-xs font-medium flex items-center justify-center gap-2 transition"
+              className="mt-2.5 w-full h-10 rounded-[8px] bg-white/10 hover:bg-red-600/35 border border-[#c5b9fa]/50 hover:border-red-300 text-white text-xs font-medium flex items-center justify-center gap-2 transition"
             >
               <LogOut className="w-3.5 h-3.5" aria-hidden /> Logout
             </button>
@@ -212,7 +212,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
             onClick={onSignOut}
             title="Logout"
             aria-label="Logout"
-            className="mx-auto mt-4 w-10 h-10 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-red-50 text-[#000000] hover:text-red-600 flex items-center justify-center transition"
+            className="mx-auto mt-4 w-10 h-10 rounded-[8px] border border-[#788991] bg-white hover:bg-red-50 text-[#000000] hover:text-red-700 flex items-center justify-center transition"
           >
             <LogOut className="w-4 h-4" aria-hidden />
           </button>

@@ -322,21 +322,27 @@ function App() {
             type="button"
             onClick={() => setNavOpen(true)}
             aria-label="Open navigation"
-            className="relative lg:hidden w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
+            className="relative lg:hidden w-9 h-9 shrink-0 rounded-[8px] border border-[#788991] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
           >
             <Menu className="w-4 h-4" aria-hidden />
             {pendingOnlineCount > 0 && (
               <span
                 aria-hidden
-                className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#795afa] ring-2 ring-white animate-pulse"
+                className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#5b3ee0] ring-2 ring-white animate-pulse"
               />
             )}
           </button>
           <h1 className="font-display text-sm sm:text-xl font-medium tracking-normal flex items-center gap-1.5 sm:gap-2.5 min-w-0">
-            <img src="/logo.svg" alt="" className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />
-            <span className="text-[#000000] truncate">Hungry Birds</span>
+            <img src="/logo.svg" alt="" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
+            <span
+              className={`text-[#000000] truncate ${
+                pendingOnlineCount > 0 ? 'sr-only sm:not-sr-only' : ''
+              }`}
+            >
+              Hungry Birds
+            </span>
           </h1>
-          <span className="hidden sm:inline-flex text-xs px-3 py-1 rounded-[88px] bg-[#eff6ff] font-medium text-[#2941e0] shrink-0">
+          <span className="hidden sm:inline-flex text-xs px-3 py-1 rounded-[88px] bg-[#eff6ff] font-semibold text-[#2941e0] shrink-0">
             {session.role}
           </span>
         </div>
@@ -354,9 +360,9 @@ function App() {
                 ? `Online orders (${pendingOnlineCount} pending)`
                 : 'Online orders'
             }
-            className={`relative px-2.5 sm:px-3.5 h-8 sm:h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1.5 shrink-0 ${
+            className={`relative px-2.5 sm:px-3.5 h-9 rounded-[8px] text-xs font-semibold transition flex items-center gap-1.5 shrink-0 ${
               pendingOnlineCount > 0
-                ? `bg-[#795afa] hover:bg-[#6646e8] text-white shadow-sm ${
+                ? `bg-[#5b3ee0] hover:bg-[#4c31c9] text-white shadow-sm ${
                     onlineOrderPulse ? 'ring-2 ring-[#c5b9fa] animate-pulse' : ''
                   }`
                 : 'bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0]'
@@ -370,7 +376,7 @@ function App() {
                 </span>
                 <BellRing className="w-4 h-4 shrink-0" aria-hidden />
                 <span className="hidden sm:inline">Online</span>
-                <span className="px-1.5 py-0.5 rounded-full bg-white text-[#795afa] text-[10px] font-bold leading-none tabular-nums">
+                <span className="px-1.5 py-0.5 rounded-full bg-white text-[#5b3ee0] text-[11px] font-bold leading-none tabular-nums">
                   {pendingOnlineCount}
                 </span>
               </>
@@ -385,7 +391,7 @@ function App() {
             type="button"
             onClick={() => setKdsOpen(true)}
             title="Open Kitchen Display System (F8)"
-            className="bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] px-2.5 sm:px-3.5 h-8 sm:h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1 sm:gap-1.5 shrink-0"
+            className="bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] px-2.5 sm:px-3.5 h-9 rounded-[8px] text-xs font-semibold transition flex items-center gap-1 sm:gap-1.5 shrink-0"
           >
             <ChefHat className="w-4 h-4 shrink-0" aria-hidden /> <span>KDS</span>
           </button>
@@ -400,9 +406,10 @@ function App() {
               setSession(null);
               setCart([]);
             }}
-            className="bg-white hover:bg-red-50 text-[#000000] hover:text-red-600 border border-[#b4c4cc] px-2.5 sm:px-4 h-8 sm:h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1 sm:gap-1.5 shrink-0"
+            aria-label="Logout"
+            className="bg-white hover:bg-red-50 text-[#000000] hover:text-red-700 border border-[#788991] px-2.5 sm:px-4 h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1 sm:gap-1.5 shrink-0"
           >
-            <LogOut className="w-3.5 h-3.5 shrink-0" /> <span>Logout</span>
+            <LogOut className="w-3.5 h-3.5 shrink-0" aria-hidden /> <span className="hidden min-[360px]:inline">Logout</span>
           </button>
         </div>
       </header>
@@ -441,14 +448,14 @@ function App() {
             <div
               role="status"
               aria-live="polite"
-              className={`lg:col-span-3 rounded-2xl bg-[#000524] border border-[#795afa] px-4 py-3 text-white flex flex-wrap items-center justify-between gap-3 shadow-lg ${
+              className={`lg:col-span-3 rounded-2xl bg-[#000524] border border-[#5b3ee0] px-4 py-3 text-white flex flex-wrap items-center justify-between gap-3 shadow-lg ${
                 onlineOrderPulse ? 'ring-2 ring-[#c5b9fa]' : ''
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c5b9fa] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#795afa]" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#5b3ee0]" />
                 </span>
                 <BellRing className="w-4 h-4 text-[#c5b9fa] shrink-0" aria-hidden />
                 <p className="text-xs sm:text-sm font-medium">
@@ -461,7 +468,7 @@ function App() {
               <button
                 type="button"
                 onClick={() => setOnlineOrdersOpen(true)}
-                className="px-3.5 h-8 rounded-[8px] bg-[#795afa] hover:bg-[#6646e8] text-white text-xs font-semibold transition shrink-0"
+                className="px-4 h-9 rounded-[8px] bg-[#5b3ee0] hover:bg-[#4c31c9] text-white text-xs font-semibold transition shrink-0"
               >
                 View &amp; Accept
               </button>
@@ -561,14 +568,14 @@ function App() {
               <button
                 type="button"
                 onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
-                className="px-3 h-9 rounded-[8px] border border-[#c5b9fa]/50 text-xs font-medium text-white hover:bg-white/10"
+                className="px-3 h-10 rounded-[8px] border border-[#c5b9fa]/60 text-xs font-medium text-white hover:bg-white/10 transition"
               >
                 View Order
               </button>
               <button
                 type="button"
                 onClick={() => void startCheckout()}
-                className="px-4 h-9 rounded-[8px] bg-[#2941e0] hover:bg-[#1f35c4] text-xs font-medium text-white"
+                className="px-4 h-10 rounded-[8px] bg-[#2941e0] hover:bg-[#1f35c4] text-xs font-semibold text-white transition"
               >
                 Checkout
               </button>
@@ -733,7 +740,7 @@ function App() {
         <div
           role="status"
           aria-live="polite"
-          className={`fixed right-4 z-[100] bg-[#000524] border border-[#795afa] text-white text-sm font-medium px-4 py-3 rounded-[10px] shadow-xl ${
+          className={`fixed right-4 z-[100] max-w-[calc(100vw-2rem)] bg-[#000524] border border-[#5b3ee0] text-white text-sm font-medium px-4 py-3 rounded-[10px] shadow-xl ${
             cart.length > 0 ? 'bottom-20 lg:bottom-4' : 'bottom-4'
           }`}
         >
@@ -749,8 +756,8 @@ function SyncBadge() {
 
   if (status.state === 'off') {
     return (
-      <span className="flex items-center gap-1 text-[10px] font-medium text-[#616f75] shrink-0" title="Sign in with a cloud account to sync across devices">
-        <CloudOff className="w-3.5 h-3.5 shrink-0" /> <span className="hidden sm:inline">Local only</span>
+      <span className="flex items-center gap-1 text-xs font-medium text-[#526066] shrink-0" title="Sign in with a cloud account to sync across devices">
+        <CloudOff className="w-3.5 h-3.5 shrink-0" aria-hidden /> <span className="hidden sm:inline">Local only</span>
       </span>
     );
   }
@@ -760,11 +767,11 @@ function SyncBadge() {
       type="button"
       onClick={() => void syncNow()}
       title={error ? `Sync error: ${status.error}` : status.lastSync ? `Last synced ${new Date(status.lastSync).toLocaleTimeString()}` : 'Syncing'}
-      className={`flex items-center gap-1 text-[10px] font-bold px-2 sm:px-3 h-8 sm:h-9 rounded-lg border shrink-0 ${
-        error ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+      className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 h-9 rounded-[8px] border shrink-0 transition ${
+        error ? 'text-red-700 bg-red-50 border-red-300 hover:bg-red-100' : 'text-emerald-800 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
       }`}
     >
-      <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${status.state === 'syncing' ? 'animate-spin' : ''}`} />
+      <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${status.state === 'syncing' ? 'animate-spin' : ''}`} aria-hidden />
       <span className="hidden sm:inline">{error ? 'Sync issue' : status.state === 'syncing' ? 'Syncing' : 'Synced'}</span>
     </button>
   );
@@ -773,17 +780,17 @@ function SyncBadge() {
 function RecentSales() {
   const sales = useLive(() => db.sales.orderBy('timestamp').reverse().limit(8).toArray(), []);
 
-  if (!sales?.length) return <p className="text-xs text-gray-400 py-4 text-center">No sales yet.</p>;
+  if (!sales?.length) return <p className="text-xs text-[#616f75] py-4 text-center">No sales recorded yet.</p>;
 
   return (
     <ul className="space-y-2 text-xs max-h-[420px] overflow-y-auto custom-scrollbar">
       {sales.map((sale) => (
-        <li key={sale.id} className="flex justify-between items-center gap-2 p-2 rounded-lg bg-gray-50">
-          <span className="text-gray-500 tabular-nums">
+        <li key={sale.id} className="flex justify-between items-center gap-2 p-2.5 rounded-[10px] bg-[#f8fafd] border border-[#e0edff]">
+          <span className="text-[#526066] tabular-nums">
             #{sale.id} · {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             {sale.tableNumber ? ` · ${sale.tableNumber}` : ''}
           </span>
-          <span className="font-bold text-gray-800">{formatAmount(sale.total)}</span>
+          <span className="font-semibold text-[#000000] tabular-nums">{formatAmount(sale.total)}</span>
         </li>
       ))}
     </ul>

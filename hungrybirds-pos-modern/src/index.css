@@ -2,23 +2,48 @@
 @config "../tailwind.config.js";
 
 :root {
-  /* Fellow DESIGN.md Tokens */
+  /* Design System Tokens (docs/DESIGN.md — WCAG 2.2 AA verified) */
+  --surface-canvas: #f8fafd;
+  --surface-card: #ffffff;
+  --surface-tint: #eff6ff;
+  --surface-navy: #000524;
+  --border-subtle: #e0edff;
+  --border-hairline: #d4d4d8;
+  --border-control: #788991;
+  --ink-primary: #000000;
+  --ink-strong: #273238;
+  --ink-secondary: #526066;
+  --ink-muted: #616f75;
+  --accent-primary: #2941e0;
+  --accent-primary-hover: #1f35c4;
+  --accent-alert: #5b3ee0;
+  --accent-alert-soft: #c5b9fa;
+  --status-success: #047857;
+  --status-success-bg: #ecfdf5;
+  --status-warning: #b45309;
+  --status-warning-ink: #92400e;
+  --status-warning-bg: #fffbeb;
+  --status-danger: #dc2626;
+  --status-danger-ink: #b91c1c;
+  --status-danger-bg: #fef2f2;
+
+  /* Fellow DESIGN.md Tokens (preserved for backwards compatibility) */
   --fellow-primary: #2941e0;
-  --fellow-primary-violet: #795afa;
+  --fellow-primary-violet: #5b3ee0;
   --fellow-primary-violet-light: #c5b9fa;
   --fellow-primary-indigo: #742afb;
   --fellow-hero-canvas: #000524;
   --fellow-canvas: #ffffff;
   --fellow-surface-1: #e0edff;
   --fellow-surface-2: #eff6ff;
-  --fellow-hairline: #b4c4cc;
+  --fellow-hairline: #788991;
   --fellow-hairline-light: #d4d4d8;
   --fellow-ink: #000000;
   --fellow-ink-muted: #273238;
   --fellow-ink-subtle: #526066;
   --fellow-ink-faint: #616f75;
   --fellow-gold: #f7ba02;
-  --fellow-success: #00574a;
+  --fellow-success: #047857;
 
   /* Mapped POS UI variables */
   --ui-bg: #f8fafd;
@@ -29,9 +54,9 @@
   --ui-muted: #526066;
   --ui-accent: #2941e0;
   --ui-accent-soft: #eff6ff;
-  --ui-success: #10b981;
-  --ui-warning: #f59e0b;
-  --ui-danger: #ef4444;
+  --ui-success: #047857;
+  --ui-warning: #b45309;
+  --ui-danger: #dc2626;
 }
 
 .dark {
@@ -162,6 +187,17 @@ a {
 
 .animate-cart-pop {
   animation: cartPop 420ms ease-out;
+}
+
+/* Accessible keyboard focus indicator across all interactive controls */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
