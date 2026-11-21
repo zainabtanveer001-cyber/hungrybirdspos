@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–14 complete; ready to push or run live visual verification / `/ship`)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slice 14)
+- **Current Phase:** Phase 3 (Build — Slices 9–15 complete; ready to push or run live visual verification / `/ship`)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slice 15)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -47,11 +47,12 @@
   - **Slice 12 (`7ecf0d3`):** Added `decrementByMenuId()` (`src/lib/cart.ts` + 2 tests in `tests/cart.test.ts`), dish-card `36px` `- [qty] +` steppers on in-cart dishes (`MenuGrid.tsx`, keeping photo/title tappable and handling modifier groups via picker on `+` / latest-line decrement on `-`), `Clear` cart button with inline 2-step confirmation resetting the full draft order (`CartPanel.tsx` + `App.tsx`), and compact single-row Dine-In Table `<select>` dropdown (`Counter (No table)` + `T1`–`T12` with `Occupied (Held)` labels and amber `"Held"` badge) freeing vertical space for cart items.
   - **Slice 13 (`f116bc5`):** Added reusable **Modifiers & Extras Library** (`src/lib/modifiers.ts`, `src/components/ModifierGroupsSection.tsx`) with 1-click `"Load Starter Extras"` (`Extra Olives`, `Cheese Slice`, `Extra Cheese`, `Extra Jalapenos`), per-dish modifier editor (`AdminSettingsModal.tsx`, `menu.ts`), on-the-fly `"+ Extras"` / `"Edit extras"` cart row editor (`CartPanel.tsx`, `ModifierModal.tsx`) with `"Apply to all N"` vs `"Customize 1 only"` line splitting and optional Kitchen Notes, optional inventory stock & Live Shift COGS / refund integration (`sales.ts`, `refunds.ts`, `shift.ts`), KDS KOT modifier deduplication (`KitchenDisplayModal.tsx`), and expanded unit tests in `tests/modifiers.test.ts` (9 tests).
   - **Slice 14 (`f9243e8`):** Upgraded thermal ESC/POS & browser receipts to an executive layout (`src/lib/escpos.ts`, `src/lib/printer.ts`, `src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`, `uqr` zero-dependency QR encoder): added `GS B` inverted white-on-black Order Type/Table & Total Amount banners, native `GS ( k` hardware QR code + offline SVG QR for browser/preview, real Cashier/Server name, split Customer/Phone/Address lines, clean word-wrapping (`wrapWords`) + indented `+ Extras` / `* Note:` sub-lines (`splitItemDisplay`), loyalty discount, visible Payment Details / Cash Received / Change Returned / `*** PAID ***`, Total Items + Total Qty, framed Online Payment box, editable store/payment/QR settings, always-on live thermal receipt preview, and expanded `tests/receipt.test.ts` (12 tests).
+  - **Slice 15 (`0e9c3d1` — `BUG-013`):** Fixed cross-device category, menu, and inventory deletion sync (`src/lib/syncMap.ts`, `src/lib/sync.ts`, `src/lib/auth.ts`, `src/lib/menu.ts`, `src/App.tsx`, `src/components/InventoryModal.tsx`): added `reconcileMirrorCollection()` and `mergePulledSnapshot()` to prune local-only/stale default categories against authoritative Firestore while protecting pending/in-flight/mid-poll pushes, persisted durable `sync.outbox` upserts/deletes flushed before every pull, gated `ensureDefaultCategories()` behind `categoriesInitialized` so deleting down to zero never resurrects defaults on reload, awaited `initializeApp()` before `startSync()` and `pushCategory`/`pushMenu`/`pushInventory` on delete, prevented `listAll()` outages from wiping local data or masking `403`/outbox errors as `'idle'`, preserved `hb.syncToken` during transient offline token refreshes, and added `focus`/`visibilitychange` wake sync (`15s` poll). Verified with 13 `tests/syncMap.test.ts` + 7 end-to-end 2-device mock-Firestore `tests/sync.test.ts` tests.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **74 passed (74)** tests.
+- `cd hungrybirds-pos-modern && npm test` → **13 passed (13)** test files, **87 passed (87)** tests.
 - `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `18 warnings` — down from `19`).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `18 warnings` on 82 files).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities**.
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
@@ -66,7 +67,7 @@
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 56 Vitest unit & regression tests
+npm test          # Run 87 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173

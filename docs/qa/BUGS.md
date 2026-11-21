@@ -197,3 +197,20 @@ Evidence: `AdminSettingsModal.tsx:520` and `InventoryModal.tsx:60`; re-verified 
 Environment: `0d9a349` / `qa/release-gate`, Webview Browser `1366x768`.
 Status: verified (fixed in `AdminSettingsModal.tsx` and `InventoryModal.tsx`)
 ```
+
+---
+
+```
+BUG-013 [S1 critical]
+Title: Deleting food categories on Device A does not delete them on Device B even when both devices are signed in as the same cloud Owner account
+Steps to reproduce:
+  1. Sign in as the same cloud Owner account on Device A and Device B.
+  2. Delete one or more food categories (especially pre-seeded default categories `cat_burgers`..`cat_desserts`, or delete all categories) on Device A.
+  3. Switch to Device B (or reload) and wait for sync.
+Expected vs actual:
+  Expected: Deleted categories propagate to Firestore immediately (or retry via durable outbox when offline), disappear on Device B on focus/poll without resurrecting defaults on reload, and surface real Firestore errors (`Sync issue`) if a write fails.
+  Actual: (1) `ensureDefaultCategories()` seeded 6 local-only categories per browser without syncing and re-seeded them on reload whenever count hit 0; (2) `pullCollection()` diffed only `sync.snapshot` instead of actual local IndexedDB keys, so local-only/default categories were never pruned on Device B; (3) `deleteCategory()` was fire-and-forget with no offline delete outbox and `rememberPush()` left deleted IDs in `sync.snapshot`; (4) `syncNow()` overwrote write errors (`403`/network) with `state: 'idle'` and `accessToken()` wiped `hb.syncToken` on transient offline token refresh failures; (5) polling waited 25s with no `focus`/`visibilitychange` wake listener.
+Evidence: Code root-cause analysis in `sync.ts`, `auth.ts`, `menu.ts`; verified with 13 `tests/syncMap.test.ts` + 7 end-to-end 2-device mock-Firestore `tests/sync.test.ts` tests.
+Environment: `805176b` / `main`.
+Status: verified (fixed in `0e9c3d1` — `syncMap.ts`, `sync.ts`, `auth.ts`, `menu.ts`, `App.tsx`, `InventoryModal.tsx`, `tests/syncMap.test.ts`, `tests/sync.test.ts`)
+```
