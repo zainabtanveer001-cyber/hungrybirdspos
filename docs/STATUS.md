@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 4 (QA) & Phase 5 (Security & Quality Audit) — `/qa-gate` **PASSED** (ready for Phase 6 Release / `/ship`)
-- **Active Branch:** `qa/release-gate` (branched from `main` @ `b4aa1cf`)
+- **Current Phase:** Phase 2 (UI/UX Design — `docs/DESIGN.md` written & audited against live code; ready for UI polish slices or Phase 6 Release `/ship`)
+- **Active Branch:** `main` (synced with `origin/main` @ `7801225`)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -38,6 +38,8 @@
 - **Feature Slice 8 — Incoming Online Order & Add-to-Cart Visual Cues:**
   - **Incoming online orders:** Added a dedicated header `Online` button (`App.tsx`) with live pulsing beacon + count pill when `pendingOnlineCount > 0`, a persistent top-of-workspace alert banner (`"N new online order(s) waiting to be accepted"` + `"View & Accept"`), a pulsing dot on the mobile navigation hamburger button, and collapsed-sidebar badge support (`Sidebar.tsx`) with accessible `aria-label`; upgraded `useOrderAlert.ts` to expose `{ pendingCount, recentArrival }`.
   - **Add-to-cart feedback:** Added `countCartByMenuId()` & `cartItemCount()` (`src/lib/cart.ts` + unit test in `tests/cart.test.ts`), dish-card `×N in cart` pill badge, active border, `"✓ Added"` flash & `animate-cart-pop` (`MenuGrid.tsx`, `index.css`), `Current Order` live item count badge & newly-added row emerald highlight (`CartPanel.tsx`), debounced toast confirmation (`Added <name> to cart (×N)`) lifted clear above the mobile sticky bottom bar, and mobile sticky bar flash on add.
+- **Phase 2 — UI/UX Design Spec (`docs/DESIGN.md`):**
+  - Authored `docs/DESIGN.md` covering the top 3 POS user tasks, happy & unhappy user flows, information architecture & role matrix, one-sentence visual direction, WCAG 2.2 AA contrast-verified design tokens, component inventory, mobile/tablet/desktop screen specs with all 6 UI states, and a concrete P1/P2 gap audit against the current `hungrybirds-pos-modern` UI (contrast fixes, 32–44px cart stepper touch targets, `<Modal>` keyboard/focus-trap & `PaymentModal` unification, quick-cash tender chips, ARIA/label fixes, and replacing native `window.confirm`/`window.prompt`).
 
 ## 2. Verification Results
 - `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **64 passed (64)** tests.
@@ -48,8 +50,10 @@
 - **Live Browser QA (`http://localhost:5174/` & `http://localhost:5175/`):** Desktop (`1366×768`) and mobile (`390×844`) verified with **0** open S1/S2 bugs and **0** browser console errors.
 
 ## 3. Known Gaps & Deferred Items
+- **Pending UI/UX visual verification (`docs/DESIGN.md` §10):** Fresh multi-width browser verification at `375px`, `768px`, and `1280px` (plus `320px` overflow check) is still pending because Chrome remote debugging (`DevToolsActivePort`) was unavailable during Phase 2. Prior `1366×768` and `390×844` captures were reviewed alongside code inspection.
+- **UI/UX alignment backlog (`docs/DESIGN.md` §9):** P1 WCAG contrast/touch-target/modal-a11y fixes and P2 legacy modal token unification are documented in `docs/DESIGN.md` and awaiting approval to implement.
 - **Offline fallback default credentials (`AUD-005`):** Fresh offline installs seed `owner`, `manager`, `cashier`, and `waiter` with password `1234` (SHA-256) in local IndexedDB for offline fallback when Firebase is unreachable. Cloud authentication always takes precedence when online.
-- **Cosmetic / S4 items deferred:** Minor text truncation on narrow pills at intermediate breakpoints and single-chunk bundle size warning (`~606 kB` minified / `172 kB` gzip).
+- **Cosmetic / S4 items deferred:** Single-chunk bundle size warning (`~606 kB` minified / `172 kB` gzip).
 
 ## 4. How to Run
 ```powershell
@@ -67,5 +71,5 @@ npm run lint      # Run ESLint on legacy root files
 ```
 
 ## 5. Next Steps / Blockers
-- **Blockers:** None.
-- **Next:** Commit code and docs on `qa/release-gate` (or merge to `main`) and proceed to Phase 6 Release (`/ship`) when ready to deploy.
+- **Blockers:** Chrome remote debugging (`DevToolsActivePort`) was unavailable for fresh `375px` / `768px` / `1280px` visual checks.
+- **Next:** Review `docs/DESIGN.md` and either (a) implement the P1/P2 UI/UX polish & WCAG 2.2 AA alignment slices (`engineering-standards`) and verify at `375px` / `768px` / `1280px`, or (b) proceed directly to Phase 6 Release (`/ship`).
