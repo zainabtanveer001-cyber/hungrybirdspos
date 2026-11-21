@@ -1,6 +1,6 @@
 /**
  * ESC/POS (Epson Standard Code for POS) encoder.
- * Converts formatting commands, text, and raster bitmaps into a Uint8Array for thermal printers.
+ * Converts formatting commands, text, QR codes, and raster bitmaps into a Uint8Array for thermal printers.
  */
 export class EscPosEncoder {
   private bytes: Uint8Array[] = [];
@@ -16,7 +16,11 @@ export class EscPosEncoder {
     return str
       .replace(/\u00A0/g, ' ')
       .replace(/[–—]/g, '-')
-      .replace(/[•·]/g, '-');
+      .replace(/[•·]/g, '-')
+      .replace(/[‘’]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/×/g, 'x')
+      .replace(/★/g, '*');
   }
 
   /** Resets printer to default settings. */
@@ -30,9 +34,19 @@ export class EscPosEncoder {
     this.append([0x1b, 0x61, map[position]]);
   }
 
-  /** Sets bold mode. */
+  /** Sets bold mode (ESC E n). */
   bold(on: boolean) {
     this.append([0x1b, 0x45, on ? 1 : 0]);
+  }
+
+  /** Sets white-on-black inverted print mode (GS B n) for premium thermal highlight bars. */
+  invert(on: boolean) {
+    this.append([0x1d, 0x42, on ? 1 : 0]);
+  }
+
+  /** Sets underline mode (ESC - n): 0 = off, 1 = 1-dot, 2 = 2-dot. */
+  underline(mode: 0 | 1 | 2) {
+    this.append([0x1b, 0x2d, mode]);
   }
 
   /**
@@ -55,6 +69,32 @@ export class EscPosEncoder {
   /** Appends a line of text with a trailing newline. */
   text(str: string) {
     this.append(new TextEncoder().encode(this.sanitizeAscii(str) + '\n'));
+  }
+
+  /**
+   * Encodes a native ESC/POS Model 2 QR Code (GS ( k) with Medium error correction.
+   * Supported natively by Epson, Xprinter, Rongta, Sunmi, Goojprt, MTP, and Star ESC/POS printers.
+   */
+  qrCode(data: string, moduleSize = 5) {
+    const payload = data.trim();
+    if (!payload) return;
+    const encoded = new TextEncoder().encode(payload);
+    const size = Math.max(3, Math.min(8, Math.round(moduleSize)));
+    const storeLen = encoded.length + 3;
+    const pL = storeLen & 0xff;
+    const pH = (storeLen >> 8) & 0xff;
+
+    // Select QR Code Model 2
+    this.append([0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]);
+    // Set module dot size (3..8)
+    this.append([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, size]);
+    // Set error correction level M (15%)
+    this.append([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31]);
+    // Store data in symbol storage area
+    this.append([0x1d, 0x28, 0x6b, pL, pH, 0x31, 0x50, 0x30]);
+    this.append(encoded);
+    // Print stored QR symbol
+    this.append([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]);
   }
 
   /**

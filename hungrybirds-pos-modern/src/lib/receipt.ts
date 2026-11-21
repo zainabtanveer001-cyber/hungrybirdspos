@@ -1,3 +1,4 @@
+import { renderSVG } from 'uqr';
 import { formatAmount } from './format';
 import { DEFAULT_PRINTER_SETTINGS, getPrinterSettings, printRaw } from './printer';
 import type { PrinterSettings } from './printer';
@@ -6,12 +7,14 @@ import { EscPosEncoder } from './escpos';
 
 export const RESTAURANT = {
   name: 'Hungry Birds Restaurant',
+  tagline: 'Fresh · Crispy · Made to Order',
   phone: '0325-7867774',
   addressLine1: 'Dubai park stop, near Dera Gujjran station',
   addressLine2: 'G.T Road Lahore',
   address: 'Dubai park stop, near Dera Gujjran station, G.T Road Lahore',
   accountTitle: 'Zeeshan Shafiq',
   accountMethod: 'Jazzcash/Easypaisa',
+  accountNumber: '0325-7867774',
 };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -37,19 +40,121 @@ export function formatBillTimestamp(value: string | number | Date): string {
   return `${day} ${mon} ${year} ${hours}:${mins}`;
 }
 
+/** Word-wraps text cleanly to `maxWidth` columns without splitting words mid-letter unless a single word exceeds `maxWidth`. */
+export function wrapWords(text: string, maxWidth: number): string[] {
+  const limit = Math.max(4, maxWidth);
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [''];
+
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    if (!current) {
+      if (word.length <= limit) {
+        current = word;
+      } else {
+        for (let i = 0; i < word.length; i += limit) {
+          const chunk = word.slice(i, i + limit);
+          if (i + limit < word.length) lines.push(chunk);
+          else current = chunk;
+        }
+      }
+      continue;
+    }
+
+    if (current.length + 1 + word.length <= limit) {
+      current = `${current} ${word}`;
+    } else {
+      lines.push(current);
+      if (word.length <= limit) {
+        current = word;
+      } else {
+        current = '';
+        for (let i = 0; i < word.length; i += limit) {
+          const chunk = word.slice(i, i + limit);
+          if (i + limit < word.length) lines.push(chunk);
+          else current = chunk;
+        }
+      }
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/** Formats a left + right pair cleanly aligned within `cols` columns. */
+export function formatTwoCol(left: string, right: string, cols: number): string {
+  const gap = cols - left.length - right.length;
+  if (gap >= 1) return left + ' '.repeat(gap) + right;
+  const maxLeft = Math.max(4, cols - right.length - 1);
+  return `${left.slice(0, maxLeft)} ${right}`;
+}
+
+/** Formats the order type banner text (e.g. "DINE IN - TABLE T4", "DELIVERY ORDER", "TAKEAWAY ORDER"). */
+export function formatOrderBadge(orderType: Sale['orderType'], tableNumber?: string): string {
+  if (orderType === 'DINE_IN') {
+    return tableNumber ? `DINE IN - TABLE ${tableNumber}` : 'DINE IN - COUNTER';
+  }
+  if (orderType === 'TAKEAWAY') return 'TAKEAWAY ORDER';
+  return 'DELIVERY ORDER';
+}
+
 /**
- * Renders the circular "HUNGRY BIRDS RESTAURANT" rooster stamp onto an offscreen
- * canvas and packs it into 1-bit monochrome ESC/POS raster bytes (168x120 px).
- * Returns null in non-browser environments (e.g., Node unit tests).
+ * Separates a cart item into its clean base dish name, deduplicated modifier labels, and optional kitchen note.
+ * Avoids printing "(Extra Cheese) (Extra Cheese)" when `item.name` already contains modifier text.
  */
+export function splitItemDisplay(item: CartItem): {
+  baseName: string;
+  modifiers: string[];
+  note?: string;
+} {
+  const modifiers = (item.modifiers || []).map((m) => m.name.trim()).filter(Boolean);
+  let baseName = String(item.name || '').trim();
+  if (modifiers.length > 0) {
+    const suffix = `(${modifiers.join(', ')})`;
+    if (baseName.endsWith(suffix)) {
+      baseName = baseName.slice(0, -suffix.length).trim();
+    }
+  }
+  const note = item.note?.trim() || undefined;
+  return { baseName: baseName || item.name, modifiers, note };
+}
+
+/** Resolves effective store/payment/QR display details, merging saved settings over defaults. */
+export function resolveReceiptProfile(settings: PrinterSettings) {
+  return {
+    name: settings.headerText?.trim() || RESTAURANT.name,
+    tagline: settings.tagline !== undefined ? settings.tagline.trim() : RESTAURANT.tagline,
+    addressLine1: settings.addressLine1 !== undefined ? settings.addressLine1.trim() : RESTAURANT.addressLine1,
+    addressLine2: settings.addressLine2 !== undefined ? settings.addressLine2.trim() : RESTAURANT.addressLine2,
+    phone: settings.phone !== undefined ? settings.phone.trim() : RESTAURANT.phone,
+    accountTitle: settings.accountTitle !== undefined ? settings.accountTitle.trim() : RESTAURANT.accountTitle,
+    accountMethod: settings.accountMethod !== undefined ? settings.accountMethod.trim() : RESTAURANT.accountMethod,
+    accountNumber: settings.accountNumber !== undefined ? settings.accountNumber.trim() : RESTAURANT.accountNumber,
+    qrUrl: (settings.qrUrl || '').trim(),
+    qrLabel: (settings.qrLabel || '').trim() || 'Scan to order or leave a review',
+    showLogo: settings.showLogo !== false,
+  };
+}
+
+/** Generates a crisp offline SVG QR code for browser printing and live preview. */
+export function buildQrSvg(url: string, sizePx = 112): string {
+  const clean = (url || '').trim();
+  if (!clean) return '';
+  try {
+    const raw = renderSVG(clean, { ecc: 'M', border: 2, pixelSize: 4 });
+    return raw.replace('<svg ', `<svg width="${sizePx}" height="${sizePx}" style="display:block;margin:0 auto;" `);
+  } catch {
+    return '';
+  }
+}
+
 /**
  * Renders the circular monochrome "HUNGRY BIRDS RESTAURANT" rooster stamp
  * onto a full-line-width offscreen canvas (560 dots = 70 bytes/row on 80mm;
  * 368 dots = 46 bytes/row on 58mm) with the stamp drawn at horizontal center (cx = width / 2).
- * Because many ESC/POS thermal printers ignore `ESC a 1` (center align) for `GS v 0` raster
- * graphics and always start at dot 0, padding the raster row symmetrically to the full printable
- * line width guarantees the logo prints dead-center on both printers that ignore `ESC a 1` and
- * printers that honor `ESC a 1`.
+ * Padding symmetrically to full printable width guarantees dead-center alignment on every printer.
  */
 export function buildLogoRaster(
   paperWidth: '58mm' | '80mm' = '80mm',
@@ -63,7 +168,6 @@ export function buildLogoRaster(
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
 
-  // White background across the full printable width
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
 
@@ -72,8 +176,7 @@ export function buildLogoRaster(
   const cx = width / 2;
   const cy = height / 2;
 
-  // Outer & inner oval stamp rings
-  ctx.lineWidth = 2.6;
+  ctx.lineWidth = 2.8;
   ctx.beginPath();
   ctx.ellipse(cx, cy, 76, 54, 0, 0, Math.PI * 2);
   ctx.stroke();
@@ -83,13 +186,11 @@ export function buildLogoRaster(
   ctx.ellipse(cx, cy, 71, 49, 0, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Inner emblem oval around the rooster
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.ellipse(cx, cy, 46, 31, 0, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Helper to draw curved text along an elliptical arc
   const drawArcText = (str: string, radiusX: number, radiusY: number, startAngle: number, endAngle: number, bottom = false) => {
     ctx.save();
     ctx.font = 'bold 10px Arial, sans-serif';
@@ -113,43 +214,34 @@ export function buildLogoRaster(
   drawArcText('HUNGRY BIRDS', 58, 40, -Math.PI * 0.82, -Math.PI * 0.18, false);
   drawArcText('RESTAURANT', 58, 40, Math.PI * 0.80, Math.PI * 0.20, true);
 
-  // Left & right stars
   ctx.font = 'bold 11px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('★', cx - 58, cy + 1);
   ctx.fillText('★', cx + 58, cy + 1);
 
-  // Center rooster silhouette (optically centered at cx - 3 since tail extends to +28 and beak to -22)
   ctx.save();
   ctx.translate(cx - 3, cy);
   ctx.beginPath();
-  // Head & neck (left)
   ctx.moveTo(-18, -8);
   ctx.quadraticCurveTo(-15, -18, -8, -16);
-  // Comb
   ctx.lineTo(-10, -21);
   ctx.lineTo(-5, -18);
   ctx.lineTo(-4, -22);
   ctx.lineTo(0, -17);
-  // Back of neck down to breast/back
   ctx.quadraticCurveTo(-2, -6, 6, -4);
-  // Tail feathers (right side)
   ctx.quadraticCurveTo(18, -20, 26, -12);
   ctx.quadraticCurveTo(18, -8, 14, -2);
   ctx.quadraticCurveTo(25, -10, 28, 0);
   ctx.quadraticCurveTo(19, -1, 14, 4);
   ctx.quadraticCurveTo(22, 2, 23, 10);
-  // Belly & body
   ctx.quadraticCurveTo(10, 14, -4, 13);
   ctx.quadraticCurveTo(-16, 11, -15, 0);
-  // Beak
   ctx.lineTo(-22, -5);
   ctx.lineTo(-17, -7);
   ctx.closePath();
   ctx.fill();
 
-  // Legs
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(-4, 12);
@@ -179,182 +271,323 @@ export function buildLogoRaster(
   return { width, height, bytes: packed };
 }
 
+function defaultThankYou(orderType: Sale['orderType']): string {
+  if (orderType === 'DELIVERY') return 'Thank you for ordering delivery!';
+  if (orderType === 'TAKEAWAY') return 'Thank you for choosing takeaway!';
+  return 'Thank you for dining with us!';
+}
+
 /**
- * Encodes the sale into raw ESC/POS bytes matching the Hungry Birds Customer Copy layout.
+ * Encodes the sale into premium raw ESC/POS bytes (80mm = 47 cols, 58mm = 31 cols)
+ * featuring inverted order-type & total banners, crisp typography hierarchy,
+ * word-wrapped items with indented modifiers/notes, payment & change details,
+ * framed digital payment info, and optional native GS ( k QR code.
  */
 export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Uint8Array {
   const encoder = new EscPosEncoder();
   encoder.initialize();
 
+  const profile = resolveReceiptProfile(settings);
   const cols = settings.paperWidth === '80mm' ? 47 : 31;
-  const dashCount = settings.paperWidth === '80mm' ? 24 : 16;
-  const dashedRule = Array(dashCount).fill('-').join(' ');
+  const heavyRule = '='.repeat(cols);
+  const lightRule = '-'.repeat(cols);
+  const orderBadge = formatOrderBadge(sale.orderType, sale.tableNumber);
 
+  // 0. Optional Kitchen Order Ticket (KOT)
   if (settings.printKitchenTicket) {
     encoder.align('center');
     encoder.bold(true);
+    encoder.invert(true);
     encoder.setSize(0, 1);
-    encoder.text('KITCHEN ORDER');
+    encoder.text('  KITCHEN ORDER (KOT)  ');
     encoder.setSize(0, 0);
+    encoder.invert(false);
+    encoder.text(orderBadge);
     encoder.bold(false);
-    encoder.text(`Bill #HBR-${sale.id}`);
+    encoder.text(`Bill #HBR-${sale.id ?? ''}  |  ${formatBillTimestamp(sale.timestamp)}`);
     encoder.text(`By: ${sale.serverUser || 'Staff'}`);
-    encoder.text(`Time: ${formatBillTimestamp(sale.timestamp)}`);
-    encoder.text(`Type: ${sale.orderType}${sale.tableNumber ? ` (${sale.tableNumber})` : ''}`);
-    encoder.text(dashedRule);
+    encoder.text(heavyRule);
     encoder.align('left');
     for (const item of sale.items || []) {
-      const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
-      const name = modifiers ? `${item.name} (${modifiers})` : item.name;
-      encoder.text(`${item.qty}x ${name}${item.note ? ` - ${item.note}` : ''}`);
+      const { baseName, modifiers, note } = splitItemDisplay(item);
+      encoder.bold(true);
+      encoder.setSize(0, 1);
+      for (const wrapped of wrapWords(`${item.qty}x ${baseName}`, cols)) {
+        encoder.text(wrapped);
+      }
+      encoder.setSize(0, 0);
+      encoder.bold(false);
+      if (modifiers.length) {
+        for (const modLine of wrapWords(`+ ${modifiers.join(', ')}`, cols - 3)) {
+          encoder.text(`   ${modLine}`);
+        }
+      }
+      if (note) {
+        for (const noteLine of wrapWords(`* Note: ${note}`, cols - 3)) {
+          encoder.text(`   ${noteLine}`);
+        }
+      }
     }
-    encoder.text(dashedRule);
+    encoder.text(heavyRule);
     encoder.feed(4);
     encoder.cut();
   }
 
-  // 1. Top Circular Rooster Stamp Logo
-  const logo = buildLogoRaster(settings.paperWidth);
-  if (logo) {
-    encoder.align('center');
-    encoder.rasterImage(logo.width, logo.height, logo.bytes);
-    encoder.text(' ');
+  // 1. Centered Rooster Stamp Logo
+  if (profile.showLogo) {
+    const logo = buildLogoRaster(settings.paperWidth);
+    if (logo) {
+      encoder.align('center');
+      encoder.rasterImage(logo.width, logo.height, logo.bytes);
+      encoder.text('');
+    }
   }
 
-  // 2. Centered Double-Height "Customer Copy" & "Hungry Birds Restaurant"
+  // 2. Bold Brand Header + Tagline + Contact
   encoder.align('center');
-  encoder.bold(false);
+  encoder.bold(true);
   encoder.setSize(0, 1);
-  encoder.text('Customer Copy');
-  encoder.text(settings.headerText || RESTAURANT.name);
+  for (const nameLine of wrapWords(profile.name, cols)) {
+    encoder.text(nameLine);
+  }
   encoder.setSize(0, 0);
+  encoder.bold(false);
 
-  // 3. Centered Address & Phone
-  encoder.text(RESTAURANT.addressLine1);
-  encoder.text(RESTAURANT.addressLine2);
-  encoder.text(RESTAURANT.phone);
+  if (profile.tagline) {
+    encoder.text(profile.tagline);
+  }
+  if (profile.addressLine1) {
+    for (const line of wrapWords(profile.addressLine1, cols)) encoder.text(line);
+  }
+  if (profile.addressLine2) {
+    for (const line of wrapWords(profile.addressLine2, cols)) encoder.text(line);
+  }
+  if (profile.phone) {
+    encoder.bold(true);
+    encoder.text(`Tel: ${profile.phone}`);
+    encoder.bold(false);
+  }
 
-  // 4. Bill #, Timestamp & Cashier
+  encoder.text('');
+  // 3. Executive Inverted Order-Type Banner + Copy Label
+  encoder.bold(true);
+  encoder.invert(true);
+  encoder.text(`  ${orderBadge}  `);
+  encoder.invert(false);
+  encoder.bold(false);
+  encoder.text('*** Customer Copy ***');
+
+  // 4. Order Metadata Block
   encoder.align('left');
-  encoder.text(dashedRule);
+  encoder.text(heavyRule);
   if (settings.printOrderDetails) {
     const billNo = `Bill #HBR-${sale.id ?? ''}`;
     const dateStr = formatBillTimestamp(sale.timestamp);
-    const gap = Math.max(1, cols - billNo.length - dateStr.length);
-    encoder.text(billNo + ' '.repeat(gap) + dateStr);
-    const cashierLabel =
-      sale.orderType === 'DINE_IN' && sale.tableNumber
-        ? `Cashier: ${RESTAURANT.name} (${sale.tableNumber})`
-        : `Cashier: ${RESTAURANT.name}`;
-    encoder.text(cashierLabel);
-    encoder.text(dashedRule);
+    encoder.bold(true);
+    encoder.text(formatTwoCol(billNo, dateStr, cols));
+    encoder.bold(false);
+
+    const cashierLeft = `Cashier: ${sale.serverUser || 'Staff'}`;
+    const rightMeta =
+      sale.orderType === 'DINE_IN'
+        ? `Table: ${sale.tableNumber || 'Counter'}`
+        : `Type: ${sale.orderType.replace('_', ' ')}`;
+    encoder.text(formatTwoCol(cashierLeft, rightMeta, cols));
+    encoder.text(lightRule);
   }
 
-  // 5. Customer / Delivery Info (shown whenever customer name/address/phone is present)
-  const cust = sale.deliveryInfo?.phone || sale.deliveryInfo?.name ? sale.deliveryInfo : sale.customer;
+  // 5. Split Customer / Delivery Details
+  const cust = sale.deliveryInfo?.phone || sale.deliveryInfo?.name || sale.deliveryInfo?.address
+    ? sale.deliveryInfo
+    : sale.customer;
   if (settings.printDeliveryDetails && cust && (cust.name || cust.address || cust.phone)) {
-    const custLabel = [cust.name, cust.address].filter(Boolean).join(' ').trim();
-    if (custLabel) {
-      encoder.text(`Customer: ${custLabel}`);
+    encoder.bold(true);
+    encoder.text(sale.orderType === 'DELIVERY' ? 'DELIVERY DETAILS' : 'CUSTOMER DETAILS');
+    encoder.bold(false);
+    if (cust.name) {
+      for (const [idx, l] of wrapWords(cust.name, cols - 10).entries()) {
+        encoder.text(`${idx === 0 ? 'Customer: ' : '          '}${l}`);
+      }
     }
     if (cust.phone) {
-      encoder.text(`Phone: ${cust.phone}`);
+      encoder.text(`Phone:    ${cust.phone}`);
     }
-    encoder.text(dashedRule);
+    if (cust.address) {
+      for (const [idx, l] of wrapWords(cust.address, cols - 10).entries()) {
+        encoder.text(`${idx === 0 ? 'Address:  ' : '          '}${l}`);
+      }
+    }
+    encoder.text(lightRule);
   }
 
-  // 6. 4-Column Item Table: Item | Rate | Qty | Amount
+  // 6. Crisp Itemized Table (Word-wrapped + Indented Modifiers & Notes)
   const itemW = settings.paperWidth === '80mm' ? 21 : 12;
-  const rateW = settings.paperWidth === '80mm' ? 10 : 7;
+  const rateW = settings.paperWidth === '80mm' ? 9 : 7;
   const qtyW = settings.paperWidth === '80mm' ? 5 : 4;
-  const amtW = settings.paperWidth === '80mm' ? 11 : 8;
+  const amtW = settings.paperWidth === '80mm' ? 12 : 8;
 
-  const headerLine =
-    'Item'.padEnd(itemW, ' ') +
-    'Rate'.padStart(rateW, ' ') +
-    'Qty'.padStart(qtyW, ' ') +
-    'Amount'.padStart(amtW, ' ');
-  encoder.text(headerLine);
-  encoder.text(dashedRule);
+  encoder.bold(true);
+  if (settings.printItemPrices) {
+    encoder.text(
+      'Item'.padEnd(itemW, ' ') +
+      'Rate'.padStart(rateW, ' ') +
+      'Qty'.padStart(qtyW, ' ') +
+      'Amount'.padStart(amtW, ' '),
+    );
+  } else {
+    encoder.text(formatTwoCol('Item', 'Qty', cols));
+  }
+  encoder.bold(false);
+  encoder.text(lightRule);
 
+  let totalUnits = 0;
   for (const item of sale.items || []) {
-    const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
-    const fullName = modifiers ? `${item.name} (${modifiers})` : item.name;
+    totalUnits += Number(item.qty) || 0;
+    const { baseName, modifiers, note } = splitItemDisplay(item);
+    const wrappedName = wrapWords(baseName, settings.printItemPrices ? itemW - 1 : cols - 6);
     const rateStr = formatDecimal(item.price);
     const qtyStr = String(item.qty);
     const amtStr = formatDecimal(item.price * item.qty);
 
-    if (fullName.length <= itemW - 1) {
-      const row =
-        fullName.padEnd(itemW, ' ') +
+    if (settings.printItemPrices) {
+      encoder.text(
+        wrappedName[0].padEnd(itemW, ' ') +
         rateStr.padStart(rateW, ' ') +
         qtyStr.padStart(qtyW, ' ') +
-        amtStr.padStart(amtW, ' ');
-      encoder.text(row);
+        amtStr.padStart(amtW, ' '),
+      );
     } else {
-      // First line has the first chunk of name + Rate + Qty + Amount; remaining name wraps below
-      const firstChunk = fullName.slice(0, itemW - 1);
-      const row =
-        firstChunk.padEnd(itemW, ' ') +
-        rateStr.padStart(rateW, ' ') +
-        qtyStr.padStart(qtyW, ' ') +
-        amtStr.padStart(amtW, ' ');
-      encoder.text(row);
-      let rest = fullName.slice(itemW - 1).trim();
-      while (rest.length > 0) {
-        encoder.text(rest.slice(0, cols));
-        rest = rest.slice(cols).trim();
+      encoder.text(formatTwoCol(wrappedName[0], `${qtyStr}x`, cols));
+    }
+
+    for (let i = 1; i < wrappedName.length; i += 1) {
+      encoder.text(wrappedName[i]);
+    }
+    if (modifiers.length) {
+      for (const modLine of wrapWords(`+ ${modifiers.join(', ')}`, cols - 2)) {
+        encoder.text(`  ${modLine}`);
       }
     }
-    if (item.note) {
-      encoder.text(`  Note: ${item.note}`);
+    if (note) {
+      for (const noteLine of wrapWords(`* Note: ${note}`, cols - 2)) {
+        encoder.text(`  ${noteLine}`);
+      }
+    }
+    if (item.refundedQty) {
+      encoder.text(`  [Refunded: ${item.refundedQty}]`);
     }
   }
 
-  encoder.text(dashedRule);
+  encoder.text(heavyRule);
 
-  // 7. Charges & Double-Height Total Amount
+  // 7. Financial Breakdown & Inverted Highlighted Grand Total
   if (settings.printTotals) {
-    const extraRow = (label: string, amount: number, sign = '') => {
-      if (!amount) return;
-      const val = `${sign}${formatDecimal(amount)}`;
-      const space = Math.max(1, cols - label.length - val.length);
-      encoder.text(label + ' '.repeat(space) + val);
+    const moneyRow = (label: string, amount: number, sign = '') => {
+      const val = `${sign}Rs ${formatDecimal(amount)}`;
+      encoder.text(formatTwoCol(label, val, cols));
     };
 
-    if (sale.discountAmount || sale.deliveryCharge || sale.packingCharge || sale.taxAmount || sale.otherCharge) {
-      extraRow('Subtotal', sale.subtotal);
-      if (sale.discountAmount) extraRow(`Discount (${sale.discountPercent || 0}%)`, sale.discountAmount, '-');
-      extraRow('Delivery Charge', sale.deliveryCharge);
-      extraRow('Packing Charge', sale.packingCharge);
-      extraRow(`Tax (${sale.taxPercent || 0}%)`, sale.taxAmount);
-      extraRow('Other Charges', sale.otherCharge);
+    const hasAdjustments = Boolean(
+      sale.discountAmount ||
+      sale.loyaltyDiscount ||
+      sale.deliveryCharge ||
+      sale.packingCharge ||
+      sale.taxAmount ||
+      sale.otherCharge,
+    );
+
+    if (hasAdjustments) {
+      moneyRow('Subtotal', sale.subtotal);
+      if (sale.discountAmount) moneyRow(`Discount (${sale.discountPercent || 0}%)`, sale.discountAmount, '-');
+      if (sale.loyaltyDiscount) {
+        moneyRow(
+          sale.loyaltyRedeemPoints ? `Loyalty (${sale.loyaltyRedeemPoints} pts)` : 'Loyalty Discount',
+          sale.loyaltyDiscount,
+          '-',
+        );
+      }
+      if (sale.deliveryCharge) moneyRow('Delivery Charge', sale.deliveryCharge);
+      if (sale.packingCharge) moneyRow('Packing Charge', sale.packingCharge);
+      if (sale.taxAmount) moneyRow(`Tax (${sale.taxPercent || 0}%)`, sale.taxAmount);
+      if (sale.otherCharge) moneyRow('Other Charges', sale.otherCharge);
+      encoder.text(lightRule);
     }
 
-    const totalLabel = 'Total Amount';
-    const totalVal = `Rs${formatDecimal(sale.total)}`;
-    const padSpaces = Math.max(1, cols - totalLabel.length - totalVal.length);
-    encoder.setSize(0, 0);
-    encoder.rawText(totalLabel + ' '.repeat(padSpaces));
+    const totalLeft = ' TOTAL AMOUNT';
+    const totalRight = `Rs ${formatDecimal(sale.total)} `;
+    encoder.bold(true);
+    encoder.invert(true);
     encoder.setSize(0, 1);
-    encoder.text(totalVal);
+    encoder.text(formatTwoCol(totalLeft, totalRight, cols));
     encoder.setSize(0, 0);
+    encoder.invert(false);
+    encoder.bold(false);
 
-    encoder.text(dashedRule);
-    encoder.text(`Total Items:   ${(sale.items || []).length}`);
-    encoder.text(dashedRule);
+    if (sale.refundedAmount) {
+      encoder.bold(true);
+      moneyRow(`Refunded (${sale.refundStatus || 'PARTIAL'})`, sale.refundedAmount, '-');
+      encoder.bold(false);
+    }
+
+    encoder.text(lightRule);
+    const lineCount = (sale.items || []).length;
+    encoder.text(formatTwoCol(`Total Items: ${lineCount}`, `Total Qty: ${totalUnits}`, cols));
+    encoder.text(lightRule);
   }
 
-  // 8. Footer Contact & Jazzcash/Easypaisa details
-  if (settings.printFooter) {
+  // 8. Payment Receipt Block
+  if (settings.printPayments && sale.payments?.length) {
+    encoder.bold(true);
+    encoder.text('PAYMENT DETAILS');
+    encoder.bold(false);
+    for (const payment of sale.payments) {
+      encoder.text(formatTwoCol(`Paid (${payment.method})`, `Rs ${formatDecimal(payment.amount)}`, cols));
+      if (payment.method === 'Cash' && payment.cashGiven != null) {
+        encoder.text(formatTwoCol('Cash Received', `Rs ${formatDecimal(payment.cashGiven)}`, cols));
+      }
+      if (Number(payment.change) > 0) {
+        encoder.bold(true);
+        encoder.text(formatTwoCol('Change Returned', `Rs ${formatDecimal(Number(payment.change))}`, cols));
+        encoder.bold(false);
+      }
+    }
     encoder.align('center');
-    encoder.text(RESTAURANT.phone);
+    encoder.bold(true);
+    encoder.text(sale.refundStatus === 'FULL' ? '*** REFUNDED ***' : '*** PAID ***');
+    encoder.bold(false);
     encoder.align('left');
-    encoder.text(RESTAURANT.accountTitle);
-    encoder.text(RESTAURANT.accountMethod);
-    if (settings.footerText?.trim()) {
+    encoder.text(lightRule);
+  }
+
+  // 9. Framed Online Payment Info, Optional QR Code, & Warm Footer
+  if (settings.printFooter) {
+    if (profile.accountTitle || profile.accountMethod || profile.accountNumber) {
       encoder.align('center');
-      encoder.text(settings.footerText.trim());
+      encoder.bold(true);
+      encoder.text('ONLINE PAYMENT');
+      encoder.bold(false);
+      encoder.align('left');
+      if (profile.accountMethod) encoder.text(formatTwoCol('Method:', profile.accountMethod, cols));
+      if (profile.accountTitle) encoder.text(formatTwoCol('Title:', profile.accountTitle, cols));
+      if (profile.accountNumber) encoder.text(formatTwoCol('Account:', profile.accountNumber, cols));
+      encoder.text(lightRule);
+    }
+
+    if (profile.qrUrl) {
+      encoder.align('center');
+      encoder.qrCode(profile.qrUrl, settings.paperWidth === '80mm' ? 5 : 4);
+      encoder.text(profile.qrLabel);
+      encoder.text(lightRule);
+    }
+
+    encoder.align('center');
+    encoder.bold(true);
+    const thanks = settings.footerText?.trim() || defaultThankYou(sale.orderType);
+    for (const line of wrapWords(thanks, cols)) encoder.text(line);
+    encoder.bold(false);
+    encoder.text('Please visit us again!');
+    if (profile.phone) {
+      encoder.text(`Order & Support: ${profile.phone}`);
     }
   }
 
@@ -365,9 +598,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
 
 /**
  * Prints to the paired thermal printer, else to the browser's print dialog
- * via a hidden iframe (the POS tab keeps its cart and open modals, unlike a
- * new window). Returns how the receipt was printed so the caller can warn
- * when the thermal printer was not used.
+ * via a hidden iframe (the POS tab keeps its cart and open modals).
  */
 export async function printReceipt(sale: Sale): Promise<'thermal' | 'browser'> {
   const settings = await getPrinterSettings();
@@ -417,10 +648,13 @@ export async function shareReceipt(sale: Sale): Promise<void> {
   window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
 }
 
-/** Everything a thermal printer receives, kept as text so a share message is one line per item. */
+/** Plain-text receipt lines used for WhatsApp sharing and unit testing. */
 export function receiptLines(sale: Sale, settings: PrinterSettings = DEFAULT_PRINTER_SETTINGS): string[] {
   const lines: string[] = [`Order #${sale.id}`, formatDate(sale.timestamp, settings.dateFormat)];
-  lines.push(`Server: ${sale.serverUser || 'Staff'}`, `Type: ${sale.orderType}`);
+  lines.push(
+    `Server: ${sale.serverUser || 'Staff'}`,
+    `Type: ${sale.orderType}${sale.tableNumber ? ` (${sale.tableNumber})` : ''}`,
+  );
   if (sale.orderType === 'DELIVERY' && sale.deliveryInfo) {
     lines.push(
       `Name: ${sale.deliveryInfo.name || '—'}`,
@@ -430,11 +664,13 @@ export function receiptLines(sale: Sale, settings: PrinterSettings = DEFAULT_PRI
   }
   for (const item of sale.items || []) {
     lines.push(`${item.name} x${item.qty}  ${formatAmount(item.price * item.qty)}`);
+    if (item.note) lines.push(`  Note: ${item.note}`);
     if (item.refundedQty) lines.push(`  (refunded ${item.refundedQty})`);
   }
   const rows: [string, number][] = [
     ['Subtotal', sale.subtotal],
     ...(sale.discountAmount ? [[`Discount ${sale.discountPercent || 0}%`, -sale.discountAmount] as [string, number]] : []),
+    ...(sale.loyaltyDiscount ? [['Loyalty Discount', -sale.loyaltyDiscount] as [string, number]] : []),
     ...(sale.deliveryCharge ? [['Delivery', sale.deliveryCharge] as [string, number]] : []),
     ...(sale.packingCharge ? [['Packing', sale.packingCharge] as [string, number]] : []),
     ...(sale.taxAmount ? [[`Tax ${sale.taxPercent || 0}%`, sale.taxAmount] as [string, number]] : []),
@@ -448,7 +684,7 @@ export function receiptLines(sale: Sale, settings: PrinterSettings = DEFAULT_PRI
     if (Number(payment.change) > 0) lines.push(`  Change: ${formatAmount(Number(payment.change))}`);
   }
   if (sale.refundedAmount) lines.push(`Refunded: ${formatAmount(sale.refundedAmount)} (${sale.refundStatus})`);
-  lines.push(sale.orderType === 'DELIVERY' ? 'Thank you for ordering!' : 'Thank you for dining with us!');
+  lines.push(settings.footerText?.trim() || defaultThankYou(sale.orderType));
   return lines;
 }
 
@@ -467,9 +703,9 @@ function escapeHtml(value: unknown): string {
 }
 
 const FONT_PT: Record<PrinterSettings['receiptFontSize'], string> = {
-  small: '10pt',
-  normal: '11pt',
-  large: '13pt',
+  small: '9.5pt',
+  normal: '10.5pt',
+  large: '12.5pt',
 };
 
 /** The shop picks the date style; the format list doubles as the label. */
@@ -491,118 +727,165 @@ export function formatDate(value: string | number | Date, format: PrinterSetting
   }
 }
 
-function itemLine(item: CartItem): string {
-  const modifiers = (item.modifiers || []).map((m) => m.name).join(', ');
-  return modifiers ? `${item.name} (${modifiers})` : item.name;
-}
-
 /**
- * Standalone receipt document matching the Customer Copy layout (Image 2),
- * while preserving the hooks tested in receipt.test.ts.
+ * Standalone HTML receipt document matching the Executive Thermal Receipt layout
+ * for browser print fallback while preserving every settings toggle & test contract.
  */
 export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
+  const profile = resolveReceiptProfile(settings);
   const width = settings.paperWidth === '58mm' ? '54mm' : '76mm';
+  const orderBadge = formatOrderBadge(sale.orderType, sale.tableNumber);
+  const totalUnits = (sale.items || []).reduce((sum, i) => sum + (Number(i.qty) || 0), 0);
+
   const items = (sale.items || [])
-    .map(
-      (item) => `<tr class="item">
-        <td class="name">${escapeHtml(itemLine(item))}${item.note ? `<div class="note">${escapeHtml(item.note)}</div>` : ''}</td>
+    .map((item) => {
+      const { baseName, modifiers, note } = splitItemDisplay(item);
+      return `<tr class="item">
+        <td class="name">
+          <div class="dish-name">${escapeHtml(baseName)}</div>
+          ${modifiers.length ? `<div class="mods">+ ${escapeHtml(modifiers.join(', '))}</div>` : ''}
+          ${note ? `<div class="note">* Note: ${escapeHtml(note)}</div>` : ''}
+          ${item.refundedQty ? `<div class="refund-tag">[Refunded: ${escapeHtml(item.refundedQty)}]</div>` : ''}
+        </td>
         ${
           settings.printItemPrices
             ? `<td class="num">${escapeHtml(formatDecimal(item.price))}</td>
                <td class="num">${escapeHtml(item.qty)}</td>
-               <td class="num">${escapeHtml(formatDecimal(item.price * item.qty))}</td>`
-            : `<td class="num" colspan="3">${escapeHtml(item.qty)} x</td>`
+               <td class="num amt">${escapeHtml(formatDecimal(item.price * item.qty))}</td>`
+            : `<td class="num amt" colspan="3">${escapeHtml(item.qty)}x</td>`
         }
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join('');
-  const payments = (sale.payments || [])
+
+  const paymentsHtml = (sale.payments || [])
     .map(
-      (payment) => `<div class="row"><span>${escapeHtml(payment.method)}</span><span>${escapeHtml(formatAmount(payment.amount))}</span></div>
-    ${payment.method === 'Cash' && payment.cashGiven != null ? `<div class="row muted"><span>Given</span><span>${escapeHtml(formatAmount(payment.cashGiven))}</span></div>` : ''}
-    ${Number(payment.change) > 0 ? `<div class="row muted"><span>Change</span><span>${escapeHtml(formatAmount(Number(payment.change)))}</span></div>` : ''}`,
+      (payment) => `<div class="row"><span>Paid (${escapeHtml(payment.method)})</span><span>Rs ${escapeHtml(formatDecimal(payment.amount))}</span></div>
+    ${payment.method === 'Cash' && payment.cashGiven != null ? `<div class="row muted"><span>Cash Received</span><span>Rs ${escapeHtml(formatDecimal(payment.cashGiven))}</span></div>` : ''}
+    ${Number(payment.change) > 0 ? `<div class="row strong"><span>Change Returned</span><span>Rs ${escapeHtml(formatDecimal(Number(payment.change)))}</span></div>` : ''}`,
     )
     .join('');
+
   const totalRow = (label: string, amount: number, sign = '') =>
-    amount ? `<div class="row"><span>${label}</span><span>${sign}${escapeHtml(formatAmount(amount))}</span></div>` : '';
+    amount ? `<div class="row"><span>${escapeHtml(label)}</span><span>${sign}Rs ${escapeHtml(formatDecimal(amount))}</span></div>` : '';
 
   const kitchen = settings.printKitchenTicket
     ? `<section class="kitchen">
-      <h1>KITCHEN ORDER</h1>
+      <div class="inv-banner">KITCHEN ORDER (KOT)</div>
+      <div class="k-badge">${escapeHtml(orderBadge)}</div>
       <div class="k-meta">
-        <p>Order: #${escapeHtml(sale.id)}</p>
+        <p>Bill #HBR-${escapeHtml(sale.id)} | ${escapeHtml(formatBillTimestamp(sale.timestamp))}</p>
         <p>By: ${escapeHtml(sale.serverUser || 'Staff')}</p>
-        <p>Time: ${escapeHtml(new Date(sale.timestamp).toLocaleTimeString())}</p>
-        <p>Type: ${escapeHtml(sale.orderType)}</p>
       </div>
-      <div class="k-rule"></div>
+      <div class="heavy-rule"></div>
       ${(sale.items || [])
-        .map(
-          (item) => `<div class="k-item">
+        .map((item) => {
+          const { baseName, modifiers, note } = splitItemDisplay(item);
+          return `<div class="k-item">
             <span class="k-qty">${escapeHtml(item.qty)}x</span>
-            <span class="k-name">${escapeHtml(itemLine(item))}${item.note ? ` — ${escapeHtml(item.note)}` : ''}</span>
-          </div>`,
-        )
+            <div class="k-body">
+              <div class="k-name">${escapeHtml(baseName)}</div>
+              ${modifiers.length ? `<div class="k-mod">+ ${escapeHtml(modifiers.join(', '))}</div>` : ''}
+              ${note ? `<div class="k-note">* Note: ${escapeHtml(note)}</div>` : ''}
+            </div>
+          </div>`;
+        })
         .join('')}
-      <div class="k-rule"></div>
+      <div class="heavy-rule"></div>
     </section>
     <div class="cut"></div>`
     : '';
 
   const orderDetails = settings.printOrderDetails
     ? `<div class="meta-block">
-    <div class="row"><span>Bill #HBR-${escapeHtml(sale.id)}</span><span>${escapeHtml(formatBillTimestamp(sale.timestamp))}</span></div>
-    <div>Cashier: ${escapeHtml(settings.headerText || RESTAURANT.name)}</div>
+    <div class="row strong"><span>Bill #HBR-${escapeHtml(sale.id)}</span><span>${escapeHtml(formatBillTimestamp(sale.timestamp))}</span></div>
+    <div class="row"><span>Cashier: ${escapeHtml(sale.serverUser || 'Staff')}</span><span>${
+      sale.orderType === 'DINE_IN'
+        ? `Table: ${escapeHtml(sale.tableNumber || 'Counter')}`
+        : `Type: ${escapeHtml(sale.orderType.replace('_', ' '))}`
+    }</span></div>
     <div class="sr-only">Order ID: #${escapeHtml(sale.id)} | Date: ${escapeHtml(formatDate(sale.timestamp, settings.dateFormat))} | Server: ${escapeHtml(sale.serverUser || 'Staff')} | Type: ${escapeHtml(sale.orderType)}</div>
-    ${sale.orderType === 'DINE_IN' && sale.tableNumber ? `<div>Table: ${escapeHtml(sale.tableNumber)}</div>` : ''}
   </div>`
     : '';
 
-  const cust = sale.deliveryInfo?.phone || sale.deliveryInfo?.name ? sale.deliveryInfo : sale.customer;
+  const cust = sale.deliveryInfo?.phone || sale.deliveryInfo?.name || sale.deliveryInfo?.address
+    ? sale.deliveryInfo
+    : sale.customer;
   const deliveryDetails =
     settings.printDeliveryDetails && cust && (cust.name || cust.address || cust.phone)
       ? `<div class="rule"></div>
          <div class="cust-block">
-           <span class="sr-only">DELIVERY DETAILS</span>
-           <div>Customer: ${escapeHtml([cust.name, cust.address].filter(Boolean).join(' ') || 'N/A')}</div>
-           <div>Phone: ${escapeHtml(cust.phone || 'N/A')}</div>
+           <div class="sec-title">${sale.orderType === 'DELIVERY' ? 'DELIVERY DETAILS' : 'CUSTOMER DETAILS'}</div>
+           ${cust.name ? `<div><span class="lbl">Customer:</span> ${escapeHtml(cust.name)}</div>` : ''}
+           ${cust.phone ? `<div><span class="lbl">Phone:</span> ${escapeHtml(cust.phone)}</div>` : ''}
+           ${cust.address ? `<div><span class="lbl">Address:</span> ${escapeHtml(cust.address)}</div>` : ''}
          </div>`
       : '';
 
+  const hasAdjustments = Boolean(
+    sale.discountAmount ||
+    sale.loyaltyDiscount ||
+    sale.deliveryCharge ||
+    sale.packingCharge ||
+    sale.taxAmount ||
+    sale.otherCharge,
+  );
+
   const totals = settings.printTotals
     ? `<div class="totals-block">
-    ${totalRow('Subtotal', sale.subtotal)}
-    ${totalRow(`Discount ${sale.discountPercent || 0}%`, sale.discountAmount, '-')}
-    ${totalRow('Delivery charge', sale.deliveryCharge)}
-    ${totalRow('Packing charge', sale.packingCharge)}
-    ${totalRow(`Tax ${sale.taxPercent || 0}%`, sale.taxAmount)}
-    ${totalRow('Other charges', sale.otherCharge)}
-    <div class="row grand"><span>Total Amount <span class="sr-only">GRAND TOTAL</span></span><span class="tall-amt">Rs${escapeHtml(formatDecimal(sale.total))}</span></div>
+    ${hasAdjustments ? totalRow('Subtotal', sale.subtotal) : ''}
+    ${totalRow(`Discount (${sale.discountPercent || 0}%)`, sale.discountAmount, '-')}
+    ${totalRow(sale.loyaltyRedeemPoints ? `Loyalty (${sale.loyaltyRedeemPoints} pts)` : 'Loyalty Discount', sale.loyaltyDiscount ?? 0, '-')}
+    ${totalRow('Delivery Charge', sale.deliveryCharge)}
+    ${totalRow('Packing Charge', sale.packingCharge)}
+    ${totalRow(`Tax (${sale.taxPercent || 0}%)`, sale.taxAmount)}
+    ${totalRow('Other Charges', sale.otherCharge)}
+    <div class="grand-bar"><span>TOTAL AMOUNT <span class="sr-only">GRAND TOTAL</span></span><span class="grand-amt">Rs ${escapeHtml(formatDecimal(sale.total))}</span></div>
+    ${sale.refundedAmount ? `<div class="row strong"><span>Refunded (${escapeHtml(sale.refundStatus || 'PARTIAL')})</span><span>-Rs ${escapeHtml(formatDecimal(sale.refundedAmount))}</span></div>` : ''}
     <div class="rule"></div>
-    <div class="row"><span>Total Items: &nbsp; ${escapeHtml((sale.items || []).length)}</span><span></span></div>
-    <div class="rule"></div>
-    ${settings.printPayments && payments ? `<div class="sr-only"><strong>PAYMENTS</strong>${payments}</div>` : ''}
+    <div class="row count-row"><span>Total Items: ${escapeHtml((sale.items || []).length)}</span><span>Total Qty: ${escapeHtml(totalUnits)}</span></div>
   </div>`
     : '';
 
+  const paymentsBlock =
+    settings.printPayments && paymentsHtml
+      ? `<div class="rule"></div>
+         <div class="pay-block">
+           <div class="sec-title">PAYMENTS</div>
+           ${paymentsHtml}
+           <div class="paid-stamp">${sale.refundStatus === 'FULL' ? '*** REFUNDED ***' : '*** PAID ***'}</div>
+         </div>`
+      : '';
+
+  const qrSvg = profile.qrUrl ? buildQrSvg(profile.qrUrl, settings.paperWidth === '58mm' ? 88 : 108) : '';
+  const hasAccount = Boolean(profile.accountTitle || profile.accountMethod || profile.accountNumber);
+
   const footer = settings.printFooter
     ? `<footer>
-        <p class="center-phone">${escapeHtml(RESTAURANT.phone)}</p>
-        <div class="acct-block">
-          <div>${escapeHtml(RESTAURANT.accountTitle)}</div>
-          <div>${escapeHtml(RESTAURANT.accountMethod)}</div>
-        </div>
         ${
-          settings.footerText
-            ? `<p>${escapeHtml(settings.footerText)}</p>`
-            : `<p class="sr-only">${escapeHtml(
-                sale.orderType === 'DELIVERY'
-                  ? 'Thank you for ordering delivery!'
-                  : sale.orderType === 'TAKEAWAY'
-                    ? 'Thank you for choosing takeaway!'
-                    : 'Thank you for dining with us!',
-              )}</p>`
+          hasAccount
+            ? `<div class="rule"></div>
+               <div class="acct-box">
+                 <div class="sec-title center">ONLINE PAYMENT</div>
+                 ${profile.accountMethod ? `<div class="row"><span>Method</span><span>${escapeHtml(profile.accountMethod)}</span></div>` : ''}
+                 ${profile.accountTitle ? `<div class="row"><span>Title</span><span>${escapeHtml(profile.accountTitle)}</span></div>` : ''}
+                 ${profile.accountNumber ? `<div class="row"><span>Account</span><span>${escapeHtml(profile.accountNumber)}</span></div>` : ''}
+               </div>`
+            : ''
         }
+        ${
+          qrSvg
+            ? `<div class="rule"></div>
+               <div class="qr-wrap">
+                 ${qrSvg}
+                 <p class="qr-label">${escapeHtml(profile.qrLabel)}</p>
+               </div>`
+            : ''
+        }
+        <div class="rule"></div>
+        <p class="thanks">${escapeHtml(settings.footerText?.trim() || defaultThankYou(sale.orderType))}</p>
+        <p class="sub-thanks">Please visit us again!</p>
+        ${profile.phone ? `<p class="support">Order &amp; Support: ${escapeHtml(profile.phone)}</p>` : ''}
       </footer>`
     : '';
 
@@ -610,46 +893,68 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   @page { size: ${settings.paperWidth} auto; margin: 2mm; }
   * { box-sizing: border-box; }
   html, body { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0; color: #000; background: #fff; }
-  body { font: ${FONT_PT[settings.receiptFontSize] ?? '11pt'}/1.35 "Courier New", Courier, monospace; }
-  main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0 1mm 3mm; }
-  header { width: 100%; text-align: center; padding-bottom: 2mm; }
-  .stamp-wrap { width: 100%; display: flex; justify-content: center; align-items: center; text-align: center; margin: 0 auto 2mm; }
+  body { font: ${FONT_PT[settings.receiptFontSize] ?? '10.5pt'}/1.35 "Courier New", Courier, monospace; }
+  main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 1mm 1.5mm 4mm; }
+  header { width: 100%; text-align: center; padding-bottom: 1.5mm; }
+  .stamp-wrap { width: 100%; display: flex; justify-content: center; margin: 0 auto 1.5mm; }
   .stamp-wrap svg { display: block; margin: 0 auto; }
-  .tall-title { font-size: 1.45em; transform: scaleY(1.35); transform-origin: center; margin: 1mm 0; font-weight: normal; text-align: center; }
-  header h1 { margin: 1.5mm 0 1mm; font-size: 1.45em; font-weight: normal; transform: scaleY(1.35); text-align: center; }
+  header h1 { margin: 1mm 0 0.5mm; font-size: 1.3em; font-weight: 900; letter-spacing: 0.02em; text-align: center; }
+  .tagline { font-size: 0.85em; font-style: italic; margin-bottom: 1mm; }
+  .addr { font-size: 0.88em; line-height: 1.25; }
+  .tel { font-weight: bold; font-size: 0.92em; margin-top: 0.5mm; }
+  .inv-banner { background: #000; color: #fff; font-weight: 900; text-align: center; padding: 1.2mm 2mm; margin: 2mm 0 1mm; letter-spacing: 0.06em; font-size: 0.95em; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .copy-tag { font-size: 0.85em; letter-spacing: 0.05em; text-align: center; }
   p { margin: 0; }
   .title { display: none; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
-  .rule { margin: 2mm 0; border-top: 1px dashed #000; }
-  table.items-tbl { width: 100%; border-collapse: collapse; font-size: 0.95em; }
-  table.items-tbl th { text-align: left; font-weight: normal; padding-bottom: 1.5mm; border-bottom: 1px dashed #000; }
+  .heavy-rule { margin: 2mm 0; border-top: 2px solid #000; }
+  .rule { margin: 1.8mm 0; border-top: 1px dashed #000; }
+  .sec-title { font-weight: 900; font-size: 0.88em; letter-spacing: 0.04em; margin-bottom: 1mm; }
+  .center { text-align: center; }
+  .lbl { font-weight: bold; }
+  table.items-tbl { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+  table.items-tbl th { text-align: left; font-weight: 900; padding-bottom: 1.2mm; border-bottom: 1px dashed #000; }
   table.items-tbl th.num, table.items-tbl td.num { text-align: right; white-space: nowrap; padding-left: 1.5mm; }
-  table.items-tbl td { padding: 1.5mm 0; vertical-align: top; }
-  .name { overflow-wrap: anywhere; }
-  .note { font-size: 0.85em; font-style: italic; }
-  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; margin: 1mm 0; }
-  .row span:last-child, .row strong { white-space: nowrap; }
-  .grand { margin-top: 2mm; padding: 1.5mm 0; font-size: 1.05em; }
-  .tall-amt { font-size: 1.45em; display: inline-block; transform: scaleY(1.35); }
-  .muted { font-size: 0.9em; }
-  footer { margin-top: 2mm; }
-  .center-phone { text-align: center; margin-bottom: 1.5mm; }
-  .acct-block { text-align: left; }
-  .kitchen h1 { margin: 0 0 1mm; font-size: 1.3em; text-align: center; }
-  .k-meta { text-align: center; margin-bottom: 1.5mm; }
-  .k-rule { border-top: 1px dashed #000; margin: 1.5mm 0; }
-  .k-item { display: flex; gap: 1.5mm; padding: 0.8mm 0; overflow-wrap: anywhere; }
-  .k-qty { font-weight: bold; min-width: 5mm; }
-  .k-name { font-weight: bold; }
+  table.items-tbl td { padding: 1.2mm 0; vertical-align: top; }
+  .name { overflow-wrap: break-word; }
+  .dish-name { font-weight: bold; }
+  .mods { font-size: 0.86em; padding-left: 2mm; }
+  .note { font-size: 0.85em; font-style: italic; padding-left: 2mm; }
+  .refund-tag { font-size: 0.82em; font-weight: bold; padding-left: 2mm; }
+  .amt { font-weight: bold; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 2mm; margin: 0.8mm 0; font-size: 0.92em; }
+  .row span:last-child { white-space: nowrap; }
+  .strong { font-weight: bold; }
+  .muted { font-size: 0.88em; }
+  .grand-bar { display: flex; justify-content: space-between; align-items: center; gap: 2mm; background: #000; color: #fff; font-weight: 900; padding: 1.8mm 2mm; margin: 1.8mm 0 1mm; font-size: 1.05em; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .grand-amt { font-size: 1.15em; white-space: nowrap; }
+  .count-row { font-size: 0.88em; font-weight: bold; }
+  .paid-stamp { text-align: center; font-weight: 900; letter-spacing: 0.08em; margin-top: 1.2mm; font-size: 0.9em; }
+  .acct-box { border: 1px solid #000; padding: 1.5mm 2mm; margin: 1mm 0; }
+  .qr-wrap { text-align: center; padding: 1mm 0; }
+  .qr-label { font-size: 0.82em; margin-top: 1mm; }
+  footer { margin-top: 1.5mm; text-align: center; }
+  .thanks { font-weight: 900; font-size: 0.95em; margin-top: 1mm; }
+  .sub-thanks { font-size: 0.88em; margin-top: 0.5mm; }
+  .support { font-size: 0.85em; margin-top: 0.8mm; }
+  .k-badge { text-align: center; font-weight: 900; font-size: 0.95em; margin-bottom: 1mm; }
+  .k-meta { text-align: center; font-size: 0.88em; margin-bottom: 1.5mm; }
+  .k-item { display: flex; gap: 2mm; padding: 1mm 0; overflow-wrap: break-word; }
+  .k-qty { font-weight: 900; font-size: 1.1em; min-width: 6mm; }
+  .k-name { font-weight: 900; font-size: 1.05em; }
+  .k-mod { font-size: 0.9em; padding-left: 1mm; }
+  .k-note { font-size: 0.88em; font-style: italic; padding-left: 1mm; }
   .cut { border-top: 1px dashed #000; margin: 20mm 0 15mm; }
   </style></head><body><main>
   ${kitchen}
   <header>
-    <div class="stamp-wrap">
-      <svg width="128" height="92" viewBox="0 0 168 120" style="display:block;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" stroke-width="2.5"/>
+    ${
+      profile.showLogo
+        ? `<div class="stamp-wrap">
+      <svg width="118" height="84" viewBox="0 0 168 120" style="display:block;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" stroke-width="2.8"/>
         <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" stroke-width="1.2"/>
-        <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" stroke-width="1.5"/>
+        <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" stroke-width="1.6"/>
         <text x="84" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1">HUNGRY BIRDS</text>
         <text x="84" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1.5">RESTAURANT</text>
         <text x="26" y="64" text-anchor="middle" font-size="11">★</text>
@@ -660,29 +965,38 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
           <line x1="87" y1="72" x2="88" y2="82" stroke="#000" stroke-width="2"/>
         </g>
       </svg>
-    </div>
-    <div class="tall-title">Customer Copy</div>
-    <h1>${escapeHtml(settings.headerText || RESTAURANT.name)}</h1>
-    <p>${escapeHtml(RESTAURANT.addressLine1)}</p>
-    <p>${escapeHtml(RESTAURANT.addressLine2)}</p>
-    <p>${escapeHtml(RESTAURANT.phone)}</p>
+    </div>`
+        : ''
+    }
+    <h1>${escapeHtml(profile.name)}</h1>
+    ${profile.tagline ? `<p class="tagline">${escapeHtml(profile.tagline)}</p>` : ''}
+    ${profile.addressLine1 ? `<p class="addr">${escapeHtml(profile.addressLine1)}</p>` : ''}
+    ${profile.addressLine2 ? `<p class="addr">${escapeHtml(profile.addressLine2)}</p>` : ''}
+    ${profile.phone ? `<p class="tel">Tel: ${escapeHtml(profile.phone)}</p>` : ''}
+    <div class="inv-banner">${escapeHtml(orderBadge)}</div>
+    <div class="copy-tag">*** Customer Copy ***</div>
   </header>
   <div class="title">ORDER RECEIPT</div>
-  <div class="rule"></div>
+  <div class="heavy-rule"></div>
   ${orderDetails}
   ${deliveryDetails}
   <div class="rule"></div>
   <span class="sr-only">ITEMS</span>
   <table class="items-tbl">
     <thead>
-      <tr><th>Item</th><th class="num">Rate</th><th class="num">Qty</th><th class="num">Amount</th></tr>
+      ${
+        settings.printItemPrices
+          ? '<tr><th>Item</th><th class="num">Rate</th><th class="num">Qty</th><th class="num">Amount</th></tr>'
+          : '<tr><th>Item</th><th class="num" colspan="3">Qty</th></tr>'
+      }
     </thead>
     <tbody>
       ${items}
     </tbody>
   </table>
-  <div class="rule"></div>
+  <div class="heavy-rule"></div>
   ${totals}
+  ${paymentsBlock}
   ${footer}
   </main></body></html>`;
 }

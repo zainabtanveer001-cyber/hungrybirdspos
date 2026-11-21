@@ -105,6 +105,7 @@ export interface PrinterSettings {
   /** Print a kitchen ticket above the customer copy. */
   printKitchenTicket: boolean;
   /** What the receipt shows. */
+  showLogo?: boolean;
   printOrderDetails: boolean;
   printDeliveryDetails: boolean;
   printItemPrices: boolean;
@@ -113,6 +114,15 @@ export interface PrinterSettings {
   printFooter: boolean;
   /** What the receipt says. */
   headerText: string;
+  tagline?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  phone?: string;
+  accountTitle?: string;
+  accountMethod?: string;
+  accountNumber?: string;
+  qrUrl?: string;
+  qrLabel?: string;
   footerText: string;
   dateFormat: DateFormat;
   /** LAN / Wi-Fi thermal printer settings. */
@@ -156,6 +166,7 @@ export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   paperWidth: '80mm',
   autoPrint: true,
   printKitchenTicket: false,
+  showLogo: true,
   printOrderDetails: true,
   printDeliveryDetails: true,
   printItemPrices: true,
@@ -163,6 +174,15 @@ export const DEFAULT_PRINTER_SETTINGS: PrinterSettings = {
   printPayments: true,
   printFooter: true,
   headerText: 'Hungry Birds Restaurant',
+  tagline: 'Fresh · Crispy · Made to Order',
+  addressLine1: 'Dubai park stop, near Dera Gujjran station',
+  addressLine2: 'G.T Road Lahore',
+  phone: '0325-7867774',
+  accountTitle: 'Zeeshan Shafiq',
+  accountMethod: 'Jazzcash/Easypaisa',
+  accountNumber: '0325-7867774',
+  qrUrl: '',
+  qrLabel: 'Scan to order or leave a review',
   footerText: '',
   dateFormat: 'locale',
   lanIp: '',
@@ -657,21 +677,36 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
 }
 
 /**
- * Sends a short ESC/POS test slip to verify the active thermal printer immediately.
+ * Sends a styled ESC/POS test slip to verify alignment, inverted banners, bold text, and optional QR printing.
  */
 export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): Promise<void> {
   const settings = await getPrinterSettings().catch(() => DEFAULT_PRINTER_SETTINGS);
+  const cols = settings.paperWidth === '80mm' ? 47 : 31;
+  const heavy = '='.repeat(cols);
+  const light = '-'.repeat(cols);
   const encoder = new EscPosEncoder();
   encoder.initialize();
   encoder.align('center');
   encoder.bold(true);
+  encoder.setSize(0, 1);
   encoder.text(headerText);
+  encoder.setSize(0, 0);
+  encoder.invert(true);
+  encoder.text('  PRINTER TEST SLIP  ');
+  encoder.invert(false);
   encoder.bold(false);
-  encoder.text('--------------------------------');
-  encoder.text(`Thermal Printer Test (${(settings.connectionType || 'bluetooth').toUpperCase()})`);
+  encoder.text(heavy);
+  encoder.text(`Mode: ${(settings.connectionType || 'bluetooth').toUpperCase()}  |  Paper: ${settings.paperWidth}`);
   encoder.text(new Date().toLocaleString());
+  encoder.bold(true);
   encoder.text('Status: CONNECTED & READY');
-  encoder.text('--------------------------------');
+  encoder.bold(false);
+  encoder.text(light);
+  if (settings.qrUrl?.trim()) {
+    encoder.qrCode(settings.qrUrl.trim(), settings.paperWidth === '80mm' ? 5 : 4);
+    encoder.text(settings.qrLabel?.trim() || 'Scan to verify QR');
+    encoder.text(light);
+  }
   encoder.feed(3);
   encoder.cut();
   await printRaw(encoder.build());

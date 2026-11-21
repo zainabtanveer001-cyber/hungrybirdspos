@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Bluetooth, Cable, Check, Cpu, Printer, Wifi, X } from 'lucide-react';
+import { encode as encodeQr } from 'uqr';
 import {
   disconnectPrinterDevice,
   disconnectSerialPrinter,
@@ -27,7 +28,7 @@ import type {
 } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
-import { formatDate, RESTAURANT } from '../lib/receipt';
+import { formatBillTimestamp, formatDecimal, resolveReceiptProfile, RESTAURANT } from '../lib/receipt';
 import { Modal } from './Modal';
 
 const FONT_OPTIONS: Array<{ value: ReceiptFontSize; label: string }> = [
@@ -55,12 +56,13 @@ const BAUD_RATES = [9600, 19200, 38400, 57600, 115200];
 
 /** The "what to print" switches, in the order they appear on the receipt. */
 const PRINT_OPTIONS: Array<[keyof PrinterSettings, string]> = [
-  ['printOrderDetails', 'Order details (ID, date, server, order type)'],
-  ['printDeliveryDetails', 'Delivery details (name, phone, address)'],
-  ['printItemPrices', 'Item prices on every line'],
-  ['printTotals', 'Subtotal, discounts, charges and grand total'],
-  ['printPayments', 'Payment methods and change'],
-  ['printFooter', 'Footer message'],
+  ['showLogo', 'Centered rooster stamp logo at top'],
+  ['printOrderDetails', 'Order details (Bill #, date, cashier, order type/table)'],
+  ['printDeliveryDetails', 'Customer & delivery details (name, phone, address)'],
+  ['printItemPrices', 'Item rate, qty, and amount columns'],
+  ['printTotals', 'Subtotal, discounts, loyalty, charges & highlighted total'],
+  ['printPayments', 'Payment method, cash received, change & PAID stamp'],
+  ['printFooter', 'Online payment box, QR code & thank-you footer'],
 ];
 
 export function PrinterSettingsModal({ username, notify, preview, onClose }: {
@@ -75,6 +77,7 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   const [serialPort, setSerialPort] = useState<SerialPortLike | null>(() => getSerialPrinterPort());
   const [connecting, setConnecting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [previewTime] = useState(() => Date.now());
 
   useEffect(() => {
     getPrinterSettings().then(setSettings);
@@ -509,133 +512,372 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
             ))}
           </section>
 
-          <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-2">
-            <SectionTitle>Receipt text</SectionTitle>
+          <section className="p-3.5 rounded-2xl border border-[#e0edff] bg-white space-y-2.5">
+            <SectionTitle>Store Header &amp; Contact</SectionTitle>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Restaurant name</span>
+                <input
+                  type="text"
+                  value={settings.headerText}
+                  onChange={(e) => setSettings({ ...settings, headerText: e.target.value })}
+                  placeholder={RESTAURANT.name}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Tagline (optional)</span>
+                <input
+                  type="text"
+                  value={settings.tagline ?? RESTAURANT.tagline}
+                  onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
+                  placeholder={RESTAURANT.tagline}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Address line 1</span>
+                <input
+                  type="text"
+                  value={settings.addressLine1 ?? RESTAURANT.addressLine1}
+                  onChange={(e) => setSettings({ ...settings, addressLine1: e.target.value })}
+                  placeholder={RESTAURANT.addressLine1}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Address line 2</span>
+                <input
+                  type="text"
+                  value={settings.addressLine2 ?? RESTAURANT.addressLine2}
+                  onChange={(e) => setSettings({ ...settings, addressLine2: e.target.value })}
+                  placeholder={RESTAURANT.addressLine2}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Phone / Hotline</span>
+                <input
+                  type="text"
+                  value={settings.phone ?? RESTAURANT.phone}
+                  onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                  placeholder={RESTAURANT.phone}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Date format</span>
+                <select
+                  value={settings.dateFormat}
+                  onChange={(e) => setSettings({ ...settings, dateFormat: e.target.value as DateFormat })}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                >
+                  {DATE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section className="p-3.5 rounded-2xl border border-[#e0edff] bg-white space-y-2.5">
+            <SectionTitle>Online Payment Box, QR Code &amp; Footer</SectionTitle>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Payment method</span>
+                <input
+                  type="text"
+                  value={settings.accountMethod ?? RESTAURANT.accountMethod}
+                  onChange={(e) => setSettings({ ...settings, accountMethod: e.target.value })}
+                  placeholder="Jazzcash/Easypaisa"
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Account title</span>
+                <input
+                  type="text"
+                  value={settings.accountTitle ?? RESTAURANT.accountTitle}
+                  onChange={(e) => setSettings({ ...settings, accountTitle: e.target.value })}
+                  placeholder={RESTAURANT.accountTitle}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">Account number</span>
+                <input
+                  type="text"
+                  value={settings.accountNumber ?? RESTAURANT.accountNumber}
+                  onChange={(e) => setSettings({ ...settings, accountNumber: e.target.value })}
+                  placeholder={RESTAURANT.accountNumber}
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">
+                  QR Code URL (optional — reviews, menu, or WhatsApp)
+                </span>
+                <input
+                  type="url"
+                  value={settings.qrUrl ?? ''}
+                  onChange={(e) => setSettings({ ...settings, qrUrl: e.target.value })}
+                  placeholder="https://g.page/r/... or https://wa.me/923257867774"
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-medium text-[#273238] mb-1">QR caption</span>
+                <input
+                  type="text"
+                  value={settings.qrLabel ?? 'Scan to order or leave a review'}
+                  onChange={(e) => setSettings({ ...settings, qrLabel: e.target.value })}
+                  placeholder="Scan to order or leave a review"
+                  className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </label>
+            </div>
+
             <label className="block">
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Header text</span>
-              <input
-                type="text"
-                value={settings.headerText}
-                onChange={(e) => setSettings({ ...settings, headerText: e.target.value })}
-                placeholder={RESTAURANT.name}
-                className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </label>
-            <label className="block">
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Footer text</span>
+              <span className="block text-xs font-medium text-[#273238] mb-1">Custom thank-you footer</span>
               <input
                 type="text"
                 value={settings.footerText}
                 onChange={(e) => setSettings({ ...settings, footerText: e.target.value })}
                 placeholder="Thank you for dining with us!"
-                className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
               />
-              <span className="block text-[10px] text-gray-500 mt-1">Leave empty to use the built-in thank-you line.</span>
-            </label>
-            <label className="block">
-              <span className="block text-[10px] font-bold uppercase tracking-wide text-gray-600 mb-1">Date format</span>
-              <select
-                value={settings.dateFormat}
-                onChange={(e) => setSettings({ ...settings, dateFormat: e.target.value as DateFormat })}
-                className="w-full p-2.5 text-xs ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {DATE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
+              <span className="block text-xs text-[#616f75] mt-1">
+                Leave empty to use the order-type thank-you message automatically.
+              </span>
             </label>
           </section>
 
-          {preview && (
-            <section className="p-3 rounded-xl border border-dashed border-gray-300 bg-gray-50">
-              <SectionTitle>Preview · {settings.paperWidth}</SectionTitle>
-              <div
-                className={`mx-auto bg-white border border-gray-200 rounded-lg p-3 ${receiptFontClass(settings.receiptFontSize)} font-mono text-gray-800`}
-                style={{ width: settings.paperWidth === '58mm' ? 220 : 300 }}
-              >
-                {settings.printKitchenTicket && (
-                  <>
-                    <div className="text-center font-black">KITCHEN ORDER</div>
-                    <div className="text-center text-gray-500">Order #42 · By: staff</div>
-                    <div className="border-t border-dashed border-gray-300 my-1" />
-                    <div className="font-bold">2x Zinger Burger</div>
-                    <div className="border-t border-dashed border-gray-300 my-1" />
-                    <div className="my-3 border-t border-dashed border-gray-400" />
-                  </>
-                )}
-                <div className="flex justify-center mb-1.5">
-                  <svg width="96" height="68" viewBox="0 0 168 120" className="block mx-auto" xmlns="http://www.w3.org/2000/svg">
-                    <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" strokeWidth="2.5" />
-                    <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" strokeWidth="1.2" />
-                    <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" strokeWidth="1.5" />
-                    <text x="84" y="21" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1">HUNGRY BIRDS</text>
-                    <text x="84" y="105" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1.5">RESTAURANT</text>
-                    <text x="26" y="64" textAnchor="middle" fontSize="11">★</text>
-                    <text x="142" y="64" textAnchor="middle" fontSize="11">★</text>
-                    <g transform="translate(-3, 0)">
-                      <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000" />
-                      <line x1="80" y1="72" x2="78" y2="82" stroke="#000" strokeWidth="2" />
-                      <line x1="87" y1="72" x2="88" y2="82" stroke="#000" strokeWidth="2" />
-                    </g>
-                  </svg>
-                </div>
-                <div className="text-center font-semibold">Customer Copy</div>
-                <div className="text-center font-bold pb-0.5">
-                  {settings.headerText || RESTAURANT.name}
-                </div>
-                <div className="text-center text-[10px] text-gray-600 leading-tight">
-                  <div>{RESTAURANT.addressLine1}</div>
-                  <div>{RESTAURANT.addressLine2}</div>
-                  <div>{RESTAURANT.phone}</div>
-                </div>
-                <div className="border-t border-dashed border-gray-300 my-1.5" />
-                {settings.printOrderDetails && (
-                  <div className="text-[10px] text-gray-700 pb-1 border-b border-dashed border-gray-300 mb-1">
-                    <div className="flex justify-between">
-                      <span>Bill #HBR-42</span>
-                      <span>{formatDate(Date.now(), settings.dateFormat)}</span>
-                    </div>
-                    <div>Cashier: {settings.headerText || RESTAURANT.name}</div>
-                  </div>
-                )}
-                <div className="flex justify-between text-[10px] text-gray-500 border-b border-dashed border-gray-300 pb-0.5 mb-1">
-                  <span>Item</span>
-                  <span>Rate · Qty · Amount</span>
-                </div>
-                {preview.lines.map(([label, value]) => (
-                  <div key={label} className="flex justify-between gap-2">
-                    <span className="truncate">{label}</span>
-                    <span className="tabular-nums shrink-0">{value}</span>
-                  </div>
-                ))}
-                {settings.printTotals && (
-                  <>
-                    <div className="flex justify-between font-bold border-t border-dashed border-gray-300 mt-1 pt-1">
-                      <span>Total Amount</span>
-                      <span className="tabular-nums">{formatAmount(preview.total)}</span>
-                    </div>
-                    <div className="border-t border-b border-dashed border-gray-300 my-1 py-0.5 text-[10px]">
-                      Total Items: &nbsp; {preview.lines.length}
-                    </div>
-                  </>
-                )}
-                {settings.printFooter && (
-                  <div className="mt-1.5 text-[10px] text-gray-700">
-                    <p className="text-center">{RESTAURANT.phone}</p>
-                    <p>{RESTAURANT.accountTitle}</p>
-                    <p>{RESTAURANT.accountMethod}</p>
-                    {settings.footerText && <p className="text-center mt-1">{settings.footerText}</p>}
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
+          <LiveReceiptPreview
+            settings={settings}
+            username={username}
+            preview={preview}
+            previewTime={previewTime}
+          />
         </div>
       )}
     </Modal>
   );
 }
 
+function LiveReceiptPreview({
+  settings,
+  username,
+  preview,
+  previewTime,
+}: {
+  settings: PrinterSettings;
+  username: string;
+  preview: { title: string; lines: Array<[string, string]>; total: number } | null;
+  previewTime: number;
+}) {
+  const profile = resolveReceiptProfile(settings);
+  const qrMatrix = useMemo(() => {
+    if (!profile.qrUrl) return null;
+    try {
+      return encodeQr(profile.qrUrl, { ecc: 'M', border: 2 });
+    } catch {
+      return null;
+    }
+  }, [profile.qrUrl]);
+
+  const sampleLines: Array<[string, string]> = preview?.lines.length
+    ? preview.lines
+    : [
+        ['2 × Crispy Zinger Burger (+ Extra Cheese)', formatAmount(1540)],
+        ['1 × Loaded Fries', formatAmount(450)],
+      ];
+  const sampleTotal = preview?.total ?? 1990;
+  const sampleBadge = preview ? preview.title.toUpperCase() : 'DINE IN - TABLE T4';
+
+  return (
+    <section className="p-3.5 rounded-2xl border border-dashed border-[#788991] bg-[#f8fafd]">
+      <SectionTitle>Live Thermal Receipt Preview · {settings.paperWidth}</SectionTitle>
+      <div
+        className={`mx-auto mt-2 bg-white border border-[#d4d4d8] rounded-xl p-3.5 shadow-sm ${receiptFontClass(settings.receiptFontSize)} font-mono text-[#000000]`}
+        style={{ width: settings.paperWidth === '58mm' ? 236 : 316 }}
+      >
+        {settings.printKitchenTicket && (
+          <>
+            <div className="bg-black text-white text-center font-black py-1 px-2 text-[11px] tracking-wider">
+              KITCHEN ORDER (KOT)
+            </div>
+            <div className="text-center font-bold text-[11px] mt-1">{sampleBadge}</div>
+            <div className="text-center text-[10px] text-[#526066]">
+              Bill #HBR-42 · Server: {username}
+            </div>
+            <div className="border-t-2 border-black my-1.5" />
+            <div className="font-bold text-xs">2x Crispy Zinger Burger</div>
+            <div className="text-[10px] pl-3 text-[#273238]">+ Extra Cheese, Extra Jalapenos</div>
+            <div className="border-t-2 border-black my-1.5" />
+            <div className="my-3 border-t border-dashed border-[#788991]" />
+          </>
+        )}
+
+        {profile.showLogo && (
+          <div className="flex justify-center mb-1.5">
+            <svg width="96" height="68" viewBox="0 0 168 120" className="block mx-auto" xmlns="http://www.w3.org/2000/svg">
+              <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" strokeWidth="2.8" />
+              <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" strokeWidth="1.2" />
+              <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" strokeWidth="1.6" />
+              <text x="84" y="21" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1">HUNGRY BIRDS</text>
+              <text x="84" y="105" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1.5">RESTAURANT</text>
+              <text x="26" y="64" textAnchor="middle" fontSize="11">★</text>
+              <text x="142" y="64" textAnchor="middle" fontSize="11">★</text>
+              <g transform="translate(-3, 0)">
+                <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000" />
+                <line x1="80" y1="72" x2="78" y2="82" stroke="#000" strokeWidth="2" />
+                <line x1="87" y1="72" x2="88" y2="82" stroke="#000" strokeWidth="2" />
+              </g>
+            </svg>
+          </div>
+        )}
+
+        <div className="text-center font-black text-sm tracking-tight">{profile.name}</div>
+        {profile.tagline && <div className="text-center text-[10px] italic text-[#273238]">{profile.tagline}</div>}
+        <div className="text-center text-[10px] text-[#273238] leading-tight mt-0.5">
+          {profile.addressLine1 && <div>{profile.addressLine1}</div>}
+          {profile.addressLine2 && <div>{profile.addressLine2}</div>}
+          {profile.phone && <div className="font-bold mt-0.5">Tel: {profile.phone}</div>}
+        </div>
+
+        <div className="bg-black text-white text-center font-bold py-1 px-2 mt-2 text-[11px] tracking-wider">
+          {sampleBadge}
+        </div>
+        <div className="text-center text-[10px] text-[#526066] mt-0.5">*** Customer Copy ***</div>
+
+        <div className="border-t-2 border-black my-1.5" />
+
+        {settings.printOrderDetails && (
+          <div className="text-[10px] pb-1.5 border-b border-dashed border-black mb-1.5 space-y-0.5">
+            <div className="flex justify-between font-bold">
+              <span>Bill #HBR-42</span>
+              <span>{formatBillTimestamp(previewTime)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Cashier: {username}</span>
+              <span>Table: T4</span>
+            </div>
+          </div>
+        )}
+
+        {settings.printDeliveryDetails && (
+          <div className="text-[10px] pb-1.5 border-b border-dashed border-black mb-1.5 space-y-0.5">
+            <div className="font-bold">CUSTOMER DETAILS</div>
+            <div>Customer: Ayesha Khan</div>
+            <div>Phone: 0300-1234567</div>
+          </div>
+        )}
+
+        <div className="flex justify-between text-[10px] font-bold border-b border-dashed border-black pb-0.5 mb-1">
+          <span>Item</span>
+          <span>{settings.printItemPrices ? 'Rate · Qty · Amt' : 'Qty'}</span>
+        </div>
+
+        <div className="space-y-1">
+          {sampleLines.map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-2 text-[11px]">
+              <span className="font-semibold break-words">{label}</span>
+              <span className="tabular-nums font-bold shrink-0">{settings.printItemPrices ? value : '1x'}</span>
+            </div>
+          ))}
+        </div>
+
+        {settings.printTotals && (
+          <>
+            <div className="border-t-2 border-black mt-2 pt-1.5" />
+            <div className="bg-black text-white flex justify-between items-center font-black px-2 py-1.5 text-xs">
+              <span>TOTAL AMOUNT</span>
+              <span className="tabular-nums">Rs {formatDecimal(sampleTotal)}</span>
+            </div>
+            <div className="flex justify-between text-[10px] font-bold border-b border-dashed border-black py-1 mt-0.5">
+              <span>Total Items: {sampleLines.length}</span>
+              <span>Total Qty: {sampleLines.length}</span>
+            </div>
+          </>
+        )}
+
+        {settings.printPayments && (
+          <div className="text-[10px] py-1.5 border-b border-dashed border-black space-y-0.5">
+            <div className="font-bold">PAYMENTS</div>
+            <div className="flex justify-between">
+              <span>Paid (Cash)</span>
+              <span className="tabular-nums">Rs {formatDecimal(sampleTotal)}</span>
+            </div>
+            <div className="text-center font-black tracking-widest pt-0.5">*** PAID ***</div>
+          </div>
+        )}
+
+        {settings.printFooter && (
+          <div className="mt-1.5 text-[10px] space-y-1.5">
+            {(profile.accountMethod || profile.accountTitle || profile.accountNumber) && (
+              <div className="border border-black p-1.5 space-y-0.5">
+                <div className="text-center font-bold">ONLINE PAYMENT</div>
+                {profile.accountMethod && (
+                  <div className="flex justify-between">
+                    <span>Method</span>
+                    <span>{profile.accountMethod}</span>
+                  </div>
+                )}
+                {profile.accountTitle && (
+                  <div className="flex justify-between">
+                    <span>Title</span>
+                    <span>{profile.accountTitle}</span>
+                  </div>
+                )}
+                {profile.accountNumber && (
+                  <div className="flex justify-between">
+                    <span>Account</span>
+                    <span>{profile.accountNumber}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {qrMatrix && (
+              <div className="text-center pt-1">
+                <svg
+                  width={settings.paperWidth === '58mm' ? 80 : 96}
+                  height={settings.paperWidth === '58mm' ? 80 : 96}
+                  viewBox={`0 0 ${qrMatrix.size} ${qrMatrix.size}`}
+                  className="block mx-auto bg-white"
+                  role="img"
+                  aria-label="Receipt QR code preview"
+                >
+                  <rect width={qrMatrix.size} height={qrMatrix.size} fill="#ffffff" />
+                  {qrMatrix.data.map((row, y) =>
+                    row.map((dark, x) =>
+                      dark ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#000000" /> : null,
+                    ),
+                  )}
+                </svg>
+                <p className="text-[9px] text-[#273238] mt-1">{profile.qrLabel}</p>
+              </div>
+            )}
+
+            <div className="text-center border-t border-dashed border-black pt-1.5">
+              <p className="font-bold">{settings.footerText?.trim() || 'Thank you for dining with us!'}</p>
+              <p className="text-[10px]">Please visit us again!</p>
+              {profile.phone && <p className="text-[10px] mt-0.5">Order &amp; Support: {profile.phone}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <p className="text-[10px] font-black uppercase tracking-wider text-gray-700">{children}</p>;
+  return <p className="text-xs font-bold uppercase tracking-wide text-[#273238]">{children}</p>;
 }

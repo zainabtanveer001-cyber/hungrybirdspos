@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatDate, generateEscPosReceipt, receiptDocument, receiptLines, receiptText } from '../src/lib/receipt';
+import {
+  formatDate,
+  generateEscPosReceipt,
+  receiptDocument,
+  receiptLines,
+  receiptText,
+  splitItemDisplay,
+  wrapWords,
+} from '../src/lib/receipt';
 import type { Sale } from '../src/lib/db/types';
 
 const sale: Sale = {
@@ -189,24 +197,104 @@ describe('receipt', () => {
     expect(getPrinterDevice()).toBeNull();
   });
 
-  it('encodes ESC/POS receipt matching the Customer Copy layout without non-ASCII currency artifacts', () => {
-    const bytes = generateEscPosReceipt(sale, { ...settings, printKitchenTicket: false });
+  it('encodes executive ESC/POS receipt with inverted banners, cashier, split delivery info, payments, totals, and zero non-ASCII artifacts', () => {
+    const richSale: Sale = {
+      ...sale,
+      items: [
+        {
+          id: 'm1::Extras:Extra Cheese',
+          menuItemId: 'm1',
+          name: 'Zinger Burger (Extra Cheese)',
+          price: 770,
+          qty: 2,
+          modifiers: [{ group: 'Extras', name: 'Extra Cheese', price: 120 }],
+          note: 'No onions',
+        },
+        { id: 'm2', menuItemId: 'm2', name: 'Cola <500ml>', price: 150, qty: 1, refundedQty: 1 },
+      ],
+      loyaltyRedeemPoints: 50,
+      loyaltyDiscount: 50,
+    };
+
+    const bytes = generateEscPosReceipt(richSale, {
+      ...settings,
+      printKitchenTicket: false,
+      qrUrl: 'https://wa.me/923257867774',
+      qrLabel: 'Scan to order on WhatsApp',
+    });
     const decoded = new TextDecoder().decode(bytes);
-    expect(decoded).toContain('Customer Copy');
+
     expect(decoded).toContain('Hungry Birds Restaurant');
+    expect(decoded).toContain('DELIVERY ORDER');
+    expect(decoded).toContain('Customer Copy');
     expect(decoded).toContain('Dubai park stop, near Dera Gujjran station');
     expect(decoded).toContain('G.T Road Lahore');
     expect(decoded).toContain('Bill #HBR-42');
-    expect(decoded).toContain('Cashier: Hungry Birds Restaurant');
-    expect(decoded).toContain('Customer: Ayesha Model Town');
-    expect(decoded).toContain('Phone: 03001234567');
+    expect(decoded).toContain('Cashier: owner');
+    expect(decoded).toContain('DELIVERY DETAILS');
+    expect(decoded).toContain('Customer: Ayesha');
+    expect(decoded).toContain('Phone:    03001234567');
+    expect(decoded).toContain('Address:  Model Town');
     expect(decoded).toMatch(/Item\s+Rate\s+Qty\s+Amount/);
-    expect(decoded).toMatch(/Zinger Burger\s+650\.00\s+2\s+1,300\.00/);
-    expect(decoded).toContain('Total Amount');
-    expect(decoded).toContain('Rs1,405.00');
-    expect(decoded).toContain('Total Items:   2');
+    expect(decoded).toMatch(/Zinger Burger\s+770\.00\s+2\s+1,540\.00/);
+    // Modifiers appear cleanly once on an indented sub-line (never duplicated)
+    expect(decoded).toContain('  + Extra Cheese');
+    expect(decoded).not.toContain('(Extra Cheese) (Extra Cheese)');
+    expect(decoded).toContain('  * Note: No onions');
+    expect(decoded).toContain('Loyalty (50 pts)');
+    expect(decoded).toContain('TOTAL AMOUNT');
+    expect(decoded).toContain('Rs 1,405.00');
+    expect(decoded).toContain('Total Items: 2');
+    expect(decoded).toContain('Total Qty: 3');
+    expect(decoded).toContain('PAYMENT DETAILS');
+    expect(decoded).toContain('Paid (Cash)');
+    expect(decoded).toContain('Cash Received');
+    expect(decoded).toContain('Change Returned');
+    expect(decoded).toContain('*** PAID ***');
+    expect(decoded).toContain('ONLINE PAYMENT');
     expect(decoded).toContain('Zeeshan Shafiq');
     expect(decoded).toContain('Jazzcash/Easypaisa');
+    expect(decoded).toContain('Scan to order on WhatsApp');
     expect(decoded).not.toContain('\u00A0');
+
+    // Verify ESC/POS inverted highlight command (GS B 1 -> 0x1d 0x42 0x01)
+    let hasInvertOn = false;
+    let hasQrCmd = false;
+    for (let i = 0; i < bytes.length - 3; i += 1) {
+      if (bytes[i] === 0x1d && bytes[i + 1] === 0x42 && bytes[i + 2] === 0x01) hasInvertOn = true;
+      if (bytes[i] === 0x1d && bytes[i + 1] === 0x28 && bytes[i + 2] === 0x6b) hasQrCmd = true;
+    }
+    expect(hasInvertOn).toBe(true);
+    expect(hasQrCmd).toBe(true);
+  });
+
+  it('word-wraps long dish names cleanly without mid-word breaks and renders offline QR SVG in HTML receipt', () => {
+    expect(wrapWords('Crispy Zinger Burger Deluxe', 12)).toEqual(['Crispy', 'Zinger', 'Burger', 'Deluxe']);
+    expect(
+      splitItemDisplay({
+        id: 'm1::Extras:Extra Olives',
+        menuItemId: 'm1',
+        name: 'Zinger Burger (Extra Olives)',
+        price: 700,
+        qty: 1,
+        modifiers: [{ group: 'Extras', name: 'Extra Olives', price: 50 }],
+        note: 'Cut in half',
+      }),
+    ).toEqual({
+      baseName: 'Zinger Burger',
+      modifiers: ['Extra Olives'],
+      note: 'Cut in half',
+    });
+
+    const html = receiptDocument(sale, {
+      ...settings,
+      qrUrl: 'https://hungrybirds.pk',
+      qrLabel: 'Order online',
+    });
+    expect(html).toContain('DELIVERY ORDER');
+    expect(html).toContain('Cashier: owner');
+    expect(html).toContain('ONLINE PAYMENT');
+    expect(html).toContain('Order online');
+    expect(html).toContain('<svg ');
   });
 });
