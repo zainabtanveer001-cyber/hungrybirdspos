@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–16 complete; ready to push or run live visual verification / `/ship`)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slice 16)
+- **Current Phase:** Phase 3 (Build — Slices 9–17 complete; ready to push or run live visual verification / `/ship`)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slice 17)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -49,11 +49,12 @@
   - **Slice 14 (`f9243e8`):** Upgraded thermal ESC/POS & browser receipts to an executive layout (`src/lib/escpos.ts`, `src/lib/printer.ts`, `src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`, `uqr` zero-dependency QR encoder): added `GS B` inverted white-on-black Order Type/Table & Total Amount banners, native `GS ( k` hardware QR code + offline SVG QR for browser/preview, real Cashier/Server name, split Customer/Phone/Address lines, clean word-wrapping (`wrapWords`) + indented `+ Extras` / `* Note:` sub-lines (`splitItemDisplay`), loyalty discount, visible Payment Details / Cash Received / Change Returned / `*** PAID ***`, Total Items + Total Qty, framed Online Payment box, editable store/payment/QR settings, always-on live thermal receipt preview, and expanded `tests/receipt.test.ts` (12 tests).
   - **Slice 15 (`0e9c3d1` — `BUG-013`):** Fixed cross-device category, menu, and inventory deletion sync (`src/lib/syncMap.ts`, `src/lib/sync.ts`, `src/lib/auth.ts`, `src/lib/menu.ts`, `src/App.tsx`, `src/components/InventoryModal.tsx`): added `reconcileMirrorCollection()` and `mergePulledSnapshot()` to prune local-only/stale default categories against authoritative Firestore while protecting pending/in-flight/mid-poll pushes, persisted durable `sync.outbox` upserts/deletes flushed before every pull, gated `ensureDefaultCategories()` behind `categoriesInitialized` so deleting down to zero never resurrects defaults on reload, awaited `initializeApp()` before `startSync()` and `pushCategory`/`pushMenu`/`pushInventory` on delete, prevented `listAll()` outages from wiping local data or masking `403`/outbox errors as `'idle'`, preserved `hb.syncToken` during transient offline token refreshes, and added `focus`/`visibilitychange` wake sync (`15s` poll). Verified with 13 `tests/syncMap.test.ts` + 7 end-to-end 2-device mock-Firestore `tests/sync.test.ts` tests.
   - **Slice 16 (`c061540`):** Added **Split Tender Payments** (`src/lib/payment.ts`, `PaymentModal.tsx` — fast single-method default + `Split Payment` across `Cash`, `Card`, `Online` with `Fill rest` helpers and cash-leg change), **Blind Cash Drawer Close & Visibility Controls** (`BlindCashModal.tsx` with direct total & PKR note/coin counter hiding expected drawer cash & sales; `RecentSales` hiding rupee totals for `CASHIER`/`WAITER` while keeping `Reprint`; `Recent Sales -> Manage` gated behind `OwnerPinModal` for `CASHIER`/`WAITER`; Owner/Manager variance history + Cash/Card/Online breakdown in `ShiftSummaryModal.tsx` & `src/lib/shift.ts`), and **Live Multi-Device Sync** (`src/lib/sync.ts` — 4s Tier 1 / 12s Tier 2 parallel polling, loop-free automatic Dexie hooks with `runAsRemoteApply`, `BroadcastChannel('hb-pos-sync')`, update/void-aware `sales`, operational collections `heldOrders`, `deliveries`, `expenses`, `suppliers`, `stockIn`, `supplierPayments`, `staff`, `attendance`, `leaves`, `salaryPayments`, `advancePayments`, `auditLogs`, and shared shop settings in `/tableOrders/setting_<key>`). Added `tests/shift.test.ts` (3 tests) + expanded `tests/payment.test.ts` (6 tests) and `tests/sync.test.ts` (10 tests).
+  - **Slice 17 (`23f4d44`):** Added **Food Category Sales Breakdown & Filtering** (`src/lib/categoryAnalytics.ts`, `analytics.ts`, `shift.ts`, `cart.ts`, `sales.ts`, `App.tsx`, `SalesAnalyticsModal.tsx`, `SalesHistoryModal.tsx`, `ShiftSummaryModal.tsx`): stamps `categoryId`/`categoryName` on cart/sale items while falling back to live menu/category mappings, computes net category revenue after proportional order/loyalty discounts and refunds (`unitsSold`, `orderCount`, `% share`), updates `getPeriodSummary(categoryId?)` and `getAnalytics(period, categoryId?)` cards/trend charts/top items/top customers when filtered by category, adds category breakdown tiles, click-to-filter category pills, mixed-order category share badges, and Category CSV exports to `SalesAnalyticsModal` and `SalesHistoryModal`, and displays `Sales by food category` inside `ShiftSummaryModal`. Added `tests/categoryAnalytics.test.ts` (4 tests).
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **14 passed (14)** test files, **96 passed (96)** tests.
+- `cd hungrybirds-pos-modern && npm test` → **15 passed (15)** test files, **100 passed (100)** tests.
 - `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `18 warnings` on 84 files).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17 warnings` on 86 files).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities**.
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
@@ -68,7 +69,7 @@
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 96 Vitest unit & regression tests
+npm test          # Run 100 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173
