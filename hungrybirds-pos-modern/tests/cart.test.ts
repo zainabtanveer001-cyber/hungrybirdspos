@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addToCart, calculateCartTotals, setQty } from '../src/lib/cart';
+import { addToCart, calculateCartTotals, cartItemCount, countCartByMenuId, setQty } from '../src/lib/cart';
 import type { CartItem } from '../src/lib/db/types';
 
 const item = (id: string, price: number, qty = 1): CartItem => ({
@@ -55,5 +55,15 @@ describe('cart mutations', () => {
 
   it('removes a line when qty drops to zero', () => {
     expect(setQty([item('a', 100), item('b', 200)], 'a', 0)).toEqual([item('b', 200)]);
+  });
+
+  it('aggregates cart quantities per canonical menuItemId (including modified variants)', () => {
+    const lines: CartItem[] = [
+      { id: 'm1::Size:Large', menuItemId: 'm1', name: 'Burger (Large)', price: 750, qty: 2 },
+      { id: 'm1::Size:Regular', menuItemId: 'm1', name: 'Burger (Regular)', price: 650, qty: 1 },
+      { id: 'm2', menuItemId: 'm2', name: 'Cola', price: 150, qty: 3 },
+    ];
+    expect(countCartByMenuId(lines)).toEqual({ m1: 3, m2: 3 });
+    expect(cartItemCount(lines)).toBe(6);
   });
 });

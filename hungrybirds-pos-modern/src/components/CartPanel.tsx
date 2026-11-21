@@ -1,7 +1,7 @@
-import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed } from 'lucide-react';
+import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed, Check } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
-import { calculateCartTotals } from '../lib/cart';
+import { calculateCartTotals, cartItemCount } from '../lib/cart';
 import type { CartCharges } from '../lib/cart';
 import { formatAmount } from '../lib/format';
 import { CustomerPanel } from './CustomerPanel';
@@ -16,7 +16,7 @@ const ORDER_TYPES: Array<{ value: OrderType; label: string }> = [
 const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T11', 'T12'];
 
 export function CartPanel({
-  items, role, charges, customer, loyaltyBalance, onChange, onCustomerChange,
+  items, role, charges, customer, loyaltyBalance, lastAddedLineId = null, onChange, onCustomerChange,
   onQtyChange, onRemove, onCheckout, onHold, notify,
 }: {
   items: CartItem[];
@@ -24,6 +24,7 @@ export function CartPanel({
   charges: CartCharges;
   customer: CustomerInfo;
   loyaltyBalance: number;
+  lastAddedLineId?: string | null;
   onChange: (charges: CartCharges) => void;
   onCustomerChange: (customer: CustomerInfo) => void;
   onQtyChange: (id: string, qty: number) => void;
@@ -33,6 +34,7 @@ export function CartPanel({
   notify: (message: string) => void;
 }) {
   const totals = calculateCartTotals(items, charges);
+  const totalUnits = cartItemCount(items);
   const { orderType, tableNumber, discountPercent, deliveryCharge } = charges;
 
   const heldOrders = useLive(() => db.heldOrders.toArray(), []) ?? [];
@@ -45,7 +47,20 @@ export function CartPanel({
   return (
     <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e0edff] flex flex-col lg:max-h-[calc(100vh-5.75rem)]">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
-        <h3 className="font-display text-lg font-medium text-[#000000]">Current Order</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-display text-lg font-medium text-[#000000]">Current Order</h3>
+          {totalUnits > 0 && (
+            <span
+              className={`px-2 py-0.5 rounded-[88px] text-xs font-semibold tabular-nums transition-colors ${
+                lastAddedLineId
+                  ? 'bg-emerald-100 text-emerald-800 ring-1 ring-emerald-400 animate-cart-pop'
+                  : 'bg-[#eff6ff] text-[#2941e0]'
+              }`}
+            >
+              {totalUnits} {totalUnits === 1 ? 'item' : 'items'}
+            </span>
+          )}
+        </div>
         <div className="flex bg-[#eff6ff] p-1 rounded-[10px] border border-[#e0edff] text-xs font-medium gap-1">
           {ORDER_TYPES.map((t) => (
             <button
@@ -147,14 +162,27 @@ export function CartPanel({
         {items.length === 0 ? (
           <p className="text-center text-[#616f75] py-6 text-xs">Cart is empty — click any dish to add</p>
         ) : (
-          items.map((item) => (
+          items.map((item) => {
+            const justAdded = lastAddedLineId === item.id;
+            return (
             <div
               key={item.id}
-              className="border border-[#e0edff] rounded-2xl p-2.5 bg-white flex justify-between items-center gap-2"
+              className={`border rounded-2xl p-2.5 flex justify-between items-center gap-2 transition-all ${
+                justAdded
+                  ? 'border-emerald-400 bg-emerald-50/90 ring-2 ring-emerald-300/60 animate-cart-pop'
+                  : 'border-[#e0edff] bg-white'
+              }`}
             >
               <div className="min-w-0">
                 <div className="font-medium text-sm text-[#000000] truncate">{item.name}</div>
-                <div className="text-xs text-[#526066]">{formatAmount(item.price)}</div>
+                <div className="text-xs text-[#526066] flex items-center gap-1.5">
+                  <span>{formatAmount(item.price)}</span>
+                  {justAdded && (
+                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-full">
+                      <Check className="w-2.5 h-2.5" aria-hidden /> Added
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <div className="flex items-center gap-1">
@@ -189,7 +217,8 @@ export function CartPanel({
                 </button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 

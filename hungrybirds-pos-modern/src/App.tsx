@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
-import { ChefHat, CloudOff, LogOut, Menu, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { BellRing, ChefHat, CloudOff, Globe, LogOut, Menu, RefreshCw } from 'lucide-react';
 import { db } from './lib/db';
 import { useLive } from './lib/useLive';
 import { initializeApp, readSession, signOut } from './lib/auth';
 import { getSyncStatus, startSync, stopSync, subscribeToSync, syncNow } from './lib/sync';
-import { addToCart, calculateCartTotals, setQty } from './lib/cart';
+import { addToCart, calculateCartTotals, countCartByMenuId, setQty } from './lib/cart';
 import type { CartCharges } from './lib/cart';
 import { getCustomer } from './lib/customers';
 import { holdOrder } from './lib/held';
@@ -81,8 +81,14 @@ function App() {
   const [kdsOpen, setKdsOpen] = useState(false);
   const [activeOnlineOrder, setActiveOnlineOrder] = useState<OnlineOrder | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [lastAddedMenuId, setLastAddedMenuId] = useState<string | null>(null);
+  const [lastAddedLineId, setLastAddedLineId] = useState<string | null>(null);
+
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const totals = calculateCartTotals(cart, charges);
+  const cartQtyByMenuId = useMemo(() => countCartByMenuId(cart), [cart]);
 
   useEffect(() => {
     initializeApp().catch((err) => console.error('App init failed:', err));
@@ -107,19 +113,42 @@ function App() {
 
   const notify = useCallback((message: string) => {
     setToast(message);
-    setTimeout(() => setToast(null), 3000);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
-  useOrderAlert(notify, onlineOrdersOpen);
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+    };
+  }, []);
+
+  const { pendingCount: pendingOnlineCount, recentArrival: onlineOrderPulse } = useOrderAlert(notify, onlineOrdersOpen);
+
+  const addCartItem = useCallback(
+    (cartItem: CartItem) => {
+      const existing = cart.find((i) => i.id === cartItem.id);
+      const nextQty = existing ? existing.qty + 1 : cartItem.qty;
+      setCart((current) => addToCart(current, cartItem));
+      setLastAddedMenuId(cartItem.menuItemId || cartItem.id);
+      setLastAddedLineId(cartItem.id);
+      if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+      addedTimerRef.current = setTimeout(() => {
+        setLastAddedMenuId(null);
+        setLastAddedLineId(null);
+      }, 950);
+      notify(`Added ${cartItem.name} to cart (×${nextQty})`);
+    },
+    [cart, notify],
+  );
 
   function pickItem(item: MenuItem) {
     if (item.modifierGroups?.length) {
       setModifying(item);
       return;
     }
-    setCart((current) =>
-      addToCart(current, { id: item.id, menuItemId: item.id, name: item.name, price: item.price, qty: 1 }),
-    );
+    addCartItem({ id: item.id, menuItemId: item.id, name: item.name, price: item.price, qty: 1 });
   }
 
   const resetOrder = useCallback(() => {
@@ -293,9 +322,15 @@ function App() {
             type="button"
             onClick={() => setNavOpen(true)}
             aria-label="Open navigation"
-            className="lg:hidden w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
+            className="relative lg:hidden w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-[8px] border border-[#b4c4cc] bg-white hover:bg-[#eff6ff] text-[#000000] flex items-center justify-center"
           >
             <Menu className="w-4 h-4" aria-hidden />
+            {pendingOnlineCount > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[#795afa] ring-2 ring-white animate-pulse"
+              />
+            )}
           </button>
           <h1 className="font-display text-sm sm:text-xl font-medium tracking-normal flex items-center gap-1.5 sm:gap-2.5 min-w-0">
             <img src="/logo.svg" alt="" className="w-6 h-6 sm:w-8 sm:h-8 shrink-0" />
@@ -306,6 +341,46 @@ function App() {
           </span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+          <button
+            type="button"
+            onClick={() => setOnlineOrdersOpen(true)}
+            title={
+              pendingOnlineCount > 0
+                ? `${pendingOnlineCount} pending online ${pendingOnlineCount === 1 ? 'order' : 'orders'}`
+                : 'Open Online Orders'
+            }
+            aria-label={
+              pendingOnlineCount > 0
+                ? `Online orders (${pendingOnlineCount} pending)`
+                : 'Online orders'
+            }
+            className={`relative px-2.5 sm:px-3.5 h-8 sm:h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1.5 shrink-0 ${
+              pendingOnlineCount > 0
+                ? `bg-[#795afa] hover:bg-[#6646e8] text-white shadow-sm ${
+                    onlineOrderPulse ? 'ring-2 ring-[#c5b9fa] animate-pulse' : ''
+                  }`
+                : 'bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0]'
+            }`}
+          >
+            {pendingOnlineCount > 0 ? (
+              <>
+                <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                </span>
+                <BellRing className="w-4 h-4 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">Online</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-white text-[#795afa] text-[10px] font-bold leading-none tabular-nums">
+                  {pendingOnlineCount}
+                </span>
+              </>
+            ) : (
+              <>
+                <Globe className="w-4 h-4 shrink-0" aria-hidden />
+                <span className="hidden sm:inline">Online</span>
+              </>
+            )}
+          </button>
           <button
             type="button"
             onClick={() => setKdsOpen(true)}
@@ -362,8 +437,43 @@ function App() {
         />
 
         <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 pb-28 lg:pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+          {pendingOnlineCount > 0 && !onlineOrdersOpen && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`lg:col-span-3 rounded-2xl bg-[#000524] border border-[#795afa] px-4 py-3 text-white flex flex-wrap items-center justify-between gap-3 shadow-lg ${
+                onlineOrderPulse ? 'ring-2 ring-[#c5b9fa]' : ''
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c5b9fa] opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#795afa]" />
+                </span>
+                <BellRing className="w-4 h-4 text-[#c5b9fa] shrink-0" aria-hidden />
+                <p className="text-xs sm:text-sm font-medium">
+                  <strong>
+                    {pendingOnlineCount} new online {pendingOnlineCount === 1 ? 'order' : 'orders'}
+                  </strong>{' '}
+                  waiting to be accepted
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOnlineOrdersOpen(true)}
+                className="px-3.5 h-8 rounded-[8px] bg-[#795afa] hover:bg-[#6646e8] text-white text-xs font-semibold transition shrink-0"
+              >
+                View &amp; Accept
+              </button>
+            </div>
+          )}
+
           <div className="lg:col-span-2 space-y-4">
-            <MenuGrid onPick={pickItem} />
+            <MenuGrid
+              onPick={pickItem}
+              cartQtyByMenuId={cartQtyByMenuId}
+              lastAddedMenuId={lastAddedMenuId}
+            />
 
             <div id="posCartMobileAnchor" className="lg:hidden scroll-mb-24 scroll-mt-4">
               <CartPanel
@@ -372,6 +482,7 @@ function App() {
                 charges={charges}
                 customer={customer}
                 loyaltyBalance={loyaltyBalance}
+                lastAddedLineId={lastAddedLineId}
                 onChange={setCharges}
                 onCustomerChange={setCustomer}
                 notify={notify}
@@ -412,6 +523,7 @@ function App() {
               charges={charges}
               customer={customer}
               loyaltyBalance={loyaltyBalance}
+              lastAddedLineId={lastAddedLineId}
               onChange={setCharges}
               onCustomerChange={setCustomer}
               notify={notify}
@@ -427,7 +539,11 @@ function App() {
       {cart.length > 0 && (() => {
         const count = cart.reduce((s, i) => s + i.qty, 0);
         return (
-          <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#000524] border-t border-[#795afa]/40 px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xl">
+          <div
+            className={`lg:hidden fixed bottom-0 inset-x-0 z-30 bg-[#000524] border-t px-4 py-2.5 flex items-center justify-between gap-3 shadow-2xl transition-all ${
+              lastAddedLineId ? 'border-emerald-400 ring-2 ring-emerald-400/60' : 'border-[#795afa]/40'
+            }`}
+          >
             <button
               type="button"
               onClick={() => document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'end' })}
@@ -607,14 +723,20 @@ function App() {
           notify={notify}
           onCancel={() => setModifying(null)}
           onAdd={(cartItem) => {
-            setCart((current) => addToCart(current, cartItem));
+            addCartItem(cartItem);
             setModifying(null);
           }}
         />
       )}
 
       {toast && (
-        <div className="fixed bottom-4 right-4 z-[100] bg-[#000524] border border-[#795afa] text-white text-sm font-medium px-4 py-3 rounded-[10px] shadow-xl">
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed right-4 z-[100] bg-[#000524] border border-[#795afa] text-white text-sm font-medium px-4 py-3 rounded-[10px] shadow-xl ${
+            cart.length > 0 ? 'bottom-20 lg:bottom-4' : 'bottom-4'
+          }`}
+        >
           {toast}
         </div>
       )}

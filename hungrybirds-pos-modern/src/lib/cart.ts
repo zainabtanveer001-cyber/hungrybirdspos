@@ -56,6 +56,21 @@ export function setQty(items: CartItem[], id: string, qty: number): CartItem[] {
   return items.map((i) => (i.id === id ? { ...i, qty } : i));
 }
 
+/** Sums cart quantities by canonical `menuItemId` (merging modified variants of the same dish). */
+export function countCartByMenuId(items: CartItem[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const key = item.menuItemId || item.id;
+    counts[key] = (counts[key] || 0) + (Number(item.qty) || 0);
+  }
+  return counts;
+}
+
+/** Total unit count across all lines in the cart. */
+export function cartItemCount(items: CartItem[]): number {
+  return items.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+}
+
 /**
  * Builds the cart line for a customized menu item. The id embeds the sorted
  * selection so the same combination merges into one line while a different

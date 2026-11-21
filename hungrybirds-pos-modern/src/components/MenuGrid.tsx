@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Check, Plus, Search } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
@@ -9,9 +9,11 @@ const ALL = 'ALL';
 
 interface MenuGridProps {
   onPick: (item: MenuItem) => void;
+  cartQtyByMenuId?: Record<string, number>;
+  lastAddedMenuId?: string | null;
 }
 
-export function MenuGrid({ onPick }: MenuGridProps) {
+export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null }: MenuGridProps) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL);
 
@@ -98,34 +100,76 @@ export function MenuGrid({ onPick }: MenuGridProps) {
                   </span>
                 </h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {group.items.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onPick(item)}
-                      title={`Add ${item.name} to the order`}
-                      className="menu-item-card w-full text-left rounded-2xl border border-[#e0edff] bg-white overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-[#2941e0]"
-                    >
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt=""
-                          loading="lazy"
-                          className="w-full h-24 object-cover border-b border-[#e0edff]"
-                        />
-                      ) : (
-                        <div className="h-24 bg-[#eff6ff] flex items-center justify-center text-xs font-medium text-[#526066]">
-                          Menu
+                  {group.items.map((item) => {
+                    const inCartQty = cartQtyByMenuId[item.id] || 0;
+                    const justAdded = lastAddedMenuId === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onPick(item)}
+                        title={`Add ${item.name} to the order`}
+                        className={`menu-item-card relative w-full text-left rounded-2xl border bg-white overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-[#2941e0] ${
+                          justAdded
+                            ? '!border-emerald-500 ring-2 ring-emerald-400/70 animate-cart-pop'
+                            : inCartQty > 0
+                              ? '!border-[#2941e0] ring-1 ring-[#2941e0]/30'
+                              : 'border-[#e0edff]'
+                        }`}
+                      >
+                        {justAdded && (
+                          <span
+                            role="status"
+                            className="absolute top-2 left-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-bold shadow-sm"
+                          >
+                            <Check className="w-3 h-3" aria-hidden /> Added
+                          </span>
+                        )}
+                        {inCartQty > 0 && (
+                          <span
+                            aria-label={`${inCartQty} in cart`}
+                            className={`absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm tabular-nums ${
+                              justAdded ? 'bg-emerald-600 text-white' : 'bg-[#2941e0] text-white'
+                            }`}
+                          >
+                            ×{inCartQty} in cart
+                          </span>
+                        )}
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt=""
+                            loading="lazy"
+                            className="w-full h-24 object-cover border-b border-[#e0edff]"
+                          />
+                        ) : (
+                          <div className="h-24 bg-[#eff6ff] flex items-center justify-center text-xs font-medium text-[#526066]">
+                            Menu
+                          </div>
+                        )}
+                        <div className="p-3">
+                          <h3 className="font-sans font-medium text-sm text-[#000000] leading-snug line-clamp-2 min-h-10">
+                            {item.name}
+                          </h3>
+                          <div className="flex items-center justify-between gap-2 mt-2">
+                            <p className="text-[#2941e0] font-semibold text-sm tabular-nums">{formatAmount(item.price)}</p>
+                            <span
+                              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold transition-colors ${
+                                justAdded
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : inCartQty > 0
+                                    ? 'bg-[#2941e0] text-white'
+                                    : 'bg-[#eff6ff] text-[#2941e0]'
+                              }`}
+                            >
+                              <Plus className="w-3 h-3" aria-hidden />
+                              {inCartQty > 0 ? '1 more' : 'Add'}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                      <div className="p-3">
-                        <h3 className="font-sans font-medium text-sm text-[#000000] leading-snug line-clamp-2 min-h-10">
-                          {item.name}
-                        </h3>
-                        <p className="text-[#2941e0] font-semibold text-sm mt-2">{formatAmount(item.price)}</p>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             ))}

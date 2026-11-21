@@ -142,18 +142,41 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
                       if (!window.matchMedia('(min-width: 1024px)').matches) onClose();
                     }}
                     title={collapsed ? item.label : undefined}
-                    className={`w-full rounded-[8px] px-3 py-2 text-left text-sm font-normal flex items-center gap-3 text-[#000000] hover:bg-[#eff6ff] hover:text-[#2941e0] transition-colors ${
+                    aria-label={collapsed ? (item.badge ? `${item.label} (${item.badge})` : item.label) : undefined}
+                    className={`relative w-full rounded-[8px] px-3 py-2 text-left text-sm font-normal flex items-center gap-3 text-[#000000] hover:bg-[#eff6ff] hover:text-[#2941e0] transition-colors ${
                       collapsed ? 'justify-center' : ''
+                    } ${
+                      item.label === 'Online orders' && item.badge && item.badge > 0
+                        ? 'bg-[#eff6ff] text-[#2941e0] font-medium'
+                        : ''
                     }`}
                   >
-                    <item.icon className="w-4 h-4 shrink-0 text-[#526066]" aria-hidden />
+                    <item.icon
+                      className={`w-4 h-4 shrink-0 ${
+                        item.label === 'Online orders' && item.badge && item.badge > 0
+                          ? 'text-[#795afa]'
+                          : 'text-[#526066]'
+                      }`}
+                      aria-hidden
+                    />
                     {!collapsed && <span className="truncate">{item.label}</span>}
+                    {collapsed && !!item.badge && (
+                      <span
+                        className={`absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full text-[9px] font-bold flex items-center justify-center ${
+                          item.label === 'Online orders'
+                            ? 'bg-[#795afa] text-white animate-pulse'
+                            : 'bg-[#2941e0] text-white'
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
                     {!collapsed && !!item.badge && (
                       <span
-                        className={`ml-auto rounded-[88px] bg-[#eff6ff] text-[#2941e0] px-2.5 py-0.5 text-xs font-medium ${
+                        className={`ml-auto rounded-[88px] px-2.5 py-0.5 text-xs font-medium ${
                           item.label === 'Online orders' && item.badge > 0
-                            ? 'animate-pulse ring-2 ring-[#795afa]'
-                            : ''
+                            ? 'bg-[#795afa] text-white animate-pulse ring-2 ring-[#c5b9fa]'
+                            : 'bg-[#eff6ff] text-[#2941e0]'
                         }`}
                       >
                         {item.badge}

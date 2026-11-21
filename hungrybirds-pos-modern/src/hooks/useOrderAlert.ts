@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 
@@ -34,29 +34,47 @@ function playBeep() {
 }
 
 /**
- * Plays an alert sound and fires a toast when a new order arrives
- * in the POS inbox — but only when the OnlineOrdersModal is not already open,
- * so accepting orders doesn't produce a cascade of alerts.
+ * Plays an alert sound, flashes visual indicators, and fires a toast when a new
+ * order arrives in the POS inbox — while returning the live pending count so the
+ * header badge and incoming-order banner stay visible until staff handle it.
  */
 export function useOrderAlert(notify: (message: string) => void, ordersModalOpen: boolean) {
   const pendingCount = useLive(() => db.onlineOrders.where('status').equals('PENDING').count(), []);
+  const [recentArrival, setRecentArrival] = useState(false);
 
-  // null until the first real count arrives, so existing orders don't alert on load.
+  // null until the first real count arrives, so existing orders don't beep on load.
   const prevCountRef = useRef<number | null>(null);
+  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (pendingCount === undefined) return;
     const prev = prevCountRef.current;
     prevCountRef.current = pendingCount;
 
-    if (prev !== null && pendingCount > prev && !ordersModalOpen) {
-      const newOrders = pendingCount - prev;
-      playBeep();
-      notify(
-        newOrders === 1
-          ? '🔔 New website order received!'
-          : `🔔 ${newOrders} new website orders received!`,
-      );
+    if (prev !== null && pendingCount > prev) {
+      setRecentArrival(true);
+      if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+      pulseTimerRef.current = setTimeout(() => setRecentArrival(false), 5000);
+
+      if (!ordersModalOpen) {
+        const newOrders = pendingCount - prev;
+        playBeep();
+        notify(
+          newOrders === 1
+            ? 'New online order received! Click "Online" to review.'
+            : `${newOrders} new online orders received! Click "Online" to review.`,
+        );
+      }
+    } else if (pendingCount === 0) {
+      setRecentArrival(false);
     }
   }, [pendingCount, notify, ordersModalOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    };
+  }, []);
+
+  return { pendingCount: pendingCount ?? 0, recentArrival };
 }
