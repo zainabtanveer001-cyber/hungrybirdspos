@@ -1,101 +1,160 @@
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { formatAmount } from '../lib/format';
+import { computeCashBalance, computeQuickTenderAmounts } from '../lib/payment';
+import { Modal } from './Modal';
 import type { PaymentDetail, PaymentMethod } from '../lib/db/types';
 
 const METHODS: PaymentMethod[] = ['Cash', 'Card', 'Online'];
 
-export function PaymentModal({ total, onCancel, onConfirm }: {
+export function PaymentModal({
+  total,
+  onCancel,
+  onConfirm,
+}: {
   total: number;
   onCancel: () => void;
-  onConfirm: (payments: PaymentDetail[]) => void;
+  onConfirm: (payments: PaymentDetail[]) => Promise<void> | void;
 }) {
   const [method, setMethod] = useState<PaymentMethod>('Cash');
   const [cashGiven, setCashGiven] = useState<number>(total);
-  const change = Math.max(0, cashGiven - total);
-  const short = method === 'Cash' && cashGiven < total;
+  const [busy, setBusy] = useState(false);
+
+  const quickAmounts = useMemo(() => computeQuickTenderAmounts(total), [total]);
+  const balance = computeCashBalance(total, cashGiven);
+  const short = method === 'Cash' && balance.short;
+
+  async function handleSubmit() {
+    if (short || busy) return;
+    setBusy(true);
+    try {
+      await onConfirm([
+        method === 'Cash'
+          ? { method, amount: total, cashGiven, change: balance.change }
+          : { method, amount: total },
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h2 className="font-black text-gray-900">Take Payment</h2>
-          <button type="button" onClick={onCancel} className="text-gray-400 hover:text-red-500" aria-label="Close">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          <div className="text-center bg-emerald-50 rounded-2xl py-4">
-            <p className="text-xs uppercase tracking-widest text-emerald-700 font-bold">Total Due</p>
-            <p className="text-3xl font-black text-emerald-700">{formatAmount(total)}</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {METHODS.map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMethod(m)}
-                aria-pressed={method === m}
-                className={`py-2.5 rounded-xl text-sm font-bold border transition ${
-                  method === m
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-blue-50'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-
-          {method === 'Cash' && (
-            <div className="space-y-2">
-              <label htmlFor="cashGiven" className="block text-xs font-bold text-gray-600 uppercase tracking-wide">
-                Cash Received
-              </label>
-              <input
-                id="cashGiven"
-                type="number"
-                min={0}
-                value={cashGiven}
-                onChange={(e) => setCashGiven(Math.max(0, Number(e.target.value) || 0))}
-                className="w-full p-3 text-right font-black text-lg border-0 ring-1 ring-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-              <div className="flex justify-between text-sm font-bold">
-                <span className="text-gray-500">{short ? 'Still owed:' : 'Change:'}</span>
-                <span className={short ? 'text-red-600' : change > 0 ? 'text-emerald-600' : 'text-gray-400'}>
-                  {formatAmount(short ? total - cashGiven : change)}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-3 px-5 pb-5">
+    <Modal
+      title="Take Payment"
+      onClose={onCancel}
+      closeDisabled={busy}
+      footer={
+        <div className="flex gap-2.5">
           <button
             type="button"
             onClick={onCancel}
-            className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+            disabled={busy}
+            className="flex-1 h-11 rounded-[8px] font-medium border border-[#788991] bg-white text-[#000000] hover:bg-[#eff6ff] disabled:opacity-45 transition text-sm"
           >
             Cancel
           </button>
           <button
             type="button"
-            disabled={short}
-            onClick={() =>
-              onConfirm([
-                method === 'Cash'
-                  ? { method, amount: total, cashGiven, change }
-                  : { method, amount: total },
-              ])
-            }
-            className="flex-2 basis-2/3 py-3 rounded-xl font-bold bg-emerald-500 text-white hover:bg-emerald-600 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={short || busy}
+            onClick={() => void handleSubmit()}
+            className="flex-[2] h-11 rounded-[8px] font-semibold bg-emerald-700 text-white hover:bg-emerald-800 transition disabled:opacity-45 disabled:cursor-not-allowed text-sm"
           >
-            Complete Sale
+            {busy ? 'Completing…' : 'Complete Sale'}
           </button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-3 bg-[#eff6ff] border border-[#e0edff] rounded-2xl px-4 py-3.5">
+          <span className="text-xs font-semibold uppercase tracking-wide text-[#526066]">Total Due</span>
+          <span className="font-display text-2xl font-bold text-[#2941e0] tabular-nums">
+            {formatAmount(total)}
+          </span>
+        </div>
+
+        <div
+          role="group"
+          aria-label="Payment method"
+          className="grid grid-cols-3 gap-1.5 bg-[#eff6ff] p-1 rounded-[10px] border border-[#e0edff]"
+        >
+          {METHODS.map((m) => (
+            <button
+              key={m}
+              type="button"
+              disabled={busy}
+              onClick={() => setMethod(m)}
+              aria-pressed={method === m}
+              className={`min-h-10 rounded-[8px] text-sm font-semibold transition ${
+                method === m
+                  ? 'bg-[#2941e0] text-white shadow-xs'
+                  : 'text-[#273238] hover:bg-white hover:text-[#2941e0]'
+              }`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {method === 'Cash' && (
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="cashGiven" className="block text-xs font-medium text-[#273238] mb-1.5">
+                Cash Received (Rs)
+              </label>
+              <input
+                id="cashGiven"
+                type="number"
+                min={0}
+                step="any"
+                autoFocus
+                disabled={busy}
+                value={cashGiven}
+                onChange={(e) => setCashGiven(Math.max(0, Number(e.target.value) || 0))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !short && !busy) void handleSubmit();
+                }}
+                className="w-full px-3.5 h-11 text-right font-display font-bold text-lg border border-[#788991] rounded-[10px] bg-white text-[#000000] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0]"
+              />
+            </div>
+
+            <div role="group" aria-label="Quick cash amounts" className="flex flex-wrap gap-1.5">
+              {quickAmounts.map((amount, index) => {
+                const active = cashGiven === amount;
+                return (
+                  <button
+                    key={amount}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setCashGiven(amount)}
+                    aria-pressed={active}
+                    className={`px-3 min-h-9 rounded-[8px] text-xs font-semibold border tabular-nums transition ${
+                      active
+                        ? 'bg-[#2941e0] text-white border-[#2941e0]'
+                        : 'bg-white text-[#273238] border-[#788991] hover:bg-[#eff6ff] hover:border-[#2941e0]'
+                    }`}
+                  >
+                    {index === 0 ? 'Exact' : formatAmount(amount)}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              className={`flex justify-between items-center rounded-[10px] px-3.5 py-2.5 text-sm font-semibold border ${
+                short
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : balance.change > 0
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    : 'bg-[#f8fafd] border-[#e0edff] text-[#526066]'
+              }`}
+            >
+              <span>{short ? 'Still owed' : 'Change'}</span>
+              <span className="font-display text-base font-bold tabular-nums">
+                {formatAmount(short ? balance.remaining : balance.change)}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 }
