@@ -34,3 +34,11 @@
   - Re-price active-shift recipe usage (excluding refunded quantities) and manual stock reductions live at the latest inventory unit cost (`computeSaleLiveCost`, `computeShiftUsage` in `src/lib/shift.ts` and `getPnl` in `src/lib/analytics.ts`), and lock/snapshot costs (`Sale.lockedCost` and `closedShiftManualCosts`) when `closeShift()` is called.
   - Subscribe `LiveStockPanel.tsx`, `ShiftSummaryModal.tsx`, and `ProfitLossModal.tsx` via `useLive` so cost and P&L update in real time on the go.
   - Add unit tests in `tests/liveCostAndMenuImage.test.ts` (6 tests).
+- [x] **Slice 8 — Incoming Online Order & Add-to-Cart Visual Cues**
+  - Add header pulsing `Online` trigger, workspace alert banner, mobile hamburger dot, collapsed sidebar badge, dish card `×N in cart` / `✓ Added` badges, `CartPanel` count badge & row highlight, and mobile-safe toast.
+- [x] **Slice 9 — Design Tokens, Accessible `<Modal>`, & Counter/Cart Polish (`docs/DESIGN.md` P1)**
+  - Add WCAG 2.2 AA CSS tokens & global `:focus-visible` ring in `src/index.css`; upgrade `Modal.tsx` with `Esc` close, `aria-labelledby`, focus trap & focus restoration; fix mobile header `"Hung..."` truncation, MenuGrid `role="group"` + clear search, CartPanel `36×36px` steppers & equal 3-col order type toggle, visible `<label>`s in `CustomerPanel.tsx` & `LoginScreen.tsx`.
+- [x] **Slice 10 — Unified Take Payment Modal (`docs/DESIGN.md` P1)**
+  - Add `src/lib/payment.ts` (`computeQuickTenderAmounts`, `computeCashBalance`) + `tests/payment.test.ts` (3 tests); migrate `PaymentModal.tsx` onto shared `<Modal>` with quick-tender PKR chips, double-submit `busy` guard, and WCAG AA `#047857` / `#2941e0` / `#dc2626` colors.
+- [x] **Slice 11 — Unified KDS, Online Orders, Shift Summary & Secondary Modals (`docs/DESIGN.md` P1/P2)**
+  - Unify `KitchenDisplayModal`, `OnlineOrdersModal`, `ShiftSummaryModal`, `LiveStockPanel`, `ModifierModal`, `OwnerPinModal`, `HeldOrdersModal`, `ProfitLossModal`, `RefundModal`, and `SalesHistoryModal` onto the cobalt-and-paper token set with `≥ 11–12px` typography, `≥ 36px` touch targets, WCAG AA button contrast, and inline confirmations replacing native `window.prompt()` / `window.confirm()`.

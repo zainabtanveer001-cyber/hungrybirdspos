@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 2 (UI/UX Design — `docs/DESIGN.md` written & audited against live code; ready for UI polish slices or Phase 6 Release `/ship`)
-- **Active Branch:** `main` (synced with `origin/main` @ `7801225`)
+- **Current Phase:** Phase 3 (Build — UI/UX & WCAG 2.2 AA alignment Slices 9–11 complete; ready for live multi-width visual verification, push, or `/ship`)
+- **Active Branch:** `main` (local ahead of `origin/main` with Phase 2 docs + Slices 9–11)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -39,21 +39,24 @@
   - **Incoming online orders:** Added a dedicated header `Online` button (`App.tsx`) with live pulsing beacon + count pill when `pendingOnlineCount > 0`, a persistent top-of-workspace alert banner (`"N new online order(s) waiting to be accepted"` + `"View & Accept"`), a pulsing dot on the mobile navigation hamburger button, and collapsed-sidebar badge support (`Sidebar.tsx`) with accessible `aria-label`; upgraded `useOrderAlert.ts` to expose `{ pendingCount, recentArrival }`.
   - **Add-to-cart feedback:** Added `countCartByMenuId()` & `cartItemCount()` (`src/lib/cart.ts` + unit test in `tests/cart.test.ts`), dish-card `×N in cart` pill badge, active border, `"✓ Added"` flash & `animate-cart-pop` (`MenuGrid.tsx`, `index.css`), `Current Order` live item count badge & newly-added row emerald highlight (`CartPanel.tsx`), debounced toast confirmation (`Added <name> to cart (×N)`) lifted clear above the mobile sticky bottom bar, and mobile sticky bar flash on add.
 - **Phase 2 — UI/UX Design Spec (`docs/DESIGN.md`):**
-  - Authored `docs/DESIGN.md` covering the top 3 POS user tasks, happy & unhappy user flows, information architecture & role matrix, one-sentence visual direction, WCAG 2.2 AA contrast-verified design tokens, component inventory, mobile/tablet/desktop screen specs with all 6 UI states, and a concrete P1/P2 gap audit against the current `hungrybirds-pos-modern` UI (contrast fixes, 32–44px cart stepper touch targets, `<Modal>` keyboard/focus-trap & `PaymentModal` unification, quick-cash tender chips, ARIA/label fixes, and replacing native `window.confirm`/`window.prompt`).
+  - Authored `docs/DESIGN.md` covering the top 3 POS user tasks, happy & unhappy user flows, information architecture & role matrix, one-sentence visual direction, WCAG 2.2 AA contrast-verified design tokens, component inventory, mobile/tablet/desktop screen specs with all 6 UI states, and a concrete P1/P2 gap audit against the current `hungrybirds-pos-modern` UI.
+- **Phase 3 — UI/UX & WCAG 2.2 AA Alignment (Slices 9–11):**
+  - **Slice 9 (`2b81133`):** Added verified WCAG 2.2 AA CSS tokens & global `:focus-visible` outline (`src/index.css`); upgraded `Modal.tsx` with `Esc` close, `aria-labelledby`, focus trap & focus return, and scrim close; eliminated mobile `"Hung..."` header truncation when Online orders are pending (`App.tsx`); fixed `MenuGrid.tsx` `role="group"` + clear-search button; upgraded `CartPanel.tsx` quantity steppers & remove buttons to `36×36px` with `#dc2626`/`#047857` contrast and equal 3-column mobile order-type toggle; added visible `12px` `<label>` elements across `CustomerPanel.tsx` and `LoginScreen.tsx`.
+  - **Slice 10 (`1389e33`):** Added `src/lib/payment.ts` (`computeQuickTenderAmounts`, `computeCashBalance`) + `tests/payment.test.ts` (3 tests); migrated `PaymentModal.tsx` onto shared `<Modal>` with quick-tender PKR chips, double-submit `busy` guard, and WCAG AA `#047857` / `#2941e0` / `#dc2626` tokens.
+  - **Slice 11 (`4c7c27f`):** Unified `KitchenDisplayModal.tsx`, `OnlineOrdersModal.tsx`, `ShiftSummaryModal.tsx`, `LiveStockPanel.tsx`, `ModifierModal.tsx`, `OwnerPinModal.tsx`, `HeldOrdersModal.tsx`, `ProfitLossModal.tsx`, `RefundModal.tsx`, and `SalesHistoryModal.tsx` onto the cobalt-and-paper token system (`≥ 11–12px` copy, `≥ 36px` touch targets, WCAG AA button contrast) and replaced native `window.prompt()` / `window.confirm()` dialogs with inline confirmation UI.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **64 passed (64)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`).
+- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **67 passed (67)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build` in `1.37s`, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `19 warnings` — down from `21`).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
-- **Live Browser QA (`http://localhost:5174/` & `http://localhost:5175/`):** Desktop (`1366×768`) and mobile (`390×844`) verified with **0** open S1/S2 bugs and **0** browser console errors.
+- **Live Browser QA:** Prior Slice 8 pass (`1366×768` & `390×844`) had **0** console errors; post-Slice 11 multi-width check (`375px` / `768px` / `1280px`) is pending Chrome remote debugging.
 
 ## 3. Known Gaps & Deferred Items
-- **Pending UI/UX visual verification (`docs/DESIGN.md` §10):** Fresh multi-width browser verification at `375px`, `768px`, and `1280px` (plus `320px` overflow check) is still pending because Chrome remote debugging (`DevToolsActivePort`) was unavailable during Phase 2. Prior `1366×768` and `390×844` captures were reviewed alongside code inspection.
-- **UI/UX alignment backlog (`docs/DESIGN.md` §9):** P1 WCAG contrast/touch-target/modal-a11y fixes and P2 legacy modal token unification are documented in `docs/DESIGN.md` and awaiting approval to implement.
+- **Pending post-polish visual verification (`docs/DESIGN.md` §10):** Live multi-width Chrome verification of Slices 9–11 at `375px`, `768px`, and `1280px` (plus `320px` overflow check) is pending Chrome remote debugging (`DevToolsActivePort`).
 - **Offline fallback default credentials (`AUD-005`):** Fresh offline installs seed `owner`, `manager`, `cashier`, and `waiter` with password `1234` (SHA-256) in local IndexedDB for offline fallback when Firebase is unreachable. Cloud authentication always takes precedence when online.
-- **Cosmetic / S4 items deferred:** Single-chunk bundle size warning (`~606 kB` minified / `172 kB` gzip).
+- **Cosmetic / S4 items deferred:** Single-chunk bundle size warning (`~635 kB` minified / `178 kB` gzip).
 
 ## 4. How to Run
 ```powershell
@@ -71,5 +74,5 @@ npm run lint      # Run ESLint on legacy root files
 ```
 
 ## 5. Next Steps / Blockers
-- **Blockers:** Chrome remote debugging (`DevToolsActivePort`) was unavailable for fresh `375px` / `768px` / `1280px` visual checks.
-- **Next:** Review `docs/DESIGN.md` and either (a) implement the P1/P2 UI/UX polish & WCAG 2.2 AA alignment slices (`engineering-standards`) and verify at `375px` / `768px` / `1280px`, or (b) proceed directly to Phase 6 Release (`/ship`).
+- **Blockers:** Chrome remote debugging (`DevToolsActivePort`) was unavailable for fresh `375px` / `768px` / `1280px` visual verification.
+- **Next:** Run live multi-width browser QA (`375px` / `768px` / `1280px`) once Chrome remote debugging is active, push to `zainabtanveer001-cyber/hungrybirdspos` when requested, or run `/ship` (Phase 6 Release).
