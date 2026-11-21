@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–12 complete; ready to push or run live multi-width visual verification / `/ship`)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slice 12)
+- **Current Phase:** Phase 3 (Build — Slices 9–13 complete; ready to push or run live multi-width visual verification / `/ship`)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slices 12–13)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -45,10 +45,11 @@
   - **Slice 10 (`1389e33`):** Added `src/lib/payment.ts` (`computeQuickTenderAmounts`, `computeCashBalance`) + `tests/payment.test.ts` (3 tests); migrated `PaymentModal.tsx` onto shared `<Modal>` with quick-tender PKR chips, double-submit `busy` guard, and WCAG AA `#047857` / `#2941e0` / `#dc2626` tokens.
   - **Slice 11 (`4c7c27f`):** Unified `KitchenDisplayModal.tsx`, `OnlineOrdersModal.tsx`, `ShiftSummaryModal.tsx`, `LiveStockPanel.tsx`, `ModifierModal.tsx`, `OwnerPinModal.tsx`, `HeldOrdersModal.tsx`, `ProfitLossModal.tsx`, `RefundModal.tsx`, and `SalesHistoryModal.tsx` onto the cobalt-and-paper token system (`≥ 11–12px` copy, `≥ 36px` touch targets, WCAG AA button contrast) and replaced native `window.prompt()` / `window.confirm()` dialogs with inline confirmation UI.
   - **Slice 12 (`7ecf0d3`):** Added `decrementByMenuId()` (`src/lib/cart.ts` + 2 tests in `tests/cart.test.ts`), dish-card `36px` `- [qty] +` steppers on in-cart dishes (`MenuGrid.tsx`, keeping photo/title tappable and handling modifier groups via picker on `+` / latest-line decrement on `-`), `Clear` cart button with inline 2-step confirmation resetting the full draft order (`CartPanel.tsx` + `App.tsx`), and compact single-row Dine-In Table `<select>` dropdown (`Counter (No table)` + `T1`–`T12` with `Occupied (Held)` labels and amber `"Held"` badge) freeing vertical space for cart items.
+  - **Slice 13 (`f116bc5`):** Added reusable **Modifiers & Extras Library** (`src/lib/modifiers.ts`, `src/components/ModifierGroupsSection.tsx`) with 1-click `"Load Starter Extras"` (`Extra Olives`, `Cheese Slice`, `Extra Cheese`, `Extra Jalapenos`), per-dish modifier editor (`AdminSettingsModal.tsx`, `menu.ts`), on-the-fly `"+ Extras"` / `"Edit extras"` cart row editor (`CartPanel.tsx`, `ModifierModal.tsx`) with `"Apply to all N"` vs `"Customize 1 only"` line splitting and optional Kitchen Notes, optional inventory stock & Live Shift COGS / refund integration (`sales.ts`, `refunds.ts`, `shift.ts`), KDS KOT modifier deduplication (`KitchenDisplayModal.tsx`), and expanded unit tests in `tests/modifiers.test.ts` (9 tests).
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **69 passed (69)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build` in `1.66s`, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **73 passed (73)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build` in `1.70s`, no `.map` file exposed).
 - `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `19 warnings`).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).

@@ -21,7 +21,7 @@
 ### US-2: Menu, Categories, Modifiers & Recipes
 - **Must:** Allow Owner to create/delete food categories and create/edit/delete menu items with price, category, optional image URL or **local device photo upload (auto-compressed on `<canvas>` to JPEG under Firestore's sync limit and displayed on that dish's card in place of the `"Menu"` placeholder box)**, and recipe ingredient deductions.
 - **Must:** Support dish search (`/` shortcut) and category filtering on the counter screen.
-- **Must:** Support modifier groups (required/optional, single/multi-select) and merge identical modifier combinations into a single cart line while keeping different combinations separate.
+- **Must:** Support reusable **Modifiers & Extras** groups in Admin Settings (with a 1-click `"Load Starter Extras"` template: Extra Olives, Cheese Slice, Extra Cheese, Extra Jalapenos, configurable as global for Cart Extras, category-attached, or auto-popup on dish tap) plus dish-specific modifier groups, optional Kitchen Notes (printed on KDS/KOT), per-cart-line `"+ Extras"` editing (with `"Apply to all N"` vs `"Customize 1 only"` splitting when `qty > 1`), and optional inventory ingredient linking so modifier add-ons deduct/restore stock and count toward Live Shift Cost & P&L.
 
 ### US-3: Cart, Order Types, Table Assignment & Pricing Math
 - **Must:** Support `DINE_IN` (with table assignment `T1`–`T12` and occupied-table indicators from held orders), `TAKEAWAY`, and `DELIVERY`.
