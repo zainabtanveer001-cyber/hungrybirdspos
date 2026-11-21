@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–13 complete; ready to push or run live multi-width visual verification / `/ship`)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slices 12–13)
+- **Current Phase:** Phase 3 (Build — Slices 9–14 complete; ready to push or run live visual verification / `/ship`)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slice 14)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -46,11 +46,13 @@
   - **Slice 11 (`4c7c27f`):** Unified `KitchenDisplayModal.tsx`, `OnlineOrdersModal.tsx`, `ShiftSummaryModal.tsx`, `LiveStockPanel.tsx`, `ModifierModal.tsx`, `OwnerPinModal.tsx`, `HeldOrdersModal.tsx`, `ProfitLossModal.tsx`, `RefundModal.tsx`, and `SalesHistoryModal.tsx` onto the cobalt-and-paper token system (`≥ 11–12px` copy, `≥ 36px` touch targets, WCAG AA button contrast) and replaced native `window.prompt()` / `window.confirm()` dialogs with inline confirmation UI.
   - **Slice 12 (`7ecf0d3`):** Added `decrementByMenuId()` (`src/lib/cart.ts` + 2 tests in `tests/cart.test.ts`), dish-card `36px` `- [qty] +` steppers on in-cart dishes (`MenuGrid.tsx`, keeping photo/title tappable and handling modifier groups via picker on `+` / latest-line decrement on `-`), `Clear` cart button with inline 2-step confirmation resetting the full draft order (`CartPanel.tsx` + `App.tsx`), and compact single-row Dine-In Table `<select>` dropdown (`Counter (No table)` + `T1`–`T12` with `Occupied (Held)` labels and amber `"Held"` badge) freeing vertical space for cart items.
   - **Slice 13 (`f116bc5`):** Added reusable **Modifiers & Extras Library** (`src/lib/modifiers.ts`, `src/components/ModifierGroupsSection.tsx`) with 1-click `"Load Starter Extras"` (`Extra Olives`, `Cheese Slice`, `Extra Cheese`, `Extra Jalapenos`), per-dish modifier editor (`AdminSettingsModal.tsx`, `menu.ts`), on-the-fly `"+ Extras"` / `"Edit extras"` cart row editor (`CartPanel.tsx`, `ModifierModal.tsx`) with `"Apply to all N"` vs `"Customize 1 only"` line splitting and optional Kitchen Notes, optional inventory stock & Live Shift COGS / refund integration (`sales.ts`, `refunds.ts`, `shift.ts`), KDS KOT modifier deduplication (`KitchenDisplayModal.tsx`), and expanded unit tests in `tests/modifiers.test.ts` (9 tests).
+  - **Slice 14 (`f9243e8`):** Upgraded thermal ESC/POS & browser receipts to an executive layout (`src/lib/escpos.ts`, `src/lib/printer.ts`, `src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`, `uqr` zero-dependency QR encoder): added `GS B` inverted white-on-black Order Type/Table & Total Amount banners, native `GS ( k` hardware QR code + offline SVG QR for browser/preview, real Cashier/Server name, split Customer/Phone/Address lines, clean word-wrapping (`wrapWords`) + indented `+ Extras` / `* Note:` sub-lines (`splitItemDisplay`), loyalty discount, visible Payment Details / Cash Received / Change Returned / `*** PAID ***`, Total Items + Total Qty, framed Online Payment box, editable store/payment/QR settings, always-on live thermal receipt preview, and expanded `tests/receipt.test.ts` (12 tests).
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **73 passed (73)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build` in `1.70s`, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `19 warnings`).
+- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **74 passed (74)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `18 warnings` — down from `19`).
+- `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities**.
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
 - **Live Browser QA:** Prior Slice 8 pass (`1366×768` & `390×844`) had **0** console errors; post-Slice 11 multi-width check (`375px` / `768px` / `1280px`) is pending Chrome remote debugging.

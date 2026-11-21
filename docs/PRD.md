@@ -64,7 +64,7 @@
 - **Must:** Provide Sales Analytics (today/week/month buckets, top items, top customers) and date-range Profit & Loss (`Sales − Inventory Cost (COGS) − Approved Expenses`).
 
 ### US-12: Receipt Printing, Backup/Restore & Mobile Responsive UI
-- **Must:** Generate ESC/POS thermal receipts (with centered monochrome logo stamp, kitchen ticket option, 58mm/80mm width) across Bluetooth, USB, Serial, and LAN printers, falling back cleanly to escaped HTML browser printing.
+- **Must:** Generate executive ESC/POS thermal receipts (with optional centered monochrome rooster logo stamp, bold brand title & tagline, white-on-black inverted Order Type/Table & Total Amount banners, real Cashier/Server name, split Customer/Phone/Address block, word-wrapped items with indented `+ Extras` & `* Note:` sub-lines, Subtotal/Discount/Loyalty/Charges breakdown, Payment Method/Cash Received/Change Returned & `*** PAID ***` stamp, Total Items & Total Qty, framed Online Payment box, optional native `GS ( k` QR code, editable store/payment/QR settings, kitchen ticket option, 58mm/80mm width) across Bluetooth, USB, Serial, and LAN printers, with matching escaped HTML browser printing (offline `uqr` SVG QR) and always-on live preview in Printer Settings.
 - **Must:** Export and import validated JSON backups (supporting both legacy and modern formats) without exposing or corrupting user credentials.
 - **Must:** Provide a responsive mobile layout (`390px` width) with accessible navigation drawer, visible Logout button, and sticky bottom checkout bar.
 
