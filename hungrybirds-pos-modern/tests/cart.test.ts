@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addToCart, calculateCartTotals, cartItemCount, countCartByMenuId, setQty } from '../src/lib/cart';
+import { addToCart, calculateCartTotals, cartItemCount, countCartByMenuId, decrementByMenuId, setQty } from '../src/lib/cart';
 import type { CartItem } from '../src/lib/db/types';
 
 const item = (id: string, price: number, qty = 1): CartItem => ({
@@ -65,5 +65,32 @@ describe('cart mutations', () => {
     ];
     expect(countCartByMenuId(lines)).toEqual({ m1: 3, m2: 3 });
     expect(cartItemCount(lines)).toBe(6);
+  });
+
+  it('decrements plain items and removes them when qty reaches zero', () => {
+    const start = [item('a', 100, 2), item('b', 200, 1)];
+    const afterOne = decrementByMenuId(start, 'a');
+    expect(afterOne).toEqual([item('a', 100, 1), item('b', 200, 1)]);
+    const afterTwo = decrementByMenuId(afterOne, 'a');
+    expect(afterTwo).toEqual([item('b', 200, 1)]);
+    expect(decrementByMenuId(afterTwo, 'missing')).toEqual([item('b', 200, 1)]);
+  });
+
+  it('decrements the most recently added matching modified line first', () => {
+    const lines: CartItem[] = [
+      { id: 'm1::Spice:Mild', menuItemId: 'm1', name: 'Burger (Mild)', price: 650, qty: 2 },
+      { id: 'm2', menuItemId: 'm2', name: 'Fries', price: 250, qty: 1 },
+      { id: 'm1::Spice:Hot', menuItemId: 'm1', name: 'Burger (Hot)', price: 700, qty: 1 },
+    ];
+    const step1 = decrementByMenuId(lines, 'm1');
+    expect(step1).toEqual([
+      { id: 'm1::Spice:Mild', menuItemId: 'm1', name: 'Burger (Mild)', price: 650, qty: 2 },
+      { id: 'm2', menuItemId: 'm2', name: 'Fries', price: 250, qty: 1 },
+    ]);
+    const step2 = decrementByMenuId(step1, 'm1');
+    expect(step2).toEqual([
+      { id: 'm1::Spice:Mild', menuItemId: 'm1', name: 'Burger (Mild)', price: 650, qty: 1 },
+      { id: 'm2', menuItemId: 'm2', name: 'Fries', price: 250, qty: 1 },
+    ]);
   });
 });

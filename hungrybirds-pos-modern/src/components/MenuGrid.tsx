@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Check, Plus, Search, X } from 'lucide-react';
+import { Check, Minus, Plus, Search, X } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
@@ -9,11 +9,17 @@ const ALL = 'ALL';
 
 interface MenuGridProps {
   onPick: (item: MenuItem) => void;
+  onDecrement?: (item: MenuItem) => void;
   cartQtyByMenuId?: Record<string, number>;
   lastAddedMenuId?: string | null;
 }
 
-export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null }: MenuGridProps) {
+export function MenuGrid({
+  onPick,
+  onDecrement,
+  cartQtyByMenuId = {},
+  lastAddedMenuId = null,
+}: MenuGridProps) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL);
 
@@ -125,13 +131,11 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                   {group.items.map((item) => {
                     const inCartQty = cartQtyByMenuId[item.id] || 0;
                     const justAdded = lastAddedMenuId === item.id;
+                    const hasModifiers = Boolean(item.modifierGroups?.length);
                     return (
-                      <button
+                      <article
                         key={item.id}
-                        type="button"
-                        onClick={() => onPick(item)}
-                        title={`Add ${item.name} to the order`}
-                        className={`menu-item-card relative w-full text-left rounded-2xl border bg-white overflow-hidden transition-all focus-visible:ring-2 focus-visible:ring-[#2941e0] ${
+                        className={`menu-item-card relative w-full text-left rounded-2xl border bg-white overflow-hidden flex flex-col transition-all ${
                           justAdded
                             ? '!border-emerald-700 ring-2 ring-emerald-700/35 animate-cart-pop'
                             : inCartQty > 0
@@ -142,7 +146,7 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                         {justAdded && (
                           <span
                             role="status"
-                            className="absolute top-2 left-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[11px] font-bold shadow-sm"
+                            className="pointer-events-none absolute top-2 left-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[11px] font-bold shadow-sm"
                           >
                             <Check className="w-3 h-3" aria-hidden /> Added
                           </span>
@@ -150,46 +154,92 @@ export function MenuGrid({ onPick, cartQtyByMenuId = {}, lastAddedMenuId = null 
                         {inCartQty > 0 && (
                           <span
                             aria-label={`${inCartQty} in cart`}
-                            className={`absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm tabular-nums ${
+                            className={`pointer-events-none absolute top-2 right-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm tabular-nums ${
                               justAdded ? 'bg-emerald-700 text-white' : 'bg-[#2941e0] text-white'
                             }`}
                           >
                             ×{inCartQty} in cart
                           </span>
                         )}
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt=""
-                            loading="lazy"
-                            className="w-full h-24 object-cover border-b border-[#e0edff]"
-                          />
-                        ) : (
-                          <div className="h-24 bg-[#eff6ff] flex items-center justify-center text-xs font-medium text-[#526066]">
-                            Menu
+
+                        <button
+                          type="button"
+                          onClick={() => onPick(item)}
+                          title={hasModifiers ? `Customize & add ${item.name}` : `Add ${item.name} to the order`}
+                          className="w-full text-left flex-1 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2941e0]"
+                        >
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl}
+                              alt=""
+                              loading="lazy"
+                              className="w-full h-24 object-cover border-b border-[#e0edff]"
+                            />
+                          ) : (
+                            <div className="w-full h-24 bg-[#eff6ff] flex items-center justify-center text-xs font-medium text-[#526066]">
+                              Menu
+                            </div>
+                          )}
+                          <div className="p-3 pb-1.5 flex-1">
+                            <h3 className="font-sans font-medium text-sm text-[#000000] leading-snug line-clamp-2 min-h-10">
+                              {item.name}
+                            </h3>
                           </div>
-                        )}
-                        <div className="p-3">
-                          <h3 className="font-sans font-medium text-sm text-[#000000] leading-snug line-clamp-2 min-h-10">
-                            {item.name}
-                          </h3>
-                          <div className="flex items-center justify-between gap-2 mt-2">
-                            <p className="text-[#2941e0] font-semibold text-sm tabular-nums">{formatAmount(item.price)}</p>
-                            <span
-                              className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[11px] font-semibold transition-colors ${
-                                justAdded
-                                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                                  : inCartQty > 0
-                                    ? 'bg-[#2941e0] text-white'
-                                    : 'bg-[#eff6ff] text-[#2941e0]'
-                              }`}
-                            >
-                              <Plus className="w-3 h-3" aria-hidden />
-                              {inCartQty > 0 ? '1 more' : 'Add'}
-                            </span>
-                          </div>
+                        </button>
+
+                        <div className="px-3 pb-3 pt-1 space-y-2">
+                          {inCartQty > 0 ? (
+                            <>
+                              <p className="text-[#2941e0] font-semibold text-sm tabular-nums">
+                                {formatAmount(item.price)}
+                              </p>
+                              <div
+                                role="group"
+                                aria-label={`Quantity in cart for ${item.name}`}
+                                className="flex items-center justify-between gap-1 bg-[#eff6ff] border border-[#e0edff] rounded-[10px] p-1"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => onDecrement?.(item)}
+                                  aria-label={`Decrease ${item.name}`}
+                                  className="w-9 h-9 rounded-[8px] bg-red-600 hover:bg-red-700 text-white flex items-center justify-center transition-colors shrink-0"
+                                >
+                                  <Minus className="w-4 h-4" aria-hidden />
+                                </button>
+                                <span className="font-display font-bold text-sm text-[#000000] tabular-nums text-center min-w-6">
+                                  {inCartQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => onPick(item)}
+                                  aria-label={
+                                    hasModifiers
+                                      ? `Customize and add another ${item.name}`
+                                      : `Increase ${item.name}`
+                                  }
+                                  className="w-9 h-9 rounded-[8px] bg-emerald-700 hover:bg-emerald-800 text-white flex items-center justify-center transition-colors shrink-0"
+                                >
+                                  <Plus className="w-4 h-4" aria-hidden />
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[#2941e0] font-semibold text-sm tabular-nums">
+                                {formatAmount(item.price)}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => onPick(item)}
+                                aria-label={`Add ${item.name} to cart`}
+                                className="inline-flex items-center gap-0.5 px-2.5 min-h-8 rounded-[8px] text-xs font-semibold bg-[#eff6ff] hover:bg-[#2941e0] text-[#2941e0] hover:text-white transition-colors"
+                              >
+                                <Plus className="w-3.5 h-3.5" aria-hidden /> Add
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </button>
+                      </article>
                     );
                   })}
                 </div>

@@ -1,3 +1,4 @@
+import { useId, useState } from 'react';
 import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed, Check } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
@@ -17,7 +18,7 @@ const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T1
 
 export function CartPanel({
   items, role, charges, customer, loyaltyBalance, lastAddedLineId = null, onChange, onCustomerChange,
-  onQtyChange, onRemove, onCheckout, onHold, notify,
+  onQtyChange, onRemove, onClear, onCheckout, onHold, notify,
 }: {
   items: CartItem[];
   role: UserRole;
@@ -29,10 +30,13 @@ export function CartPanel({
   onCustomerChange: (customer: CustomerInfo) => void;
   onQtyChange: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
+  onClear: () => void;
   onCheckout: () => void;
   onHold: () => void;
   notify: (message: string) => void;
 }) {
+  const [confirmingClear, setConfirmingClear] = useState(false);
+  const tableSelectId = useId();
   const totals = calculateCartTotals(items, charges);
   const totalUnits = cartItemCount(items);
   const { orderType, tableNumber, discountPercent, deliveryCharge } = charges;
@@ -44,21 +48,36 @@ export function CartPanel({
       .map((h) => h.tableNumber as string),
   );
 
+  const selectedTableOccupied = Boolean(tableNumber && occupiedTables.has(tableNumber));
+  const showClearConfirm = confirmingClear && items.length > 0;
+
   return (
     <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#e0edff] flex flex-col lg:max-h-[calc(100vh-5.75rem)]">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 gap-2">
-        <div className="flex items-center gap-2">
-          <h3 className="font-display text-lg font-medium text-[#000000]">Current Order</h3>
-          {totalUnits > 0 && (
-            <span
-              className={`px-2.5 py-0.5 rounded-[88px] text-xs font-semibold tabular-nums transition-colors ${
-                lastAddedLineId
-                  ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-700/40 animate-cart-pop'
-                  : 'bg-[#eff6ff] text-[#2941e0]'
-              }`}
+        <div className="flex items-center justify-between sm:justify-start gap-2">
+          <div className="flex items-center gap-2">
+            <h3 className="font-display text-lg font-medium text-[#000000]">Current Order</h3>
+            {totalUnits > 0 && (
+              <span
+                className={`px-2.5 py-0.5 rounded-[88px] text-xs font-semibold tabular-nums transition-colors ${
+                  lastAddedLineId
+                    ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-700/40 animate-cart-pop'
+                    : 'bg-[#eff6ff] text-[#2941e0]'
+                }`}
+              >
+                {totalUnits} {totalUnits === 1 ? 'item' : 'items'}
+              </span>
+            )}
+          </div>
+          {items.length > 0 && !showClearConfirm && (
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(true)}
+              aria-label="Clear cart"
+              className="text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 px-2.5 min-h-8 rounded-[8px] flex items-center gap-1 transition-colors shrink-0"
             >
-              {totalUnits} {totalUnits === 1 ? 'item' : 'items'}
-            </span>
+              <Trash2 className="w-3.5 h-3.5" aria-hidden /> Clear
+            </button>
           )}
         </div>
         <div
@@ -90,50 +109,63 @@ export function CartPanel({
         </div>
       </div>
 
+      {showClearConfirm && (
+        <div
+          role="alert"
+          className="mb-3 p-3 rounded-[10px] bg-red-50 border border-red-200 flex flex-wrap items-center justify-between gap-2"
+        >
+          <span className="text-xs font-semibold text-red-800">
+            Clear entire order?
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(false)}
+              className="px-3 min-h-9 rounded-[8px] text-xs font-semibold border border-[#788991] bg-white text-[#273238] hover:bg-[#eff6ff] transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingClear(false);
+                onClear();
+              }}
+              className="px-3 min-h-9 rounded-[8px] text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition"
+            >
+              Confirm Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {orderType === 'DINE_IN' && (
-        <div className="mb-3 p-3 rounded-2xl bg-[#eff6ff]/60 border border-[#e0edff]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-[#273238] flex items-center gap-1.5">
-              <UtensilsCrossed className="w-3.5 h-3.5 text-[#2941e0]" aria-hidden />
-              Table Assignment {tableNumber ? `· ${tableNumber}` : '· Counter'}
+        <div className="mb-3 px-3 py-2 rounded-[10px] bg-[#eff6ff]/70 border border-[#e0edff] flex items-center gap-2">
+          <label
+            htmlFor={tableSelectId}
+            className="text-xs font-semibold text-[#273238] flex items-center gap-1.5 shrink-0"
+          >
+            <UtensilsCrossed className="w-3.5 h-3.5 text-[#2941e0]" aria-hidden />
+            <span>Table</span>
+          </label>
+          <select
+            id={tableSelectId}
+            value={tableNumber ?? ''}
+            onChange={(e) => onChange({ ...charges, tableNumber: e.target.value || undefined })}
+            className="flex-1 min-w-0 h-9 px-2.5 text-xs font-medium text-[#000000] bg-white border border-[#788991] rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0]"
+          >
+            <option value="">Counter (No table)</option>
+            {TABLES.map((t) => (
+              <option key={t} value={t}>
+                {occupiedTables.has(t) ? `${t} — Occupied (Held)` : t}
+              </option>
+            ))}
+          </select>
+          {selectedTableOccupied && (
+            <span className="px-2 py-0.5 rounded-[88px] bg-amber-50 border border-amber-300 text-amber-900 text-[11px] font-semibold shrink-0">
+              Held
             </span>
-            {tableNumber && (
-              <button
-                type="button"
-                onClick={() => onChange({ ...charges, tableNumber: undefined })}
-                className="text-xs font-medium text-[#2941e0] hover:underline"
-              >
-                Clear (Counter)
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-6 gap-1.5">
-            {TABLES.map((t) => {
-              const selected = tableNumber === t;
-              const occupied = occupiedTables.has(t);
-              return (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => onChange({ ...charges, tableNumber: selected ? undefined : t })}
-                  aria-pressed={selected}
-                  title={occupied ? `${t} has a held order` : `Assign to ${t}`}
-                  className={`relative min-h-9 rounded-[8px] text-xs font-medium border transition ${
-                    selected
-                      ? 'bg-[#2941e0] text-white border-[#2941e0]'
-                      : occupied
-                        ? 'bg-amber-50 text-amber-900 border-amber-400 hover:bg-amber-100'
-                        : 'bg-white text-[#273238] border-[#788991] hover:border-[#2941e0]'
-                  }`}
-                >
-                  {t}
-                  {occupied && !selected && (
-                    <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-amber-700" aria-hidden />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          )}
         </div>
       )}
 
@@ -163,65 +195,65 @@ export function CartPanel({
         </div>
       )}
 
-      <div className="space-y-2 mb-3 flex-1 overflow-y-auto custom-scrollbar min-h-[110px]">
+      <div className="space-y-2 mb-3 flex-1 overflow-y-auto custom-scrollbar min-h-[150px]">
         {items.length === 0 ? (
           <p className="text-center text-[#616f75] py-6 text-xs">Cart is empty — tap any dish to start an order</p>
         ) : (
           items.map((item) => {
             const justAdded = lastAddedLineId === item.id;
             return (
-            <div
-              key={item.id}
-              className={`border rounded-2xl p-2.5 flex justify-between items-center gap-2 transition-all ${
-                justAdded
-                  ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-700/25 animate-cart-pop'
-                  : 'border-[#e0edff] bg-white'
-              }`}
-            >
-              <div className="min-w-0">
-                <div className="font-medium text-sm text-[#000000] truncate">{item.name}</div>
-                <div className="text-xs text-[#526066] flex items-center gap-1.5 tabular-nums">
-                  <span>{formatAmount(item.price)}</span>
-                  {justAdded && (
-                    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-full">
-                      <Check className="w-3 h-3" aria-hidden /> Added
-                    </span>
-                  )}
+              <div
+                key={item.id}
+                className={`border rounded-2xl p-2.5 flex justify-between items-center gap-2 transition-all ${
+                  justAdded
+                    ? 'border-emerald-700 bg-emerald-50 ring-2 ring-emerald-700/25 animate-cart-pop'
+                    : 'border-[#e0edff] bg-white'
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="font-medium text-sm text-[#000000] truncate">{item.name}</div>
+                  <div className="text-xs text-[#526066] flex items-center gap-1.5 tabular-nums">
+                    <span>{formatAmount(item.price)}</span>
+                    {justAdded && (
+                      <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-full">
+                        <Check className="w-3 h-3" aria-hidden /> Added
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onQtyChange(item.id, item.qty - 1)}
+                      className="w-9 h-9 rounded-[8px] bg-red-600 text-white hover:bg-red-700 flex items-center justify-center transition-colors"
+                      aria-label={`Decrease ${item.name}`}
+                    >
+                      <Minus className="w-4 h-4" aria-hidden />
+                    </button>
+                    <span className="font-semibold min-w-6 text-center text-sm tabular-nums text-[#000000]">{item.qty}</span>
+                    <button
+                      type="button"
+                      onClick={() => onQtyChange(item.id, item.qty + 1)}
+                      className="w-9 h-9 rounded-[8px] bg-emerald-700 text-white hover:bg-emerald-800 flex items-center justify-center transition-colors"
+                      aria-label={`Increase ${item.name}`}
+                    >
+                      <Plus className="w-4 h-4" aria-hidden />
+                    </button>
+                  </div>
+                  <div className="font-semibold text-xs sm:text-sm min-w-14 sm:min-w-16 text-right text-[#000000] tabular-nums">
+                    {formatAmount(item.price * item.qty)}
+                  </div>
                   <button
                     type="button"
-                    onClick={() => onQtyChange(item.id, item.qty - 1)}
-                    className="w-9 h-9 rounded-[8px] bg-red-600 text-white hover:bg-red-700 flex items-center justify-center transition-colors"
-                    aria-label={`Decrease ${item.name}`}
+                    onClick={() => onRemove(item.id)}
+                    className="w-9 h-9 rounded-[8px] text-[#526066] hover:text-red-700 hover:bg-red-50 flex items-center justify-center transition-colors"
+                    aria-label={`Remove ${item.name}`}
                   >
-                    <Minus className="w-4 h-4" aria-hidden />
-                  </button>
-                  <span className="font-semibold min-w-6 text-center text-sm tabular-nums text-[#000000]">{item.qty}</span>
-                  <button
-                    type="button"
-                    onClick={() => onQtyChange(item.id, item.qty + 1)}
-                    className="w-9 h-9 rounded-[8px] bg-emerald-700 text-white hover:bg-emerald-800 flex items-center justify-center transition-colors"
-                    aria-label={`Increase ${item.name}`}
-                  >
-                    <Plus className="w-4 h-4" aria-hidden />
+                    <Trash2 className="w-4 h-4" aria-hidden />
                   </button>
                 </div>
-                <div className="font-semibold text-xs sm:text-sm min-w-14 sm:min-w-16 text-right text-[#000000] tabular-nums">
-                  {formatAmount(item.price * item.qty)}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onRemove(item.id)}
-                  className="w-9 h-9 rounded-[8px] text-[#526066] hover:text-red-700 hover:bg-red-50 flex items-center justify-center transition-colors"
-                  aria-label={`Remove ${item.name}`}
-                >
-                  <Trash2 className="w-4 h-4" aria-hidden />
-                </button>
               </div>
-            </div>
             );
           })
         )}

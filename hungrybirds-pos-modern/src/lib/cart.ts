@@ -56,6 +56,26 @@ export function setQty(items: CartItem[], id: string, qty: number): CartItem[] {
   return items.map((i) => (i.id === id ? { ...i, qty } : i));
 }
 
+/**
+ * Decrements the most recently added cart line matching `menuItemId` by 1,
+ * removing that line if its quantity drops to 0.
+ */
+export function decrementByMenuId(items: CartItem[], menuItemId: string): CartItem[] {
+  let targetIndex = -1;
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    if ((items[i].menuItemId || items[i].id) === menuItemId) {
+      targetIndex = i;
+      break;
+    }
+  }
+  if (targetIndex === -1) return items;
+  const target = items[targetIndex];
+  if (target.qty <= 1) {
+    return items.filter((_, idx) => idx !== targetIndex);
+  }
+  return items.map((item, idx) => (idx === targetIndex ? { ...item, qty: item.qty - 1 } : item));
+}
+
 /** Sums cart quantities by canonical `menuItemId` (merging modified variants of the same dish). */
 export function countCartByMenuId(items: CartItem[]): Record<string, number> {
   const counts: Record<string, number> = {};

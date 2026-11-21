@@ -4,7 +4,7 @@ import { db } from './lib/db';
 import { useLive } from './lib/useLive';
 import { initializeApp, readSession, signOut } from './lib/auth';
 import { getSyncStatus, startSync, stopSync, subscribeToSync, syncNow } from './lib/sync';
-import { addToCart, calculateCartTotals, countCartByMenuId, setQty } from './lib/cart';
+import { addToCart, calculateCartTotals, countCartByMenuId, decrementByMenuId, setQty } from './lib/cart';
 import type { CartCharges } from './lib/cart';
 import { getCustomer } from './lib/customers';
 import { holdOrder } from './lib/held';
@@ -158,6 +158,15 @@ function App() {
     setLoyaltyBalance(0);
     setActiveOnlineOrder(null);
   }, []);
+
+  const decrementMenuItem = useCallback((item: MenuItem) => {
+    setCart((current) => decrementByMenuId(current, item.id));
+  }, []);
+
+  const clearCart = useCallback(() => {
+    resetOrder();
+    notify('Cart cleared.');
+  }, [notify, resetOrder]);
 
   const hold = useCallback(async () => {
     if (!cart.length) return;
@@ -478,6 +487,7 @@ function App() {
           <div className="lg:col-span-2 space-y-4">
             <MenuGrid
               onPick={pickItem}
+              onDecrement={decrementMenuItem}
               cartQtyByMenuId={cartQtyByMenuId}
               lastAddedMenuId={lastAddedMenuId}
             />
@@ -495,6 +505,7 @@ function App() {
                 notify={notify}
                 onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
                 onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
+                onClear={clearCart}
                 onHold={hold}
                 onCheckout={() => void startCheckout()}
               />
@@ -536,6 +547,7 @@ function App() {
               notify={notify}
               onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
               onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
+              onClear={clearCart}
               onHold={hold}
               onCheckout={() => void startCheckout()}
             />
