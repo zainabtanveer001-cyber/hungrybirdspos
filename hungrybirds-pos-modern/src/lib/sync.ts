@@ -2,7 +2,7 @@ import { db } from './db';
 import { configManager } from './config';
 import {
   cloudOrderToLocal, cloudSaleToLocal, decodeFields, documentId, encodeFields,
-  localOrderPatch, toIso,
+  localOrderPatch, mergePulledSnapshot, reconcileMirrorCollection, toIso,
 } from './syncMap';
 import type { Category, InventoryItem, MenuItem, OnlineOrder } from './db/types';
 
@@ -10,7 +10,10 @@ import type { Category, InventoryItem, MenuItem, OnlineOrder } from './db/types'
 // Vercel/Rolldown build, and polling a tiny metadata projection is cheap.
 const TOKEN_KEY = 'hb.syncToken';
 const SNAPSHOT_KEY = 'sync.snapshot';
-const POLL_MS = 25_000;
+const OUTBOX_KEY = 'sync.outbox';
+const CATEGORIES_INITIALIZED_KEY = 'categoriesInitialized';
+const POLL_MS = 15_000;
+const WAKE_MIN_INTERVAL_MS = 3_000;
 const MAX_SYNCED_IMAGE_BYTES = 700 * 1024;
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
@@ -92,8 +95,16 @@ async function accessToken(): Promise<string | null> {
     body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: token.refreshToken }),
     signal: AbortSignal.timeout(8000),
   }).catch(() => null);
-  if (!res?.ok) {
-    forgetToken();
+  if (!res) {
+    setStatus({ state: 'error', error: 'Offline — retrying sync' });
+    return null;
+  }
+  if (!res.ok) {
+    if (res.status >= 400 && res.status < 500) {
+      forgetToken();
+    } else {
+      setStatus({ state: 'error', error: `Auth refresh ${res.status}` });
+    }
     return null;
   }
   const next = await res.json();
@@ -121,6 +132,10 @@ function url(path: string, mask: string[] = []): Promise<string | null> {
 }
 
 async function rest(method: string, target: string | Promise<string | null>, body?: unknown): Promise<any | null> {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    if (isSyncEnabled()) setStatus({ state: 'error', error: 'Offline — queued for sync' });
+    return null;
+  }
   const token = await accessToken();
   if (!token) return null;
   const resolvedTarget = typeof target === 'string' ? target : await target;
@@ -149,9 +164,17 @@ export function restWrite(method: string, target: string, body?: unknown): Promi
   return rest(method, target, body);
 }
 
-/* ---------------------------------------------------------------- snapshot */
+/* --------------------------------------------------------- snapshot/outbox */
 
 type Snapshot = Record<string, Record<string, string>>;
+type MirrorCollection = 'categories' | 'menu' | 'inventory';
+
+interface SyncOutbox {
+  upserts: Record<string, string[]>;
+  deletes: Record<string, string[]>;
+}
+
+const EMPTY_OUTBOX = (): SyncOutbox => ({ upserts: {}, deletes: {} });
 
 async function readSnapshot(): Promise<Snapshot> {
   const setting = await db.settings.get(SNAPSHOT_KEY);
@@ -163,8 +186,8 @@ async function readSnapshot(): Promise<Snapshot> {
   }
 }
 
-async function writeSnapshot(snapshot: Snapshot): Promise<void> {
-  await db.settings.put({ key: SNAPSHOT_KEY, value: JSON.stringify(snapshot) });
+async function writeSnapshot(next: Snapshot): Promise<void> {
+  await db.settings.put({ key: SNAPSHOT_KEY, value: JSON.stringify(next) });
 }
 
 let snapshot: Snapshot | null = null;
@@ -174,27 +197,84 @@ async function getSnapshot(): Promise<Snapshot> {
   return snapshot;
 }
 
+async function readOutbox(): Promise<SyncOutbox> {
+  const setting = await db.settings.get(OUTBOX_KEY);
+  if (!setting) return EMPTY_OUTBOX();
+  try {
+    const parsed = JSON.parse(setting.value) as Partial<SyncOutbox>;
+    return {
+      upserts: parsed.upserts ?? {},
+      deletes: parsed.deletes ?? {},
+    };
+  } catch {
+    return EMPTY_OUTBOX();
+  }
+}
+
+let outboxCache: SyncOutbox | null = null;
+
+async function getOutbox(): Promise<SyncOutbox> {
+  outboxCache ??= await readOutbox();
+  return outboxCache;
+}
+
+async function writeOutbox(next: SyncOutbox): Promise<void> {
+  outboxCache = next;
+  await db.settings.put({ key: OUTBOX_KEY, value: JSON.stringify(next) });
+}
+
+async function markOutbox(collection: MirrorCollection, id: string, kind: 'upsert' | 'delete'): Promise<void> {
+  const box = await getOutbox();
+  const up = new Set(box.upserts[collection] ?? []);
+  const del = new Set(box.deletes[collection] ?? []);
+  if (kind === 'upsert') {
+    up.add(id);
+    del.delete(id);
+  } else {
+    del.add(id);
+    up.delete(id);
+  }
+  await writeOutbox({
+    upserts: { ...box.upserts, [collection]: [...up] },
+    deletes: { ...box.deletes, [collection]: [...del] },
+  });
+}
+
+async function clearOutbox(collection: MirrorCollection, id: string, kind: 'upsert' | 'delete'): Promise<void> {
+  const box = await getOutbox();
+  const list = (kind === 'upsert' ? box.upserts[collection] : box.deletes[collection]) ?? [];
+  if (!list.includes(id)) return;
+  const filtered = list.filter((entry) => entry !== id);
+  await writeOutbox(
+    kind === 'upsert'
+      ? { ...box, upserts: { ...box.upserts, [collection]: filtered } }
+      : { ...box, deletes: { ...box.deletes, [collection]: filtered } },
+  );
+}
+
 /* -------------------------------------------------------------------- pull */
 
-/** `{docId: updateTime}` plus the docs themselves, from one list per collection. */
-async function metadata(collection: string): Promise<{ times: Record<string, string>; docs: any[] }> {
+/** `{docId: updateTime}` plus the docs themselves, or `null` if the cloud fetch failed. */
+async function metadata(collection: string): Promise<{ times: Record<string, string>; docs: any[] } | null> {
   const docs = await listAll(collection);
+  if (docs === null) return null;
   const times: Record<string, string> = {};
   for (const doc of docs) times[documentId(doc.name)] = doc.updateTime ?? '';
   return { times, docs };
 }
 
-async function listAll(collection: string): Promise<any[]> {
+/** Returns `null` on network/HTTP error so callers never mistake an outage for an empty collection. */
+async function listAll(collection: string): Promise<any[] | null> {
   const config = await configManager.getConfig();
   const base = await getBaseUrl();
-  if (!config || !base) return [];
+  if (!config || !base) return null;
   const docs: any[] = [];
   let pageToken = '';
   do {
     const query = new URLSearchParams({ key: config.apiKey, pageSize: '1000' });
     if (pageToken) query.set('pageToken', pageToken);
     const page = await rest('GET', `${base}/${collection}?${query}`);
-    if (!page) break;
+    if (page === null) return null;
     docs.push(...(page.documents ?? []));
     pageToken = page.nextPageToken ?? '';
   } while (pageToken);
@@ -269,12 +349,96 @@ const APPLY: Record<string, (doc: any, updateTime: string) => Promise<void>> = {
 
 const COLLECTIONS = Object.keys(APPLY);
 
-async function pullCollection(collection: string, snap: Snapshot): Promise<boolean> {
-  const { times: remote, docs } = await metadata(collection);
-  const seen = snap[collection] ?? {};
-  const changed = Object.keys(remote).filter((id) => remote[id] !== seen[id]);
-  const removed = Object.keys(seen).filter((id) => !(id in remote));
-  if (!changed.length && !removed.length) return false;
+function isMirrorCollection(collection: string): collection is MirrorCollection {
+  return collection === 'categories' || collection === 'menu' || collection === 'inventory';
+}
+
+async function localPrimaryKeys(collection: MirrorCollection): Promise<string[]> {
+  if (collection === 'categories') return (await db.categories.toCollection().primaryKeys()).map(String);
+  if (collection === 'menu') return (await db.menu.toCollection().primaryKeys()).map(String);
+  return (await db.inventory.toCollection().primaryKeys()).map(String);
+}
+
+function inFlightKeys(collection: string): string[] {
+  const prefix = `${collection}/`;
+  const ids: string[] = [];
+  for (const key of pushes.keys()) {
+    if (key.startsWith(prefix)) ids.push(key.slice(prefix.length));
+  }
+  return ids;
+}
+
+function touchedSince(collection: string, sinceEpoch: number): string[] {
+  const prefix = `${collection}/`;
+  const ids: string[] = [];
+  for (const [key, epoch] of recentlyPushed.entries()) {
+    if (epoch > sinceEpoch && key.startsWith(prefix)) {
+      ids.push(key.slice(prefix.length));
+    }
+  }
+  return ids;
+}
+
+async function pullCollection(collection: string, snap: Snapshot): Promise<'changed' | 'unchanged' | 'error'> {
+  const pullStartEpoch = pushEpoch;
+  const preInFlight = inFlightKeys(collection);
+  const meta = await metadata(collection);
+  if (!meta) return 'error';
+  const { times: remote, docs } = meta;
+  const seen = snap[collection];
+  const seenMap = seen ?? {};
+  const box = await getOutbox();
+  const pendingDeletes = new Set(box.deletes[collection] ?? []);
+  const touched = new Set([
+    ...preInFlight,
+    ...inFlightKeys(collection),
+    ...touchedSince(collection, pullStartEpoch),
+  ]);
+  const pendingUpserts = new Set([...(box.upserts[collection] ?? []), ...touched]);
+  const protectedIds = new Set([...pendingDeletes, ...pendingUpserts]);
+
+  const changed = Object.keys(remote).filter(
+    (id) => remote[id] !== seenMap[id] && !protectedIds.has(id),
+  );
+
+  let removed: string[] = [];
+  let shouldBootstrapCloud = false;
+  let localKeys: string[] = [];
+
+  if (isMirrorCollection(collection)) {
+    localKeys = await localPrimaryKeys(collection);
+    const reconciled = reconcileMirrorCollection({
+      remoteIds: Object.keys(remote),
+      seenIds: seen !== undefined ? Object.keys(seen) : undefined,
+      localIds: localKeys,
+      pendingUpsertIds: pendingUpserts,
+    });
+    removed = reconciled.toDelete;
+    shouldBootstrapCloud = reconciled.shouldBootstrapCloud;
+  }
+
+  if (collection === 'categories') {
+    await db.settings.put({ key: CATEGORIES_INITIALIZED_KEY, value: 'true' });
+  }
+
+  if (shouldBootstrapCloud && isMirrorCollection(collection)) {
+    snap[collection] = mergePulledSnapshot(remote, snap[collection], protectedIds);
+    const bootstrapTasks = localKeys.map((id) =>
+      collection === 'categories'
+        ? pushCategory(id)
+        : collection === 'menu'
+          ? pushMenu(id)
+          : pushInventory(id),
+    );
+    if (bootstrapTasks.length) await Promise.all(bootstrapTasks);
+    const afterBox = await getOutbox();
+    const hasPending =
+      (afterBox.upserts[collection]?.length ?? 0) > 0 || (afterBox.deletes[collection]?.length ?? 0) > 0;
+    return hasPending ? 'error' : 'changed';
+  }
+
+  const snapshotInitialized = seen === undefined;
+  if (!changed.length && !removed.length && !snapshotInitialized) return 'unchanged';
 
   const apply = APPLY[collection];
   const byId = new Map(docs.map((d) => [documentId(d.name), d]));
@@ -296,15 +460,33 @@ async function pullCollection(collection: string, snap: Snapshot): Promise<boole
   }
   // Sales and onlineOrders are never deleted locally: the POS holds sales the
   // cloud may not, and the website owns the order collection (no delete rule).
-  // Add tombstones on the cloud side when cross-till deletion matters.
 
-  snap[collection] = remote;
-  return true;
+  snap[collection] = mergePulledSnapshot(remote, snap[collection], protectedIds);
+  return changed.length > 0 || removed.length > 0 || snapshotInitialized ? 'changed' : 'unchanged';
+}
+
+/** Retries any pending offline/failed mirror pushes; returns true if anything still failed to send. */
+async function flushOutbox(): Promise<boolean> {
+  const box = await getOutbox();
+  const tasks: Promise<void>[] = [];
+  for (const collection of ['categories', 'menu', 'inventory'] as const) {
+    const ids = new Set([...(box.deletes[collection] ?? []), ...(box.upserts[collection] ?? [])]);
+    for (const id of ids) {
+      if (collection === 'categories') tasks.push(pushCategory(id));
+      else if (collection === 'menu') tasks.push(pushMenu(id));
+      else tasks.push(pushInventory(id));
+    }
+  }
+  if (tasks.length) await Promise.all(tasks);
+  const remaining = await getOutbox();
+  return (['categories', 'menu', 'inventory'] as const).some(
+    (c) => (remaining.deletes[c]?.length ?? 0) > 0 || (remaining.upserts[c]?.length ?? 0) > 0,
+  );
 }
 
 let inFlight: Promise<boolean> | null = null;
 
-/** Pulls every collection once. Returns true when something changed. */
+/** Flushes queued local edits/deletes, then pulls every collection once. Returns true when something changed. */
 export function syncNow(): Promise<boolean> {
   inFlight ??= (async () => {
     if (!isSyncEnabled()) {
@@ -312,17 +494,26 @@ export function syncNow(): Promise<boolean> {
       return false;
     }
     setStatus({ state: 'syncing', error: undefined });
+    let hadError = await flushOutbox();
+
     const snap = await getSnapshot();
     let changed = false;
     for (const collection of COLLECTIONS) {
       try {
-        if (await pullCollection(collection, snap)) changed = true;
+        const outcome = await pullCollection(collection, snap);
+        if (outcome === 'changed') changed = true;
+        else if (outcome === 'error') hadError = true;
       } catch (err) {
+        hadError = true;
         setStatus({ state: 'error', error: err instanceof Error ? err.message : 'pull failed' });
       }
     }
     if (changed) await writeSnapshot(snap);
-    setStatus({ state: 'idle', lastSync: Date.now() });
+    if (!hadError && isSyncEnabled()) {
+      setStatus({ state: 'idle', lastSync: Date.now(), error: undefined });
+    } else if (hadError && isSyncEnabled() && status.state === 'syncing') {
+      setStatus({ state: 'error', error: status.error ?? 'Pending changes could not sync' });
+    }
     return changed;
   })().finally(() => {
     inFlight = null;
@@ -331,6 +522,12 @@ export function syncNow(): Promise<boolean> {
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
+
+function wakeIfStale(): void {
+  if (typeof document !== 'undefined' && document.hidden) return;
+  if (status.lastSync && Date.now() - status.lastSync < WAKE_MIN_INTERVAL_MS) return;
+  void syncNow();
+}
 
 export function startSync(): void {
   if (timer) return;
@@ -341,12 +538,20 @@ export function startSync(): void {
   void syncNow();
   timer = setInterval(() => void syncNow(), POLL_MS);
   window.addEventListener('online', wake);
+  window.addEventListener('focus', wakeIfStale);
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', wakeIfStale);
+  }
 }
 
 export function stopSync(): void {
   if (timer) clearInterval(timer);
   timer = null;
   window.removeEventListener('online', wake);
+  window.removeEventListener('focus', wakeIfStale);
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('visibilitychange', wakeIfStale);
+  }
 }
 
 function wake(): void {
@@ -356,15 +561,28 @@ function wake(): void {
 /* -------------------------------------------------------------------- push */
 
 const pushes = new Map<string, Promise<void>>();
+let pushEpoch = 0;
+const recentlyPushed = new Map<string, number>();
+
+function recordPushTouch(key: string): void {
+  recentlyPushed.set(key, ++pushEpoch);
+  if (recentlyPushed.size > 500) {
+    const oldest = recentlyPushed.keys().next().value;
+    if (oldest !== undefined) recentlyPushed.delete(oldest);
+  }
+}
 
 /** Serialises pushes per document so a burst of edits cannot land out of order. */
-function enqueue(key: string, task: () => Promise<void>): void {
+function enqueue(key: string, task: () => Promise<void>): Promise<void> {
+  recordPushTouch(key);
   const previous = pushes.get(key) ?? Promise.resolve();
   const next = previous.then(task).catch(() => undefined);
   pushes.set(key, next);
   void next.finally(() => {
+    recordPushTouch(key);
     if (pushes.get(key) === next) pushes.delete(key);
   });
+  return next;
 }
 
 async function rememberPush(collection: string, id: string, response: any): Promise<void> {
@@ -374,13 +592,30 @@ async function rememberPush(collection: string, id: string, response: any): Prom
   await writeSnapshot(snap);
 }
 
-export function pushMenu(id: string): void {
-  enqueue(`menu/${id}`, async () => {
+async function forgetPush(collection: string, id: string): Promise<void> {
+  const snap = await getSnapshot();
+  if (snap[collection] && id in snap[collection]) {
+    const nextCol = { ...snap[collection] };
+    delete nextCol[id];
+    snap[collection] = nextCol;
+    await writeSnapshot(snap);
+  }
+}
+
+export function pushMenu(id: string): Promise<void> {
+  return enqueue(`menu/${id}`, async () => {
+    if (!isSyncEnabled()) return;
     const item = await db.menu.get(id);
     if (!item) {
-      await rest('DELETE', url(`menu/${encodeURIComponent(id)}`));
+      await markOutbox('menu', id, 'delete');
+      const res = await rest('DELETE', url(`menu/${encodeURIComponent(id)}`));
+      if (res !== null) {
+        await clearOutbox('menu', id, 'delete');
+        await forgetPush('menu', id);
+      }
       return;
     }
+    await markOutbox('menu', id, 'upsert');
     const recipes = await db.recipes.where('menuItemId').equals(id).toArray();
     const payload: Record<string, unknown> = {
       ...item,
@@ -390,37 +625,61 @@ export function pushMenu(id: string): void {
     if (typeof payload.imageUrl === 'string' && payload.imageUrl.length > MAX_SYNCED_IMAGE_BYTES) {
       delete payload.imageUrl;
     }
-    await rememberPush('menu', id, await rest('PATCH', url(`menu/${encodeURIComponent(id)}`), { fields: encodeFields(payload) }));
+    const res = await rest('PATCH', url(`menu/${encodeURIComponent(id)}`), { fields: encodeFields(payload) });
+    if (res !== null) {
+      await clearOutbox('menu', id, 'upsert');
+      await rememberPush('menu', id, res);
+    }
   });
 }
 
-export function pushCategory(id: string): void {
-  enqueue(`categories/${id}`, async () => {
+export function pushCategory(id: string): Promise<void> {
+  return enqueue(`categories/${id}`, async () => {
+    if (!isSyncEnabled()) return;
     const category = await db.categories.get(id);
-    await rememberPush(
-      'categories', id,
-      category
-        ? await rest('PATCH', url(`categories/${encodeURIComponent(id)}`), { fields: encodeFields({ ...category }) })
-        : await rest('DELETE', url(`categories/${encodeURIComponent(id)}`)),
-    );
+    if (!category) {
+      await markOutbox('categories', id, 'delete');
+      const res = await rest('DELETE', url(`categories/${encodeURIComponent(id)}`));
+      if (res !== null) {
+        await clearOutbox('categories', id, 'delete');
+        await forgetPush('categories', id);
+      }
+      return;
+    }
+    await markOutbox('categories', id, 'upsert');
+    const res = await rest('PATCH', url(`categories/${encodeURIComponent(id)}`), { fields: encodeFields({ ...category }) });
+    if (res !== null) {
+      await clearOutbox('categories', id, 'upsert');
+      await rememberPush('categories', id, res);
+    }
   });
 }
 
-export function pushInventory(id: string): void {
-  enqueue(`inventory/${id}`, async () => {
+export function pushInventory(id: string): Promise<void> {
+  return enqueue(`inventory/${id}`, async () => {
+    if (!isSyncEnabled()) return;
     const item = await db.inventory.get(id);
-    await rememberPush(
-      'inventory', id,
-      item
-        ? await rest('PATCH', url(`inventory/${encodeURIComponent(id)}`), { fields: encodeFields({ ...item }) })
-        : await rest('DELETE', url(`inventory/${encodeURIComponent(id)}`)),
-    );
+    if (!item) {
+      await markOutbox('inventory', id, 'delete');
+      const res = await rest('DELETE', url(`inventory/${encodeURIComponent(id)}`));
+      if (res !== null) {
+        await clearOutbox('inventory', id, 'delete');
+        await forgetPush('inventory', id);
+      }
+      return;
+    }
+    await markOutbox('inventory', id, 'upsert');
+    const res = await rest('PATCH', url(`inventory/${encodeURIComponent(id)}`), { fields: encodeFields({ ...item }) });
+    if (res !== null) {
+      await clearOutbox('inventory', id, 'upsert');
+      await rememberPush('inventory', id, res);
+    }
   });
 }
 
 /** Sales are append-only in the cloud; the local numeric id rides along as `localId`. */
-export function pushSale(localId: number): void {
-  enqueue(`sales/${localId}`, async () => {
+export function pushSale(localId: number): Promise<void> {
+  return enqueue(`sales/${localId}`, async () => {
     const sale = await db.sales.get(localId);
     if (!sale || sale.cloudId) return;
     const { id: _id, cloudId: _cloudId, ...payload } = sale;
@@ -438,9 +697,9 @@ export function pushSale(localId: number): void {
   });
 }
 
-export function pushOrder(order: OnlineOrder): void {
+export function pushOrder(order: OnlineOrder): Promise<void> | void {
   if (!order.cloudId) return;
-  enqueue(`onlineOrders/${order.cloudId}`, async () => {
+  return enqueue(`onlineOrders/${order.cloudId}`, async () => {
     const current = order.id ? await db.onlineOrders.get(order.id) : order;
     if (!current) return;
     const patch = localOrderPatch(current);
@@ -453,15 +712,13 @@ export function pushOrder(order: OnlineOrder): void {
   });
 }
 
-export function deleteSale(cloudId: string): void {
-  enqueue(`sales/${cloudId}`, async () => {
+export function deleteSale(cloudId: string): Promise<void> {
+  return enqueue(`sales/${cloudId}`, async () => {
     if (await rest('DELETE', url(`sales/${encodeURIComponent(cloudId)}`)) === null) return;
-    const snap = await getSnapshot();
-    if (snap.sales) delete snap.sales[cloudId];
-    await writeSnapshot(snap);
+    await forgetPush('sales', cloudId);
   });
 }
 
 export function pushStock(ids: Iterable<string>): void {
-  for (const id of ids) pushInventory(id);
+  for (const id of ids) void pushInventory(id);
 }

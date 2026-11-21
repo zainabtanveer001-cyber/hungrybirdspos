@@ -91,8 +91,15 @@ async function ensureDefaultUsers(): Promise<void> {
   }
 }
 
+export const CATEGORIES_INITIALIZED_KEY = 'categoriesInitialized';
+
 export async function ensureDefaultCategories(): Promise<void> {
-  if ((await db.categories.count()) > 0) return;
+  const initialized = await db.settings.get(CATEGORIES_INITIALIZED_KEY);
+  if (initialized?.value === 'true') return;
+  if ((await db.categories.count()) > 0) {
+    await db.settings.put({ key: CATEGORIES_INITIALIZED_KEY, value: 'true' });
+    return;
+  }
   await db.categories.bulkAdd([
     { id: 'cat_burgers', name: 'Burgers' },
     { id: 'cat_pizza', name: 'Pizza' },
@@ -101,6 +108,7 @@ export async function ensureDefaultCategories(): Promise<void> {
     { id: 'cat_drinks', name: 'Drinks' },
     { id: 'cat_desserts', name: 'Desserts' },
   ]);
+  await db.settings.put({ key: CATEGORIES_INITIALIZED_KEY, value: 'true' });
 }
 
 let bootstrap: Promise<void> | null = null;

@@ -86,7 +86,7 @@ export function InventoryModal({ onClose, notify }: {
     const used = await db.recipes.where('inventoryId').equals(item.id).count();
     if (used > 0 && !window.confirm(`${used} recipe(s) reference this item. Delete anyway? (Recipes are kept but orphaned.)`)) return;
     await db.inventory.delete(item.id);
-    pushInventory(item.id);
+    await pushInventory(item.id);
     notify(`${item.name} deleted.`);
   }
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   cloudOrderToLocal, cloudSaleToLocal, decodeFields, documentId, encodeFields,
-  localOrderPatch,
+  localOrderPatch, mergePulledSnapshot, reconcileMirrorCollection,
 } from '../src/lib/syncMap';
 
 describe('firestore value codec', () => {
@@ -96,5 +96,69 @@ describe('online order mapping', () => {
     expect(sale.localId).toBe(12);
     expect(sale.id).toBeUndefined();
     expect(sale.timestamp).toBe('2026-09-02T12:24:39.118Z');
+  });
+});
+
+describe('cross-device mirror reconciliation (category/menu/inventory deletes)', () => {
+  it('deletes locally-seeded default categories missing from an authoritative cloud collection', () => {
+    const result = reconcileMirrorCollection({
+      remoteIds: ['CAT_1', 'CAT_2'],
+      seenIds: ['CAT_1', 'CAT_2'],
+      localIds: ['cat_burgers', 'cat_pizza', 'CAT_1', 'CAT_2'],
+    });
+    expect(result.shouldBootstrapCloud).toBe(false);
+    expect(result.toDelete.sort()).toEqual(['cat_burgers', 'cat_pizza']);
+  });
+
+  it('deletes a category on device B when deleted on device A, even down to zero categories', () => {
+    const result = reconcileMirrorCollection({
+      remoteIds: [],
+      seenIds: ['CAT_1'],
+      localIds: ['CAT_1', 'cat_burgers'],
+    });
+    expect(result.shouldBootstrapCloud).toBe(false);
+    expect(result.toDelete.sort()).toEqual(['CAT_1', 'cat_burgers']);
+  });
+
+  it('protects unsynced offline-created categories from being pruned before upload', () => {
+    const result = reconcileMirrorCollection({
+      remoteIds: ['CAT_1'],
+      seenIds: ['CAT_1', 'CAT_DELETED'],
+      localIds: ['CAT_1', 'CAT_DELETED', 'CAT_OFFLINE_NEW'],
+      pendingUpsertIds: ['CAT_OFFLINE_NEW'],
+    });
+    expect(result.toDelete).toEqual(['CAT_DELETED']);
+  });
+
+  it('bootstraps an empty cloud once on first-ever sync instead of wiping local categories', () => {
+    const result = reconcileMirrorCollection({
+      remoteIds: [],
+      seenIds: undefined,
+      localIds: ['cat_burgers', 'cat_pizza'],
+    });
+    expect(result.shouldBootstrapCloud).toBe(true);
+    expect(result.toDelete).toEqual([]);
+  });
+
+  it('prunes local defaults on first-ever sync when cloud already has real categories', () => {
+    const result = reconcileMirrorCollection({
+      remoteIds: ['CAT_REAL_1'],
+      seenIds: undefined,
+      localIds: ['cat_burgers', 'cat_pizza', 'CAT_REAL_1'],
+    });
+    expect(result.shouldBootstrapCloud).toBe(false);
+    expect(result.toDelete.sort()).toEqual(['cat_burgers', 'cat_pizza']);
+  });
+
+  it('merges pulled snapshots without resurrecting mid-poll deletes or clobbering mid-poll creates', () => {
+    const merged = mergePulledSnapshot(
+      { CAT_1: 't1', CAT_JUST_DELETED: 't2' },
+      { CAT_1: 't1', CAT_JUST_CREATED: 't3' },
+      ['CAT_JUST_DELETED', 'CAT_JUST_CREATED'],
+    );
+    expect(merged).toEqual({
+      CAT_1: 't1',
+      CAT_JUST_CREATED: 't3',
+    });
   });
 });

@@ -128,3 +128,77 @@ export function cloudSaleToLocal(cloudId: string, data: Record<string, any>): Sa
     timestamp: toIso(data.createdAt) ?? toIso(data.timestamp) ?? new Date().toISOString(),
   } as Sale;
 }
+
+export interface MirrorReconcileInput {
+  remoteIds: Iterable<string>;
+  /** Previously synced remote IDs from `sync.snapshot`, or `undefined` if never synced yet. */
+  seenIds: Iterable<string> | undefined;
+  /** All primary keys currently stored in local IndexedDB for this collection. */
+  localIds: Iterable<string>;
+  /** Local IDs with an unsynced create/update still queued for push (must never be pruned). */
+  pendingUpsertIds?: Iterable<string>;
+}
+
+export interface MirrorReconcileResult {
+  /** Local IDs that should be deleted because they no longer exist in the cloud. */
+  toDelete: string[];
+  /**
+   * True only on first-ever sync (`seenIds === undefined`) when the cloud collection is
+   * completely empty (`remoteIds` empty) while the device has local rows to seed the cloud.
+   */
+  shouldBootstrapCloud: boolean;
+}
+
+/**
+ * Computes which local rows to prune when mirroring an authoritative cloud collection
+ * (`categories`, `menu`, `inventory`). Unlike snapshot-only diffing, this also removes
+ * stale local-only rows (such as pre-seeded default categories) on other devices once
+ * the cloud collection is authoritative, while protecting any unsynced local writes.
+ */
+export function reconcileMirrorCollection({
+  remoteIds,
+  seenIds,
+  localIds,
+  pendingUpsertIds = [],
+}: MirrorReconcileInput): MirrorReconcileResult {
+  const remote = new Set(remoteIds);
+  const local = new Set(localIds);
+  const pending = new Set(pendingUpsertIds);
+
+  if (seenIds === undefined && remote.size === 0) {
+    return { toDelete: [], shouldBootstrapCloud: local.size > 0 };
+  }
+
+  const candidates = new Set<string>(local);
+  if (seenIds !== undefined) {
+    for (const id of seenIds) candidates.add(id);
+  }
+
+  const toDelete: string[] = [];
+  for (const id of candidates) {
+    if (!remote.has(id) && !pending.has(id)) {
+      toDelete.push(id);
+    }
+  }
+  return { toDelete, shouldBootstrapCloud: false };
+}
+
+/**
+ * Merges freshly pulled remote timestamps into the local snapshot without clobbering
+ * IDs that were concurrently pushed or deleted while the pull request was in flight.
+ */
+export function mergePulledSnapshot(
+  remote: Record<string, string>,
+  current: Record<string, string> | undefined,
+  protectedIds: Iterable<string>,
+): Record<string, string> {
+  const next: Record<string, string> = { ...remote };
+  for (const id of protectedIds) {
+    if (current && id in current) {
+      next[id] = current[id];
+    } else {
+      delete next[id];
+    }
+  }
+  return next;
+}

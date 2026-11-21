@@ -104,8 +104,16 @@ function App() {
 
   useEffect(() => {
     if (!session) return;
-    startSync();
-    return stopSync;
+    let active = true;
+    initializeApp()
+      .catch((err) => console.error('App init failed:', err))
+      .finally(() => {
+        if (active) startSync();
+      });
+    return () => {
+      active = false;
+      stopSync();
+    };
   }, [session]);
 
   useEffect(() => {
