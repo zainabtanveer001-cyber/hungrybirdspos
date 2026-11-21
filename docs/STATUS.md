@@ -35,14 +35,17 @@
   - `BUG-010` [S1]: Made `getShiftStart()` strictly read-only (never calls `db.settings.put()` inside Dexie `liveQuery`), initialized `shiftStartTime` in `initializeApp()`, and proportionally scaled `sale.lockedCost` when closed-shift sales are later refunded (`refunds.ts`). Verified in browser on clean `:5175` origin with **0 console errors**.
   - `BUG-011` [S2]: Added `scroll-mb-24 scroll-mt-4` on `#posCartMobileAnchor` (`App.tsx`) so mobile `390×844` `View Order` leaves `51.56px` clearance above the sticky bottom bar.
   - `BUG-012` [S3]: Replaced `useMemo` with `useEffect` in `OwnerPinSection` (`AdminSettingsModal.tsx`) and enforced non-negative cost validation on edit in `InventoryModal.tsx`.
+- **Feature Slice 8 — Incoming Online Order & Add-to-Cart Visual Cues:**
+  - **Incoming online orders:** Added a dedicated header `Online` button (`App.tsx`) with live pulsing beacon + count pill when `pendingOnlineCount > 0`, a persistent top-of-workspace alert banner (`"N new online order(s) waiting to be accepted"` + `"View & Accept"`), a pulsing dot on the mobile navigation hamburger button, and collapsed-sidebar badge support (`Sidebar.tsx`) with accessible `aria-label`; upgraded `useOrderAlert.ts` to expose `{ pendingCount, recentArrival }`.
+  - **Add-to-cart feedback:** Added `countCartByMenuId()` & `cartItemCount()` (`src/lib/cart.ts` + unit test in `tests/cart.test.ts`), dish-card `×N in cart` pill badge, active border, `"✓ Added"` flash & `animate-cart-pop` (`MenuGrid.tsx`, `index.css`), `Current Order` live item count badge & newly-added row emerald highlight (`CartPanel.tsx`), debounced toast confirmation (`Added <name> to cart (×N)`) lifted clear above the mobile sticky bottom bar, and mobile sticky bar flash on add.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **63 passed (63)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`dist/assets/index-*.js` and `dist/assets/index-*.css` built in 4.03s, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `20` warnings).
+- `cd hungrybirds-pos-modern && npm test` → **11 passed (11)** test files, **64 passed (64)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
-- **Live Browser QA (`http://localhost:5174/` & fresh `http://localhost:5175/`):** All 24 test cases (`TC-001`..`TC-024`) **PASS**, **0** open S1/S2 bugs, **0** browser console errors.
+- **Live Browser QA (`http://localhost:5174/` & `http://localhost:5175/`):** Desktop (`1366×768`) and mobile (`390×844`) verified with **0** open S1/S2 bugs and **0** browser console errors.
 
 ## 3. Known Gaps & Deferred Items
 - **Offline fallback default credentials (`AUD-005`):** Fresh offline installs seed `owner`, `manager`, `cashier`, and `waiter` with password `1234` (SHA-256) in local IndexedDB for offline fallback when Firebase is unreachable. Cloud authentication always takes precedence when online.
