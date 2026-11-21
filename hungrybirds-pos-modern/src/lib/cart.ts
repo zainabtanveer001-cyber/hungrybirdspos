@@ -113,6 +113,7 @@ export function composeModifiedItem(
     qty: 1,
     modifiers: selections.length ? selections : undefined,
   };
+  if (item.categoryId) line.categoryId = item.categoryId;
   if (trimmedNote) line.note = trimmedNote;
   return line;
 }

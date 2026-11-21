@@ -2,7 +2,17 @@ import { db } from './db';
 import { getShiftStockDeltas } from './inventory';
 import { computeSaleLiveCost, getClosedShiftManualCosts, getShiftStart } from './shift';
 import { isApproved } from './suppliers';
+import {
+  computeCategoryBreakdown,
+  computeSaleCategoryShares,
+  computeSaleNetMultiplier,
+  resolveLineCategory,
+} from './categoryAnalytics';
+import type { CategorySalesRow, SaleCategoryShare } from './categoryAnalytics';
 import type { Expense, Sale } from './db/types';
+
+export type { CategorySalesRow, SaleCategoryShare };
+export { computeCategoryBreakdown, computeSaleCategoryShares, resolveLineCategory };
 
 export type Period = 'day' | 'week' | 'month';
 
@@ -22,8 +32,15 @@ export interface PeriodSummary {
 
 const amount = (sale: Sale) => Number(sale.total) || 0;
 
-export async function getPeriodSummary(): Promise<PeriodSummary> {
-  const sales = await db.sales.toArray();
+export async function getPeriodSummary(categoryId?: string): Promise<PeriodSummary> {
+  const [sales, menu, categories] = await Promise.all([
+    db.sales.toArray(),
+    categoryId ? Promise.resolve().then(() => db.menu.toArray()).catch(() => []) : Promise.resolve([]),
+    categoryId ? Promise.resolve().then(() => db.categories.toArray()).catch(() => []) : Promise.resolve([]),
+  ]);
+  const menuById = new Map(menu.map((m) => [m.id, m]));
+  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const weekday = new Date(startOfDay).getDay();
@@ -44,8 +61,18 @@ export async function getPeriodSummary(): Promise<PeriodSummary> {
   for (const sale of sales) {
     const at = new Date(sale.timestamp).getTime();
     if (!Number.isFinite(at)) continue;
-    const total = amount(sale);
-    const discount = Number(sale.discountAmount) || 0;
+
+    let total = Math.max(0, amount(sale) - (Number(sale.refundedAmount) || 0));
+    let discount = Number(sale.discountAmount) || 0;
+
+    if (categoryId) {
+      const share = computeSaleCategoryShares(sale, menuById, categoryNameById).find(
+        (s) => s.categoryId === categoryId,
+      );
+      if (!share || share.unitsSold <= 0) continue;
+      total = share.netRevenue;
+      discount = Math.max(0, Math.round((share.grossRevenue - share.netRevenue) * 100) / 100);
+    }
 
     summary.totalOverallSales += total;
     summary.totalDiscounts += discount;
@@ -126,10 +153,16 @@ export interface AnalyticsReport {
   orderCount: number;
   topItems: Ranking[];
   topCustomers: Ranking[];
+  categoryBreakdown: CategorySalesRow[];
 }
 
 export async function getAnalytics(period: Period, categoryId?: string): Promise<AnalyticsReport> {
-  const [sales, customers, menu] = await Promise.all([db.sales.toArray(), db.customers.toArray(), db.menu.toArray()]);
+  const [sales, customers, menu, categories] = await Promise.all([
+    db.sales.toArray(),
+    db.customers.toArray(),
+    db.menu.toArray(),
+    Promise.resolve().then(() => db.categories.toArray()).catch(() => []),
+  ]);
   const { buckets, caption } = getBuckets(period);
   const from = buckets[0].start;
   const to = buckets[buckets.length - 1].end;
@@ -141,24 +174,40 @@ export async function getAnalytics(period: Period, categoryId?: string): Promise
   const items = new Map<string, Ranking>();
   const people = new Map<string, Ranking>();
   const profiles = new Map(customers.map((c) => [c.phone || c.id, c.name]));
-  const categoryByItem = new Map(menu.map((m) => [m.id, m.categoryId]));
+  const menuById = new Map(menu.map((m) => [m.id, m]));
+  const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+  const categoryBreakdown = computeCategoryBreakdown(inPeriod, menu, categories);
+
+  let matchedOrders = 0;
 
   for (const sale of inPeriod) {
     const at = new Date(sale.timestamp).getTime();
+    const saleShares = computeSaleCategoryShares(sale, menuById, categoryNameById);
+    const activeShare = categoryId ? saleShares.find((s) => s.categoryId === categoryId) : undefined;
+    if (categoryId && (!activeShare || activeShare.unitsSold <= 0)) continue;
+
+    matchedOrders++;
+    const saleContribution = activeShare
+      ? activeShare.netRevenue
+      : Math.max(0, amount(sale) - (Number(sale.refundedAmount) || 0));
+
     const bucket = buckets.find((b) => at >= b.start && at < b.end);
     if (bucket) {
-      bucket.amount += amount(sale);
+      bucket.amount += saleContribution;
       bucket.orders++;
     }
 
+    const netMultiplier = computeSaleNetMultiplier(sale);
     for (const item of sale.items || []) {
-      const qty = Number(item.qty) || 0;
-      if (qty <= 0) continue;
-      if (categoryId !== undefined && categoryByItem.get(item.menuItemId) !== categoryId) continue;
+      const effectiveQty = Math.max(0, (Number(item.qty) || 0) - (Number(item.refundedQty) || 0));
+      if (effectiveQty <= 0) continue;
+      if (categoryId !== undefined && resolveLineCategory(item, menuById, categoryNameById).categoryId !== categoryId) {
+        continue;
+      }
       const name = item.name || 'Unnamed item';
       const row = items.get(name) || { name, metric: 0, detail: 0 };
-      row.metric += qty;
-      row.detail += qty * (Number(item.price) || 0);
+      row.metric += effectiveQty;
+      row.detail += Math.round(effectiveQty * (Number(item.price) || 0) * netMultiplier * 100) / 100;
       items.set(name, row);
     }
 
@@ -168,16 +217,17 @@ export async function getAnalytics(period: Period, categoryId?: string): Promise
     const row = people.get(phone) || { name: buyer?.name || profiles.get(phone) || 'Customer', metric: 0, detail: 0 };
     if (buyer?.name) row.name = buyer.name;
     row.metric++;
-    row.detail += amount(sale);
+    row.detail += saleContribution;
     people.set(phone, row);
   }
 
   return {
     buckets,
     caption,
-    orderCount: inPeriod.length,
+    orderCount: matchedOrders,
     topItems: [...items.values()].sort((a, b) => b.metric - a.metric || b.detail - a.detail).slice(0, 5),
     topCustomers: [...people.values()].sort((a, b) => b.metric - a.metric || b.detail - a.detail).slice(0, 5),
+    categoryBreakdown,
   };
 }
 

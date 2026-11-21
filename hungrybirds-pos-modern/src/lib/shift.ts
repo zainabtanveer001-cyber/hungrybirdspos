@@ -1,5 +1,7 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { computeCategoryBreakdown } from './categoryAnalytics';
+import type { CategorySalesRow } from './categoryAnalytics';
 import { clearShiftStockDeltas, getShiftStockDeltas } from './inventory';
 import { collectModifierIngredientUsage } from './modifiers';
 import { isApproved } from './suppliers';
@@ -337,6 +339,7 @@ export interface ShiftReport {
   dineIn: number;
   takeaway: number;
   delivery: number;
+  categorySales: CategorySalesRow[];
   cashCollected: number;
   changeGiven: number;
   netCash: number;
@@ -354,7 +357,7 @@ export interface ShiftReport {
 }
 
 export async function buildShiftReport(): Promise<ShiftReport> {
-  const [startedAt, openingCash, sales, inventory, recipes, expenses, stockDeltas] = await Promise.all([
+  const [startedAt, openingCash, sales, inventory, recipes, expenses, stockDeltas, menu, categories] = await Promise.all([
     getShiftStart(),
     getOpeningCash(),
     db.sales.toArray(),
@@ -362,6 +365,8 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     db.recipes.toArray(),
     db.expenses.toArray(),
     getShiftStockDeltas(),
+    Promise.resolve().then(() => db.menu.toArray()).catch(() => []),
+    Promise.resolve().then(() => db.categories.toArray()).catch(() => []),
   ]);
 
   const from = new Date(startedAt).getTime();
@@ -419,6 +424,7 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     dineIn: sum((s) => (s.orderType === 'DINE_IN' ? Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)) : 0)),
     takeaway: sum((s) => (s.orderType === 'TAKEAWAY' ? Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)) : 0)),
     delivery: sum((s) => (s.orderType === 'DELIVERY' ? Math.max(0, (Number(s.total) || 0) - (Number(s.refundedAmount) || 0)) : 0)),
+    categorySales: computeCategoryBreakdown(shiftSales, menu, categories),
     cashCollected,
     changeGiven,
     netCash: cashCollected - changeGiven,

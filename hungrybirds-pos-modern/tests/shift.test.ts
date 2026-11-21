@@ -78,6 +78,8 @@ describe('blind cash drawer & payment-mode shift helpers', () => {
     vi.spyOn(db.inventory, 'toArray').mockResolvedValue([]);
     vi.spyOn(db.recipes, 'toArray').mockResolvedValue([]);
     vi.spyOn(db.expenses, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.menu, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.categories, 'toArray').mockResolvedValue([]);
     vi.spyOn(db.auditLogs, 'add').mockResolvedValue(1);
     vi.spyOn(db, 'transaction').mockImplementation((async (...args: any[]) => {
       const fn = args[args.length - 1];

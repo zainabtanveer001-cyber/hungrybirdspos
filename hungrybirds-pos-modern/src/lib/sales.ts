@@ -58,6 +58,23 @@ export interface SaleInput {
 
 /** Commits a sale, deducts recipe-linked stock, opens a delivery row and updates the CRM record. */
 export async function recordSale(input: SaleInput): Promise<number> {
+  const [menuList, categoryList] = await Promise.all([
+    Promise.resolve().then(() => db.menu.toArray()).catch(() => []),
+    Promise.resolve().then(() => db.categories.toArray()).catch(() => []),
+  ]);
+  const menuCatById = new Map(menuList.map((m) => [m.id, m.categoryId]));
+  const catNameById = new Map(categoryList.map((c) => [c.id, c.name]));
+  const stampedItems: CartItem[] = (input.items || []).map((line) => {
+    const catId = line.categoryId || menuCatById.get(line.menuItemId || line.id);
+    const catName = line.categoryName || (catId ? catNameById.get(catId) : undefined);
+    if (!catId && !catName) return line;
+    return {
+      ...line,
+      ...(catId ? { categoryId: catId } : {}),
+      ...(catName ? { categoryName: catName } : {}),
+    };
+  });
+
   const payments = input.payments.map((p) => ({
     ...p,
     amount: Number(p.amount) || 0,
@@ -69,6 +86,7 @@ export async function recordSale(input: SaleInput): Promise<number> {
   await db.transaction('rw', db.sales, db.inventory, db.recipes, db.deliveries, db.customers, async () => {
     const sale: Sale = {
       ...input,
+      items: stampedItems,
       payments,
       totalReceived: payments.reduce(
         (sum, p) => sum + (p.method === 'Cash' && p.cashGiven != null ? p.cashGiven : p.amount),

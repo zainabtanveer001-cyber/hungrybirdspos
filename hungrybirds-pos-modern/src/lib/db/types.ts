@@ -92,6 +92,9 @@ export interface CartItem {
   name: string;
   price: number;
   qty: number;
+  /** Snapshot of the item's category at time of order so historical category reports survive menu edits. */
+  categoryId?: string;
+  categoryName?: string;
   /** Written by partial refunds; never reduces `qty` so the original bill stays legible. */
   refundedQty?: number;
   modifiers?: ModifierSelection[];

@@ -168,7 +168,15 @@ function App() {
       setModifying({ mode: 'add', item, groups });
       return;
     }
-    addCartItem({ id: item.id, menuItemId: item.id, name: item.name, price: item.price, qty: 1 });
+    const line: CartItem = {
+      id: item.id,
+      menuItemId: item.id,
+      name: item.name,
+      price: item.price,
+      qty: 1,
+    };
+    if (item.categoryId) line.categoryId = item.categoryId;
+    addCartItem(line);
   }
 
   function editCartLineModifiers(line: CartItem) {

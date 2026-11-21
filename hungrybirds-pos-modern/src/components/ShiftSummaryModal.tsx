@@ -162,6 +162,36 @@ export function ShiftSummaryModal({
           </div>
         </section>
 
+        <section className="pt-3 border-t border-[#e0edff] space-y-2">
+          <Caption>Sales by food category</Caption>
+          {!report?.categorySales.length ? (
+            <p className="text-xs text-[#616f75] py-2">No food category sales recorded this shift.</p>
+          ) : (
+            <ul className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+              {report.categorySales.map((cat) => (
+                <li key={cat.categoryId} className="p-2.5 bg-[#f8fafd] border border-[#e0edff] rounded-[10px] text-xs space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-[#000000] truncate">{cat.categoryName}</span>
+                    <div className="flex items-center gap-2 shrink-0 tabular-nums">
+                      <span className="text-[11px] font-semibold text-[#2941e0]">{cat.sharePercent}%</span>
+                      <strong className="text-[#000000]">{formatAmount(cat.netRevenue)}</strong>
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-[#e0edff] overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#2941e0]"
+                      style={{ width: `${cat.netRevenue > 0 ? Math.max(4, cat.sharePercent) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-[#526066] tabular-nums">
+                    {cat.unitsSold} {cat.unitsSold === 1 ? 'item' : 'items'} sold · {cat.orderCount} {cat.orderCount === 1 ? 'order' : 'orders'}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <section className="pt-3 border-t border-[#e0edff] space-y-1 text-xs text-[#526066]">
           <Caption>Checkout charges collected</Caption>
           <Row label="Packing charges" value={formatAmount(report?.packingCharges ?? 0)} />
