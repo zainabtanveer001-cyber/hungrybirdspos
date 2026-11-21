@@ -1,24 +1,48 @@
 import { useState } from 'react';
-import { buildShiftReport, closeShift } from '../lib/shift';
+import {
+  buildShiftReport,
+  closeShift,
+  computeDrawerVariance,
+  getClosedShiftReports,
+} from '../lib/shift';
 import { useLive } from '../lib/useLive';
 import { formatAmount } from '../lib/format';
 import { Modal } from './Modal';
+import type { UserRole } from '../lib/db/types';
 
-export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
+export function ShiftSummaryModal({
+  username,
+  role,
+  onClose,
+  notify,
+  onClosed,
+}: {
   username: string;
+  role?: UserRole;
   onClose: () => void;
   notify: (message: string) => void;
   onClosed: () => void;
 }) {
   const report = useLive(() => buildShiftReport(), []) ?? null;
+  const closedReports = useLive(() => getClosedShiftReports(), []) ?? [];
   const [fallbackTime] = useState(() => Date.now());
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const [countedInput, setCountedInput] = useState('');
+  const [closeNote, setCloseNote] = useState('');
   const [closing, setClosing] = useState(false);
 
   async function handleConfirmClose() {
     setClosing(true);
     try {
-      await closeShift(username);
+      const hasCount = countedInput.trim() !== '' && Number.isFinite(Number(countedInput)) && Number(countedInput) >= 0;
+      const blindInput =
+        hasCount || closeNote.trim()
+          ? {
+              countedCash: hasCount ? Number(countedInput) : (report?.expectedDrawerCash ?? 0),
+              note: closeNote.trim() || undefined,
+            }
+          : undefined;
+      await closeShift(username, blindInput, role);
       notify('Shift closed. Set opening cash for the new shift.');
       onClose();
       onClosed();
@@ -39,6 +63,38 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
             <p className="text-xs font-medium text-[#273238]">
               End the current shift? Active-shift ingredient costs will lock permanently and opening cash will reset.
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="ownerCloseCounted" className="block text-[11px] font-semibold text-[#273238] mb-1">
+                  Counted drawer cash (optional)
+                </label>
+                <input
+                  id="ownerCloseCounted"
+                  type="number"
+                  min={0}
+                  step="any"
+                  disabled={closing}
+                  value={countedInput}
+                  placeholder={`Default: ${Math.round(report?.expectedDrawerCash ?? 0)}`}
+                  onChange={(e) => setCountedInput(e.target.value)}
+                  className="w-full px-2.5 h-9 text-xs font-semibold border border-[#788991] rounded-[8px] bg-white text-[#000000] tabular-nums focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </div>
+              <div>
+                <label htmlFor="ownerCloseNote" className="block text-[11px] font-semibold text-[#273238] mb-1">
+                  Closing note (optional)
+                </label>
+                <input
+                  id="ownerCloseNote"
+                  type="text"
+                  disabled={closing}
+                  value={closeNote}
+                  placeholder="Handover note…"
+                  onChange={(e) => setCloseNote(e.target.value)}
+                  className="w-full px-2.5 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
+                />
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -86,6 +142,15 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
           <p className="text-xs text-emerald-800 mt-0.5">
             {report?.orderCount ?? 0} {report?.orderCount === 1 ? 'order' : 'orders'} completed
           </p>
+        </section>
+
+        <section>
+          <Caption>Payment modes collected</Caption>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <Tile label="Net Cash" value={report?.netCash ?? 0} tone="bg-emerald-50 border-emerald-200 text-emerald-900" />
+            <Tile label="Card" value={report?.cardCollected ?? 0} tone="bg-[#eff6ff] border-[#e0edff] text-[#2941e0]" />
+            <Tile label="Online" value={report?.onlineCollected ?? 0} tone="bg-amber-50 border-amber-200 text-amber-900" />
+          </div>
         </section>
 
         <section>
@@ -157,6 +222,61 @@ export function ShiftSummaryModal({ username, onClose, notify, onClosed }: {
             <span>Net shift profit / (loss)</span>
             <strong className="tabular-nums">{formatAmount(report?.netProfit ?? 0)}</strong>
           </div>
+        </section>
+
+        <section className="pt-3 border-t border-[#e0edff] space-y-2">
+          <Caption>Blind Cash Drops &amp; Closed Shift History</Caption>
+          {closedReports.length === 0 ? (
+            <p className="text-xs text-[#616f75] py-2">No closed shift drawer counts recorded yet.</p>
+          ) : (
+            <ul className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+              {closedReports.slice(0, 12).map((entry) => {
+                const { status, variance } = computeDrawerVariance(entry.expectedDrawerCash, entry.countedCash);
+                const badgeClass =
+                  status === 'EXACT'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : status === 'OVER'
+                      ? 'bg-[#eff6ff] text-[#2941e0] border-[#e0edff]'
+                      : 'bg-red-50 text-red-700 border-red-200';
+                const badgeLabel =
+                  status === 'EXACT'
+                    ? 'Exact match'
+                    : status === 'OVER'
+                      ? `+${formatAmount(variance)} Over`
+                      : `-${formatAmount(Math.abs(variance))} Short`;
+                return (
+                  <li key={entry.id} className="p-3 bg-[#f8fafd] border border-[#e0edff] rounded-[12px] text-xs space-y-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="font-semibold text-[#000000]">{entry.closedBy}</span>
+                        {entry.role && <span className="text-[#526066]"> ({entry.role})</span>}
+                        <span className="text-[#526066]"> · {new Date(entry.closedAt).toLocaleString()}</span>
+                      </div>
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-[88px] border tabular-nums ${badgeClass}`}>
+                        {badgeLabel}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-[11px] text-[#526066] tabular-nums">
+                      <div>Expected: <strong className="text-[#000000]">{formatAmount(entry.expectedDrawerCash)}</strong></div>
+                      <div>Counted: <strong className="text-[#000000]">{formatAmount(entry.countedCash)}</strong></div>
+                      <div>Sales ({entry.orderCount}): <strong className="text-[#000000]">{formatAmount(entry.totalSales)}</strong></div>
+                    </div>
+                    {entry.denominations && Object.keys(entry.denominations).length > 0 && (
+                      <p className="text-[11px] text-[#526066] tabular-nums">
+                        Notes: {Object.entries(entry.denominations)
+                          .map(([d, q]) => `Rs ${d}×${q}`)
+                          .join(', ')}
+                        {entry.looseCoins ? ` + Rs ${entry.looseCoins} coins` : ''}
+                      </p>
+                    )}
+                    {entry.note && (
+                      <p className="text-[11px] text-[#273238] italic">Note: {entry.note}</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
       </div>
     </Modal>

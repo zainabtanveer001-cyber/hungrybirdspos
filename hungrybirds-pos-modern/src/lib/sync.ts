@@ -1,10 +1,11 @@
+import type { Table, Transaction } from 'dexie';
 import { db } from './db';
 import { configManager } from './config';
 import {
   cloudOrderToLocal, cloudSaleToLocal, decodeFields, documentId, encodeFields,
   localOrderPatch, mergePulledSnapshot, reconcileMirrorCollection, toIso,
 } from './syncMap';
-import type { Category, InventoryItem, MenuItem, OnlineOrder } from './db/types';
+import type { OnlineOrder, Sale } from './db/types';
 
 // Firestore REST, same reasoning as auth.ts: the `firebase` package broke the
 // Vercel/Rolldown build, and polling a tiny metadata projection is cheap.
@@ -12,9 +13,81 @@ const TOKEN_KEY = 'hb.syncToken';
 const SNAPSHOT_KEY = 'sync.snapshot';
 const OUTBOX_KEY = 'sync.outbox';
 const CATEGORIES_INITIALIZED_KEY = 'categoriesInitialized';
-const POLL_MS = 15_000;
-const WAKE_MIN_INTERVAL_MS = 3_000;
+const SETTING_PREFIX = 'setting_';
+const POLL_MS = 4_000;
+const TIER2_EVERY_TICKS = 3;
+const WAKE_MIN_INTERVAL_MS = 1_500;
 const MAX_SYNCED_IMAGE_BYTES = 700 * 1024;
+const BROADCAST_CHANNEL_NAME = 'hb-pos-sync';
+
+const STRING_MIRROR_COLLECTIONS = ['categories', 'menu', 'inventory', 'suppliers'] as const;
+const NUMERIC_MIRROR_COLLECTIONS = [
+  'heldOrders',
+  'deliveries',
+  'expenses',
+  'staff',
+  'attendance',
+  'leaves',
+  'salaryPayments',
+  'advancePayments',
+  'stockIn',
+  'supplierPayments',
+  'auditLogs',
+] as const;
+
+const NUMERIC_COLLECTION_SET = new Set<string>(NUMERIC_MIRROR_COLLECTIONS);
+const MIRROR_COLLECTIONS = [
+  ...STRING_MIRROR_COLLECTIONS,
+  ...NUMERIC_MIRROR_COLLECTIONS,
+] as const;
+
+type MirrorCollection = (typeof MIRROR_COLLECTIONS)[number];
+type OutboxCollection = MirrorCollection | 'sales' | 'tableOrders';
+
+export const SYNCED_SETTING_KEYS = new Set([
+  'modifierGroupsLibrary',
+  'shiftStartTime',
+  'shiftOpeningCash',
+  'shiftStockDeltas',
+  'closedShiftReports',
+  'closedShiftManualCosts',
+  'lowStockThreshold',
+  'printerSettings',
+  'receiptSettings',
+  'ownerPinHash',
+]);
+
+const TIER1_COLLECTIONS = [
+  'categories',
+  'menu',
+  'inventory',
+  'sales',
+  'onlineOrders',
+  'heldOrders',
+  'deliveries',
+  'tableOrders',
+] as const;
+
+const TIER2_COLLECTIONS = [
+  'suppliers',
+  'expenses',
+  'stockIn',
+  'supplierPayments',
+  'staff',
+  'attendance',
+  'leaves',
+  'salaryPayments',
+  'advancePayments',
+  'auditLogs',
+] as const;
+
+const ALL_COLLECTIONS = [...TIER1_COLLECTIONS, ...TIER2_COLLECTIONS] as const;
+
+const OUTBOX_COLLECTIONS: OutboxCollection[] = [
+  ...MIRROR_COLLECTIONS,
+  'sales',
+  'tableOrders',
+];
 
 export type SyncState = 'off' | 'idle' | 'syncing' | 'error';
 export interface SyncStatus {
@@ -43,7 +116,21 @@ export function getSyncStatus(): SyncStatus {
 }
 
 export function isSyncEnabled(): boolean {
-  return Boolean(localStorage.getItem(TOKEN_KEY)) && configManager.isConfigured();
+  return typeof localStorage !== 'undefined' && Boolean(localStorage.getItem(TOKEN_KEY)) && configManager.isConfigured();
+}
+
+/* ------------------------------------------------------------- remote guard */
+
+let remoteApplyDepth = 0;
+
+/** Wraps pulled remote IndexedDB writes so Dexie hooks never echo them back to Firestore. */
+async function runAsRemoteApply<T>(fn: () => Promise<T>): Promise<T> {
+  remoteApplyDepth += 1;
+  try {
+    return await fn();
+  } finally {
+    remoteApplyDepth -= 1;
+  }
 }
 
 /* ------------------------------------------------------------------- token */
@@ -60,7 +147,7 @@ interface Token {
 }
 
 export function rememberToken(idToken: string, refreshToken?: string, expiresIn?: number): void {
-  if (!refreshToken) return;
+  if (!refreshToken || typeof localStorage === 'undefined') return;
   const token: Token = {
     idToken,
     refreshToken,
@@ -70,11 +157,14 @@ export function rememberToken(idToken: string, refreshToken?: string, expiresIn?
 }
 
 export function forgetToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY);
+  }
   setStatus({ state: 'off', error: undefined });
 }
 
 async function accessToken(): Promise<string | null> {
+  if (typeof localStorage === 'undefined') return null;
   const raw = localStorage.getItem(TOKEN_KEY);
   if (!raw) return null;
   let token: Token;
@@ -167,7 +257,6 @@ export function restWrite(method: string, target: string, body?: unknown): Promi
 /* --------------------------------------------------------- snapshot/outbox */
 
 type Snapshot = Record<string, Record<string, string>>;
-type MirrorCollection = 'categories' | 'menu' | 'inventory';
 
 interface SyncOutbox {
   upserts: Record<string, string[]>;
@@ -223,7 +312,7 @@ async function writeOutbox(next: SyncOutbox): Promise<void> {
   await db.settings.put({ key: OUTBOX_KEY, value: JSON.stringify(next) });
 }
 
-async function markOutbox(collection: MirrorCollection, id: string, kind: 'upsert' | 'delete'): Promise<void> {
+async function markOutbox(collection: OutboxCollection, id: string, kind: 'upsert' | 'delete'): Promise<void> {
   const box = await getOutbox();
   const up = new Set(box.upserts[collection] ?? []);
   const del = new Set(box.deletes[collection] ?? []);
@@ -240,7 +329,7 @@ async function markOutbox(collection: MirrorCollection, id: string, kind: 'upser
   });
 }
 
-async function clearOutbox(collection: MirrorCollection, id: string, kind: 'upsert' | 'delete'): Promise<void> {
+async function clearOutbox(collection: OutboxCollection, id: string, kind: 'upsert' | 'delete'): Promise<void> {
   const box = await getOutbox();
   const list = (kind === 'upsert' ? box.upserts[collection] : box.deletes[collection]) ?? [];
   if (!list.includes(id)) return;
@@ -252,12 +341,53 @@ async function clearOutbox(collection: MirrorCollection, id: string, kind: 'upse
   );
 }
 
+/* ---------------------------------------------------------- table helpers */
+
+function mirrorTable(collection: MirrorCollection): Table<any, any> | undefined {
+  return (db as unknown as Record<string, Table<any, any> | undefined>)[collection];
+}
+
+function isMirrorCollection(collection: string): collection is MirrorCollection {
+  return (MIRROR_COLLECTIONS as readonly string[]).includes(collection);
+}
+
+function isNumericCollection(collection: MirrorCollection): boolean {
+  return NUMERIC_COLLECTION_SET.has(collection);
+}
+
+function isSyncedSettingDocId(docId: string): boolean {
+  return docId.startsWith(SETTING_PREFIX) && SYNCED_SETTING_KEYS.has(docId.slice(SETTING_PREFIX.length));
+}
+
+function localMirrorKey(collection: MirrorCollection, id: string): string | number | null {
+  if (!isNumericCollection(collection)) return id;
+  const num = Number(id);
+  return Number.isInteger(num) && num > 0 ? num : null;
+}
+
+async function localPrimaryKeys(collection: MirrorCollection): Promise<string[]> {
+  const table = mirrorTable(collection);
+  if (!table) return [];
+  return (await table.toCollection().primaryKeys()).map(String);
+}
+
+async function localSettingDocIds(): Promise<string[]> {
+  const rows = await db.settings.toArray();
+  return rows
+    .filter((row) => SYNCED_SETTING_KEYS.has(row.key))
+    .map((row) => `${SETTING_PREFIX}${row.key}`);
+}
+
 /* -------------------------------------------------------------------- pull */
 
 /** `{docId: updateTime}` plus the docs themselves, or `null` if the cloud fetch failed. */
 async function metadata(collection: string): Promise<{ times: Record<string, string>; docs: any[] } | null> {
-  const docs = await listAll(collection);
-  if (docs === null) return null;
+  const allDocs = await listAll(collection);
+  if (allDocs === null) return null;
+  const docs =
+    collection === 'tableOrders'
+      ? allDocs.filter((doc) => isSyncedSettingDocId(documentId(doc.name)))
+      : allDocs;
   const times: Record<string, string> = {};
   for (const doc of docs) times[documentId(doc.name)] = doc.updateTime ?? '';
   return { times, docs };
@@ -285,78 +415,108 @@ async function fetchDoc(collection: string, id: string): Promise<any | null> {
   return rest('GET', url(`${collection}/${encodeURIComponent(id)}`));
 }
 
-async function applyMenu(doc: any, updateTime: string): Promise<void> {
+async function applyMenuDoc(doc: any, updateTime: string): Promise<void> {
   const id = documentId(doc.name);
   const data: any = decodeFields(doc.fields ?? {});
   const { recipes, ...item } = data;
-  await db.menu.put({ ...item, id, updatedAt: toIso(updateTime) } as unknown as MenuItem);
-  await db.recipes.where('menuItemId').equals(id).delete();
-  for (const row of recipes ?? []) {
-    if (!row?.inventoryId) continue;
-    await db.recipes.add({
-      menuItemId: id,
-      inventoryId: row.inventoryId,
-      qtyRequired: Number(row.qtyRequired) || 0,
-    });
+  await runAsRemoteApply(async () => {
+    await db.menu.put({ ...item, id, updatedAt: toIso(updateTime) });
+    await db.recipes.where('menuItemId').equals(id).delete();
+    for (const row of recipes ?? []) {
+      if (!row?.inventoryId) continue;
+      await db.recipes.add({
+        menuItemId: id,
+        inventoryId: row.inventoryId,
+        qtyRequired: Number(row.qtyRequired) || 0,
+      });
+    }
+  });
+  lastSentSig.delete(`menu/${id}`);
+}
+
+async function applyMirrorDoc(collection: MirrorCollection, doc: any, updateTime: string): Promise<void> {
+  if (collection === 'menu') {
+    await applyMenuDoc(doc, updateTime);
+    return;
   }
+  const table = mirrorTable(collection);
+  if (!table) return;
+  const rawId = documentId(doc.name);
+  const id = localMirrorKey(collection, rawId);
+  if (id === null) return;
+  const data = decodeFields(doc.fields ?? {});
+  await runAsRemoteApply(async () => {
+    await table.put({ ...data, id, updatedAt: toIso(updateTime) });
+  });
+  lastSentSig.delete(`${collection}/${rawId}`);
 }
 
-async function applyCategory(doc: any, updateTime: string): Promise<void> {
-  const id = documentId(doc.name);
-  await db.categories.put({ ...decodeFields(doc.fields ?? {}), id, updatedAt: toIso(updateTime) } as unknown as Category);
+async function applySyncedSetting(doc: any): Promise<void> {
+  const docId = documentId(doc.name);
+  if (!isSyncedSettingDocId(docId)) return;
+  const data = decodeFields(doc.fields ?? {});
+  const key = String(data.key || docId.slice(SETTING_PREFIX.length));
+  if (!SYNCED_SETTING_KEYS.has(key)) return;
+  await runAsRemoteApply(async () => {
+    await db.settings.put({ key, value: data.value });
+  });
+  lastSentSig.delete(`tableOrders/${docId}`);
 }
 
-async function applyInventory(doc: any, updateTime: string): Promise<void> {
-  const id = documentId(doc.name);
-  await db.inventory.put({ ...decodeFields(doc.fields ?? {}), id, updatedAt: toIso(updateTime) } as unknown as InventoryItem);
-}
-
-async function applySale(doc: any): Promise<void> {
+async function applySale(doc: any, updateTime: string): Promise<void> {
   const cloudId = documentId(doc.name);
   const data = decodeFields(doc.fields ?? {});
-  if (await db.sales.where('cloudId').equals(cloudId).first()) return;
+  const box = await getOutbox();
+  const pendingLocalIds = new Set(box.upserts.sales ?? []);
+
+  const existingByCloud = await db.sales.where('cloudId').equals(cloudId).first();
+  if (existingByCloud?.id) {
+    if (pendingLocalIds.has(String(existingByCloud.id)) || pushes.has(`sales/${existingByCloud.id}`)) {
+      return;
+    }
+    await runAsRemoteApply(async () => {
+      const patch: Partial<Sale> = {
+        kitchenStatus: data.kitchenStatus,
+        deliveryStatus: data.deliveryStatus,
+        refundedAmount: data.refundedAmount,
+        refundStatus: data.refundStatus,
+        refunds: data.refunds,
+        lockedCost: data.lockedCost,
+        updatedAt: toIso(data.updatedAt) ?? toIso(updateTime),
+      };
+      if (Array.isArray(data.items)) patch.items = data.items;
+      await db.sales.update(existingByCloud.id!, patch);
+    });
+    return;
+  }
 
   // A poll can overtake the push's `cloudId` write-back. The local row is the
   // same sale when the ids collide *and* the figures agree — another till can
   // legitimately hold a different sale under the same numeric id.
   const known = Number(data.localId) ? await db.sales.get(Number(data.localId)) : undefined;
   if (known?.id && known.timestamp === toIso(data.createdAt) && Number(known.total) === Number(data.total ?? known.total)) {
-    if (!known.cloudId) await db.sales.update(known.id, { cloudId });
+    if (!known.cloudId) {
+      await runAsRemoteApply(() => db.sales.update(known.id!, { cloudId }));
+    }
     return;
   }
 
-  await db.sales.add({ ...cloudSaleToLocal(cloudId, data), id: undefined });
+  await runAsRemoteApply(async () => {
+    await db.sales.add({ ...cloudSaleToLocal(cloudId, data), id: undefined });
+  });
 }
 
 async function applyOnlineOrder(doc: any): Promise<void> {
   const cloudId = documentId(doc.name);
   const order = cloudOrderToLocal(cloudId, decodeFields(doc.fields ?? {}));
   const local = await db.onlineOrders.where('cloudId').equals(cloudId).first();
-  if (local?.id) {
-    await db.onlineOrders.put({ ...order, id: local.id });
-  } else {
-    await db.onlineOrders.add(order);
-  }
-}
-
-const APPLY: Record<string, (doc: any, updateTime: string) => Promise<void>> = {
-  menu: applyMenu,
-  categories: applyCategory,
-  inventory: applyInventory,
-  sales: applySale,
-  onlineOrders: applyOnlineOrder,
-};
-
-const COLLECTIONS = Object.keys(APPLY);
-
-function isMirrorCollection(collection: string): collection is MirrorCollection {
-  return collection === 'categories' || collection === 'menu' || collection === 'inventory';
-}
-
-async function localPrimaryKeys(collection: MirrorCollection): Promise<string[]> {
-  if (collection === 'categories') return (await db.categories.toCollection().primaryKeys()).map(String);
-  if (collection === 'menu') return (await db.menu.toCollection().primaryKeys()).map(String);
-  return (await db.inventory.toCollection().primaryKeys()).map(String);
+  await runAsRemoteApply(async () => {
+    if (local?.id) {
+      await db.onlineOrders.put({ ...order, id: local.id });
+    } else {
+      await db.onlineOrders.add(order);
+    }
+  });
 }
 
 function inFlightKeys(collection: string): string[] {
@@ -379,13 +539,61 @@ function touchedSince(collection: string, sinceEpoch: number): string[] {
   return ids;
 }
 
+async function pushByCollection(collection: MirrorCollection | 'tableOrders', docId: string): Promise<void> {
+  if (collection === 'tableOrders') {
+    if (docId.startsWith(SETTING_PREFIX)) {
+      await pushSetting(docId.slice(SETTING_PREFIX.length));
+    }
+    return;
+  }
+  if (collection === 'categories') return pushCategory(docId);
+  if (collection === 'menu') return pushMenu(docId);
+  if (collection === 'inventory') return pushInventory(docId);
+  return pushMirrorDoc(collection, docId);
+}
+
+async function deleteRemovedLocal(collection: MirrorCollection | 'tableOrders', removed: string[]): Promise<void> {
+  if (!removed.length) return;
+  await runAsRemoteApply(async () => {
+    if (collection === 'tableOrders') {
+      for (const docId of removed) {
+        if (isSyncedSettingDocId(docId)) {
+          await db.settings.delete(docId.slice(SETTING_PREFIX.length));
+          lastSentSig.delete(`tableOrders/${docId}`);
+        }
+      }
+      return;
+    }
+    const table = mirrorTable(collection);
+    if (!table) return;
+    for (const rawId of removed) {
+      const key = localMirrorKey(collection, rawId);
+      if (key === null) continue;
+      await table.delete(key);
+      if (collection === 'menu') {
+        await db.recipes.where('menuItemId').equals(rawId).delete();
+      }
+      lastSentSig.delete(`${collection}/${rawId}`);
+    }
+  });
+}
+
+async function applyDoc(collection: string, doc: any, updateTime: string): Promise<void> {
+  if (collection === 'sales') return applySale(doc, updateTime);
+  if (collection === 'onlineOrders') return applyOnlineOrder(doc);
+  if (collection === 'tableOrders') return applySyncedSetting(doc);
+  if (isMirrorCollection(collection)) return applyMirrorDoc(collection, doc, updateTime);
+}
+
 async function pullCollection(collection: string, snap: Snapshot): Promise<'changed' | 'unchanged' | 'error'> {
   const pullStartEpoch = pushEpoch;
   const preInFlight = inFlightKeys(collection);
+  const preSnap = snap[collection];
+  const preSeenKeys = preSnap !== undefined ? Object.keys(preSnap) : undefined;
   const meta = await metadata(collection);
   if (!meta) return 'error';
   const { times: remote, docs } = meta;
-  const seen = snap[collection];
+  const seen = preSnap;
   const seenMap = seen ?? {};
   const box = await getOutbox();
   const pendingDeletes = new Set(box.deletes[collection] ?? []);
@@ -404,32 +612,43 @@ async function pullCollection(collection: string, snap: Snapshot): Promise<'chan
   let removed: string[] = [];
   let shouldBootstrapCloud = false;
   let localKeys: string[] = [];
+  const mirrorLike = isMirrorCollection(collection) || collection === 'tableOrders';
 
-  if (isMirrorCollection(collection)) {
-    localKeys = await localPrimaryKeys(collection);
+  if (mirrorLike) {
+    localKeys =
+      collection === 'tableOrders'
+        ? await localSettingDocIds()
+        : await localPrimaryKeys(collection as MirrorCollection);
     const reconciled = reconcileMirrorCollection({
       remoteIds: Object.keys(remote),
-      seenIds: seen !== undefined ? Object.keys(seen) : undefined,
+      seenIds: preSeenKeys,
       localIds: localKeys,
       pendingUpsertIds: pendingUpserts,
     });
     removed = reconciled.toDelete;
     shouldBootstrapCloud = reconciled.shouldBootstrapCloud;
+  } else if (collection === 'sales' && preSeenKeys !== undefined) {
+    const voidedCloudIds = preSeenKeys.filter(
+      (cloudId) => !(cloudId in remote) && !protectedIds.has(cloudId),
+    );
+    if (voidedCloudIds.length > 0) {
+      await runAsRemoteApply(async () => {
+        for (const cloudId of voidedCloudIds) {
+          await db.sales.where('cloudId').equals(cloudId).delete();
+        }
+      });
+      removed = voidedCloudIds;
+    }
   }
 
   if (collection === 'categories') {
     await db.settings.put({ key: CATEGORIES_INITIALIZED_KEY, value: 'true' });
   }
 
-  if (shouldBootstrapCloud && isMirrorCollection(collection)) {
+  if (shouldBootstrapCloud && mirrorLike) {
     snap[collection] = mergePulledSnapshot(remote, snap[collection], protectedIds);
-    const bootstrapTasks = localKeys.map((id) =>
-      collection === 'categories'
-        ? pushCategory(id)
-        : collection === 'menu'
-          ? pushMenu(id)
-          : pushInventory(id),
-    );
+    const target = collection as MirrorCollection | 'tableOrders';
+    const bootstrapTasks = localKeys.map((id) => pushByCollection(target, id));
     if (bootstrapTasks.length) await Promise.all(bootstrapTasks);
     const afterBox = await getOutbox();
     const hasPending =
@@ -440,74 +659,99 @@ async function pullCollection(collection: string, snap: Snapshot): Promise<'chan
   const snapshotInitialized = seen === undefined;
   if (!changed.length && !removed.length && !snapshotInitialized) return 'unchanged';
 
-  const apply = APPLY[collection];
   const byId = new Map(docs.map((d) => [documentId(d.name), d]));
 
   for (const id of changed) {
     const doc = byId.get(id) ?? (await fetchDoc(collection, id));
-    if (doc?.fields) await apply(doc, remote[id]);
+    if (doc?.fields) await applyDoc(collection, doc, remote[id]);
   }
 
-  if (collection === 'menu') {
-    for (const id of removed) {
-      await db.menu.delete(id);
-      await db.recipes.where('menuItemId').equals(id).delete();
-    }
-  } else if (collection === 'categories') {
-    for (const id of removed) await db.categories.delete(id);
-  } else if (collection === 'inventory') {
-    for (const id of removed) await db.inventory.delete(id);
+  if (mirrorLike && removed.length > 0) {
+    await deleteRemovedLocal(collection as MirrorCollection | 'tableOrders', removed);
   }
-  // Sales and onlineOrders are never deleted locally: the POS holds sales the
-  // cloud may not, and the website owns the order collection (no delete rule).
 
   snap[collection] = mergePulledSnapshot(remote, snap[collection], protectedIds);
   return changed.length > 0 || removed.length > 0 || snapshotInitialized ? 'changed' : 'unchanged';
 }
 
-/** Retries any pending offline/failed mirror pushes; returns true if anything still failed to send. */
-async function flushOutbox(): Promise<boolean> {
+/** Retries any pending offline/failed pushes; returns true if anything still failed to send. */
+async function flushOutbox(): Promise<{ hadError: boolean; flushedTier2: boolean }> {
   const box = await getOutbox();
   const tasks: Promise<void>[] = [];
-  for (const collection of ['categories', 'menu', 'inventory'] as const) {
+  let flushedTier2 = false;
+
+  for (const collection of MIRROR_COLLECTIONS) {
     const ids = new Set([...(box.deletes[collection] ?? []), ...(box.upserts[collection] ?? [])]);
+    if (ids.size > 0 && (TIER2_COLLECTIONS as readonly string[]).includes(collection)) {
+      flushedTier2 = true;
+    }
     for (const id of ids) {
-      if (collection === 'categories') tasks.push(pushCategory(id));
-      else if (collection === 'menu') tasks.push(pushMenu(id));
-      else tasks.push(pushInventory(id));
+      tasks.push(pushByCollection(collection, id));
     }
   }
+
+  for (const docId of new Set([...(box.deletes.tableOrders ?? []), ...(box.upserts.tableOrders ?? [])])) {
+    tasks.push(pushByCollection('tableOrders', docId));
+  }
+
+  for (const localIdStr of box.upserts.sales ?? []) {
+    const localId = Number(localIdStr);
+    if (Number.isFinite(localId) && localId > 0) tasks.push(pushSale(localId));
+  }
+
+  for (const cloudId of box.deletes.sales ?? []) {
+    tasks.push(deleteSale(cloudId));
+  }
+
   if (tasks.length) await Promise.all(tasks);
   const remaining = await getOutbox();
-  return (['categories', 'menu', 'inventory'] as const).some(
+  const hadError = OUTBOX_COLLECTIONS.some(
     (c) => (remaining.deletes[c]?.length ?? 0) > 0 || (remaining.upserts[c]?.length ?? 0) > 0,
   );
+  return { hadError, flushedTier2 };
 }
 
 let inFlight: Promise<boolean> | null = null;
+let tier2Initialized = false;
 
-/** Flushes queued local edits/deletes, then pulls every collection once. Returns true when something changed. */
-export function syncNow(): Promise<boolean> {
+/** Flushes queued local edits/deletes, then pulls synced collections in parallel. Returns true when something changed. */
+export function syncNow(includeTier2 = true): Promise<boolean> {
   inFlight ??= (async () => {
     if (!isSyncEnabled()) {
       setStatus({ state: 'off' });
       return false;
     }
     setStatus({ state: 'syncing', error: undefined });
-    let hadError = await flushOutbox();
+    const outboxResult = await flushOutbox();
+    let hadError = outboxResult.hadError;
+
+    const pullTier2 = includeTier2 || !tier2Initialized || outboxResult.flushedTier2;
+    const collectionsToPull = pullTier2 ? ALL_COLLECTIONS : TIER1_COLLECTIONS;
 
     const snap = await getSnapshot();
     let changed = false;
-    for (const collection of COLLECTIONS) {
-      try {
-        const outcome = await pullCollection(collection, snap);
-        if (outcome === 'changed') changed = true;
-        else if (outcome === 'error') hadError = true;
-      } catch (err) {
+    const results = await Promise.all(
+      collectionsToPull.map(async (collection) => {
+        try {
+          const outcome = await pullCollection(collection, snap);
+          return { collection, outcome, err: undefined };
+        } catch (err) {
+          return { collection, outcome: 'error' as const, err };
+        }
+      }),
+    );
+
+    for (const result of results) {
+      if (result.outcome === 'changed') changed = true;
+      else if (result.outcome === 'error') {
         hadError = true;
-        setStatus({ state: 'error', error: err instanceof Error ? err.message : 'pull failed' });
+        if (result.err) {
+          setStatus({ state: 'error', error: result.err instanceof Error ? result.err.message : 'pull failed' });
+        }
       }
     }
+
+    if (pullTier2 && !hadError) tier2Initialized = true;
     if (changed) await writeSnapshot(snap);
     if (!hadError && isSyncEnabled()) {
       setStatus({ state: 'idle', lastSync: Date.now(), error: undefined });
@@ -521,12 +765,158 @@ export function syncNow(): Promise<boolean> {
   return inFlight;
 }
 
+/* ----------------------------------------------------------- hooks & timer */
+
 let timer: ReturnType<typeof setInterval> | null = null;
+let pollTicks = 0;
+let broadcastChannel: BroadcastChannel | null = null;
+let hooksInstalled = false;
+const txPending = new WeakMap<object, Map<string, () => void>>();
+
+function notifyBroadcast(): void {
+  try {
+    broadcastChannel?.postMessage({ type: 'local-write', at: Date.now() });
+  } catch {
+    // BroadcastChannel can throw if closing during teardown.
+  }
+}
+
+function queueAfterCommit(tx: Transaction | undefined, dedupeKey: string, action: () => void): void {
+  if (!tx || typeof tx.on !== 'function') {
+    setTimeout(() => {
+      if (isSyncEnabled()) {
+        action();
+        notifyBroadcast();
+      }
+    }, 0);
+    return;
+  }
+  let jobs = txPending.get(tx);
+  if (!jobs) {
+    jobs = new Map();
+    txPending.set(tx, jobs);
+    tx.on('complete', () => {
+      const queued = txPending.get(tx);
+      txPending.delete(tx);
+      if (!queued || !isSyncEnabled()) return;
+      for (const fn of queued.values()) fn();
+      notifyBroadcast();
+    });
+  }
+  jobs.set(dedupeKey, action);
+}
+
+/** Attaches idempotent Dexie hooks so every local CRUD write pushes immediately to Firestore. */
+export function installSyncHooks(): void {
+  if (hooksInstalled) return;
+  hooksInstalled = true;
+
+  for (const collection of MIRROR_COLLECTIONS) {
+    const table = mirrorTable(collection);
+    if (!table || typeof table.hook !== 'function') continue;
+
+    table.hook('creating', function (primKey, _obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      this.onsuccess = (resolvedKey) => {
+        const key = resolvedKey ?? primKey;
+        if (key === undefined || key === null) return;
+        const id = String(key);
+        queueAfterCommit(transaction, `${collection}/${id}`, () => {
+          void pushByCollection(collection, id);
+        });
+      };
+    });
+
+    table.hook('updating', function (_mods, primKey, _obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      this.onsuccess = () => {
+        if (primKey === undefined || primKey === null) return;
+        const id = String(primKey);
+        queueAfterCommit(transaction, `${collection}/${id}`, () => {
+          void pushByCollection(collection, id);
+        });
+      };
+    });
+
+    table.hook('deleting', function (primKey, _obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      this.onsuccess = () => {
+        if (primKey === undefined || primKey === null) return;
+        const id = String(primKey);
+        queueAfterCommit(transaction, `${collection}/${id}`, () => {
+          void pushByCollection(collection, id);
+        });
+      };
+    });
+  }
+
+  if (typeof db.sales?.hook === 'function') {
+    db.sales.hook('creating', function (primKey, _obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      this.onsuccess = (resolvedKey) => {
+        const numKey = Number(resolvedKey ?? primKey);
+        if (!Number.isFinite(numKey) || numKey <= 0) return;
+        queueAfterCommit(transaction, `sales/${numKey}`, () => {
+          void pushSale(numKey);
+        });
+      };
+    });
+
+    db.sales.hook('updating', function (_mods, primKey, _obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      this.onsuccess = () => {
+        const numKey = Number(primKey);
+        if (!Number.isFinite(numKey) || numKey <= 0) return;
+        queueAfterCommit(transaction, `sales/${numKey}`, () => {
+          void pushSale(numKey);
+        });
+      };
+    });
+
+    db.sales.hook('deleting', function (_primKey, obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      const cloudId = obj?.cloudId;
+      if (!cloudId) return;
+      this.onsuccess = () => {
+        queueAfterCommit(transaction, `sales/del/${cloudId}`, () => {
+          void deleteSale(cloudId);
+        });
+      };
+    });
+  }
+
+  if (typeof db.settings?.hook === 'function') {
+    const scheduleSetting = (key: string, transaction: Transaction | undefined) => {
+      if (!SYNCED_SETTING_KEYS.has(key)) return;
+      queueAfterCommit(transaction, `tableOrders/${SETTING_PREFIX}${key}`, () => {
+        void pushSetting(key);
+      });
+    };
+
+    db.settings.hook('creating', function (primKey, obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      const key = String(primKey ?? obj?.key ?? '');
+      this.onsuccess = () => scheduleSetting(key, transaction);
+    });
+
+    db.settings.hook('updating', function (_mods, primKey, obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      const key = String(primKey ?? obj?.key ?? '');
+      this.onsuccess = () => scheduleSetting(key, transaction);
+    });
+
+    db.settings.hook('deleting', function (primKey, obj, transaction) {
+      if (remoteApplyDepth > 0 || !isSyncEnabled()) return;
+      const key = String(primKey ?? obj?.key ?? '');
+      this.onsuccess = () => scheduleSetting(key, transaction);
+    });
+  }
+}
 
 function wakeIfStale(): void {
   if (typeof document !== 'undefined' && document.hidden) return;
   if (status.lastSync && Date.now() - status.lastSync < WAKE_MIN_INTERVAL_MS) return;
-  void syncNow();
+  void syncNow(true);
 }
 
 export function startSync(): void {
@@ -535,32 +925,53 @@ export function startSync(): void {
     setStatus({ state: 'off' });
     return;
   }
-  void syncNow();
-  timer = setInterval(() => void syncNow(), POLL_MS);
-  window.addEventListener('online', wake);
-  window.addEventListener('focus', wakeIfStale);
+  installSyncHooks();
+  pollTicks = 0;
+  tier2Initialized = false;
+  void syncNow(true);
+
+  timer = setInterval(() => {
+    pollTicks += 1;
+    void syncNow(pollTicks % TIER2_EVERY_TICKS === 0);
+  }, POLL_MS);
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', wake);
+    window.addEventListener('focus', wakeIfStale);
+  }
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', wakeIfStale);
+  }
+  if (typeof BroadcastChannel !== 'undefined' && !broadcastChannel) {
+    broadcastChannel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+    broadcastChannel.onmessage = () => wakeIfStale();
   }
 }
 
 export function stopSync(): void {
   if (timer) clearInterval(timer);
   timer = null;
-  window.removeEventListener('online', wake);
-  window.removeEventListener('focus', wakeIfStale);
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('online', wake);
+    window.removeEventListener('focus', wakeIfStale);
+  }
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', wakeIfStale);
+  }
+  if (broadcastChannel) {
+    broadcastChannel.close();
+    broadcastChannel = null;
   }
 }
 
 function wake(): void {
-  void syncNow();
+  void syncNow(true);
 }
 
 /* -------------------------------------------------------------------- push */
 
 const pushes = new Map<string, Promise<void>>();
+const lastSentSig = new Map<string, string>();
 let pushEpoch = 0;
 const recentlyPushed = new Map<string, number>();
 
@@ -602,97 +1013,158 @@ async function forgetPush(collection: string, id: string): Promise<void> {
   }
 }
 
-export function pushMenu(id: string): Promise<void> {
-  return enqueue(`menu/${id}`, async () => {
+function stripOversizedImages(payload: Record<string, unknown>): void {
+  for (const field of ['imageUrl', 'receiptImage'] as const) {
+    if (typeof payload[field] === 'string' && (payload[field] as string).length > MAX_SYNCED_IMAGE_BYTES) {
+      delete payload[field];
+    }
+  }
+}
+
+function pushMirrorDoc(collection: MirrorCollection, id: string): Promise<void> {
+  const queueKey = `${collection}/${id}`;
+  return enqueue(queueKey, async () => {
     if (!isSyncEnabled()) return;
-    const item = await db.menu.get(id);
-    if (!item) {
-      await markOutbox('menu', id, 'delete');
-      const res = await rest('DELETE', url(`menu/${encodeURIComponent(id)}`));
+    const table = mirrorTable(collection);
+    if (!table) return;
+
+    const lookupKey = localMirrorKey(collection, id);
+    const row = lookupKey === null ? undefined : await table.get(lookupKey);
+    const box = await getOutbox();
+
+    if (!row) {
+      const pendingDel = (box.deletes[collection] ?? []).includes(id);
+      if (lastSentSig.get(queueKey) === '__DELETED__' && !pendingDel) return;
+      await markOutbox(collection, id, 'delete');
+      const res = await rest('DELETE', url(`${collection}/${encodeURIComponent(id)}`));
       if (res !== null) {
-        await clearOutbox('menu', id, 'delete');
-        await forgetPush('menu', id);
+        lastSentSig.set(queueKey, '__DELETED__');
+        await clearOutbox(collection, id, 'delete');
+        await forgetPush(collection, id);
       }
       return;
     }
-    await markOutbox('menu', id, 'upsert');
-    const recipes = await db.recipes.where('menuItemId').equals(id).toArray();
-    const payload: Record<string, unknown> = {
-      ...item,
-      recipes: recipes.map((row) => ({ inventoryId: row.inventoryId, qtyRequired: row.qtyRequired })),
-    };
-    // Same guard as the legacy app: a huge data-URL image would reject the whole write.
-    if (typeof payload.imageUrl === 'string' && payload.imageUrl.length > MAX_SYNCED_IMAGE_BYTES) {
-      delete payload.imageUrl;
+
+    const payload: Record<string, unknown> = { ...row };
+    if (collection === 'menu') {
+      const recipes = await db.recipes.where('menuItemId').equals(id).toArray();
+      payload.recipes = recipes.map((r) => ({ inventoryId: r.inventoryId, qtyRequired: r.qtyRequired }));
     }
-    const res = await rest('PATCH', url(`menu/${encodeURIComponent(id)}`), { fields: encodeFields(payload) });
+    stripOversizedImages(payload);
+
+    const sig = JSON.stringify(payload);
+    const pendingUp = (box.upserts[collection] ?? []).includes(id);
+    if (lastSentSig.get(queueKey) === sig && !pendingUp) return;
+
+    await markOutbox(collection, id, 'upsert');
+    const res = await rest('PATCH', url(`${collection}/${encodeURIComponent(id)}`), { fields: encodeFields(payload) });
     if (res !== null) {
-      await clearOutbox('menu', id, 'upsert');
-      await rememberPush('menu', id, res);
+      lastSentSig.set(queueKey, sig);
+      await clearOutbox(collection, id, 'upsert');
+      await rememberPush(collection, id, res);
     }
   });
+}
+
+export function pushMenu(id: string): Promise<void> {
+  return pushMirrorDoc('menu', id);
 }
 
 export function pushCategory(id: string): Promise<void> {
-  return enqueue(`categories/${id}`, async () => {
-    if (!isSyncEnabled()) return;
-    const category = await db.categories.get(id);
-    if (!category) {
-      await markOutbox('categories', id, 'delete');
-      const res = await rest('DELETE', url(`categories/${encodeURIComponent(id)}`));
-      if (res !== null) {
-        await clearOutbox('categories', id, 'delete');
-        await forgetPush('categories', id);
-      }
-      return;
-    }
-    await markOutbox('categories', id, 'upsert');
-    const res = await rest('PATCH', url(`categories/${encodeURIComponent(id)}`), { fields: encodeFields({ ...category }) });
-    if (res !== null) {
-      await clearOutbox('categories', id, 'upsert');
-      await rememberPush('categories', id, res);
-    }
-  });
+  return pushMirrorDoc('categories', id);
 }
 
 export function pushInventory(id: string): Promise<void> {
-  return enqueue(`inventory/${id}`, async () => {
+  return pushMirrorDoc('inventory', id);
+}
+
+/** Syncs a shared shop setting document under `tableOrders/setting_<key>`. */
+export function pushSetting(key: string): Promise<void> {
+  if (!SYNCED_SETTING_KEYS.has(key)) return Promise.resolve();
+  const docId = `${SETTING_PREFIX}${key}`;
+  const queueKey = `tableOrders/${docId}`;
+  return enqueue(queueKey, async () => {
     if (!isSyncEnabled()) return;
-    const item = await db.inventory.get(id);
-    if (!item) {
-      await markOutbox('inventory', id, 'delete');
-      const res = await rest('DELETE', url(`inventory/${encodeURIComponent(id)}`));
+    const row = await db.settings.get(key);
+    const box = await getOutbox();
+
+    if (!row) {
+      const pendingDel = (box.deletes.tableOrders ?? []).includes(docId);
+      if (lastSentSig.get(queueKey) === '__DELETED__' && !pendingDel) return;
+      await markOutbox('tableOrders', docId, 'delete');
+      const res = await rest('DELETE', url(`tableOrders/${encodeURIComponent(docId)}`));
       if (res !== null) {
-        await clearOutbox('inventory', id, 'delete');
-        await forgetPush('inventory', id);
+        lastSentSig.set(queueKey, '__DELETED__');
+        await clearOutbox('tableOrders', docId, 'delete');
+        await forgetPush('tableOrders', docId);
       }
       return;
     }
-    await markOutbox('inventory', id, 'upsert');
-    const res = await rest('PATCH', url(`inventory/${encodeURIComponent(id)}`), { fields: encodeFields({ ...item }) });
+
+    const payload = { key: row.key, value: row.value };
+    const sig = JSON.stringify(payload);
+    const pendingUp = (box.upserts.tableOrders ?? []).includes(docId);
+    if (lastSentSig.get(queueKey) === sig && !pendingUp) return;
+
+    await markOutbox('tableOrders', docId, 'upsert');
+    const res = await rest('PATCH', url(`tableOrders/${encodeURIComponent(docId)}`), {
+      fields: encodeFields({ ...payload, updatedAt: new Date().toISOString() }),
+    });
     if (res !== null) {
-      await clearOutbox('inventory', id, 'upsert');
-      await rememberPush('inventory', id, res);
+      lastSentSig.set(queueKey, sig);
+      await clearOutbox('tableOrders', docId, 'upsert');
+      await rememberPush('tableOrders', docId, res);
     }
   });
 }
 
-/** Sales are append-only in the cloud; the local numeric id rides along as `localId`. */
+/** Pushes a new sale (`POST`) or updates an existing cloud sale (`PATCH`, e.g. KDS status, refund, lockedCost). */
 export function pushSale(localId: number): Promise<void> {
-  return enqueue(`sales/${localId}`, async () => {
+  const queueKey = `sales/${localId}`;
+  return enqueue(queueKey, async () => {
+    if (!isSyncEnabled()) return;
     const sale = await db.sales.get(localId);
-    if (!sale || sale.cloudId) return;
-    const { id: _id, cloudId: _cloudId, ...payload } = sale;
+    if (!sale) {
+      await clearOutbox('sales', String(localId), 'upsert');
+      return;
+    }
+
+    const { id: _id, cloudId, ...payload } = sale;
+    const bodyPayload = {
+      ...payload,
+      localId,
+      createdAt: sale.createdAt ?? sale.timestamp,
+      updatedAt: sale.updatedAt ?? new Date().toISOString(),
+    };
+    const sig = JSON.stringify({ ...payload, cloudId: cloudId ?? '' });
+    const box = await getOutbox();
+    const pendingUp = (box.upserts.sales ?? []).includes(String(localId));
+    if (cloudId && lastSentSig.get(queueKey) === sig && !pendingUp) return;
+
+    await markOutbox('sales', String(localId), 'upsert');
+
+    if (cloudId) {
+      recordPushTouch(`sales/${cloudId}`);
+      const response = await rest('PATCH', url(`sales/${encodeURIComponent(cloudId)}`), {
+        fields: encodeFields(bodyPayload),
+      });
+      if (!response) return;
+      recordPushTouch(`sales/${cloudId}`);
+      lastSentSig.set(queueKey, sig);
+      await clearOutbox('sales', String(localId), 'upsert');
+      await rememberPush('sales', cloudId, response);
+      return;
+    }
+
     const response = await rest('POST', url('sales'), {
-      fields: encodeFields({
-        ...payload,
-        localId,
-        createdAt: sale.createdAt ?? sale.timestamp,
-      }),
+      fields: encodeFields(bodyPayload),
     });
     const newCloudId = response?.name ? documentId(response.name) : null;
     if (!newCloudId) return;
-    await db.sales.update(localId, { cloudId: newCloudId });
+    recordPushTouch(`sales/${newCloudId}`);
+    lastSentSig.set(queueKey, JSON.stringify({ ...payload, cloudId: newCloudId }));
+    await clearOutbox('sales', String(localId), 'upsert');
+    await runAsRemoteApply(() => db.sales.update(localId, { cloudId: newCloudId }));
     await rememberPush('sales', newCloudId, response);
   });
 }
@@ -700,6 +1172,7 @@ export function pushSale(localId: number): Promise<void> {
 export function pushOrder(order: OnlineOrder): Promise<void> | void {
   if (!order.cloudId) return;
   return enqueue(`onlineOrders/${order.cloudId}`, async () => {
+    if (!isSyncEnabled()) return;
     const current = order.id ? await db.onlineOrders.get(order.id) : order;
     if (!current) return;
     const patch = localOrderPatch(current);
@@ -713,8 +1186,17 @@ export function pushOrder(order: OnlineOrder): Promise<void> | void {
 }
 
 export function deleteSale(cloudId: string): Promise<void> {
-  return enqueue(`sales/${cloudId}`, async () => {
-    if (await rest('DELETE', url(`sales/${encodeURIComponent(cloudId)}`)) === null) return;
+  const queueKey = `sales/del/${cloudId}`;
+  return enqueue(queueKey, async () => {
+    if (!isSyncEnabled()) return;
+    const box = await getOutbox();
+    const pendingDel = (box.deletes.sales ?? []).includes(cloudId);
+    if (lastSentSig.get(queueKey) === '__DELETED__' && !pendingDel) return;
+    await markOutbox('sales', cloudId, 'delete');
+    const res = await rest('DELETE', url(`sales/${encodeURIComponent(cloudId)}`));
+    if (res === null) return;
+    lastSentSig.set(queueKey, '__DELETED__');
+    await clearOutbox('sales', cloudId, 'delete');
     await forgetPush('sales', cloudId);
   });
 }

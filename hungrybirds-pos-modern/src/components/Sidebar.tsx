@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   LayoutGrid, Globe, Archive, Bike, Users, BarChart3, TrendingUp,
   Boxes, Truck, Receipt, UserCog, Wallet, Clock, Printer, ScrollText,
-  ShieldCheck, ChevronLeft, ChevronRight, ChefHat, LogOut,
+  ShieldCheck, ChevronLeft, ChevronRight, ChefHat, LogOut, EyeOff,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { db } from '../lib/db';
@@ -22,7 +22,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
-export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOrders, onOpenDeliveries, onOpenCustomers, onOpenInventory, onOpenSuppliers, onOpenExpenses, onOpenAnalytics, onOpenPnl, onOpenStaff, onOpenOpeningCash, onOpenShiftSummary, onOpenActivityLog, onOpenPrinter, onOpenAdmin, onOpenOnlineOrders, onOpenKds }: {
+export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOrders, onOpenDeliveries, onOpenCustomers, onOpenInventory, onOpenSuppliers, onOpenExpenses, onOpenAnalytics, onOpenPnl, onOpenStaff, onOpenOpeningCash, onOpenShiftSummary, onOpenBlindClose, onOpenActivityLog, onOpenPrinter, onOpenAdmin, onOpenOnlineOrders, onOpenKds }: {
   role: UserRole;
   username: string;
   /** Drawer state below the lg breakpoint, where the sidebar overlays the POS. */
@@ -40,6 +40,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
   onOpenStaff: () => void;
   onOpenOpeningCash: () => void;
   onOpenShiftSummary: () => void;
+  onOpenBlindClose: () => void;
   onOpenActivityLog: () => void;
   onOpenPrinter: () => void;
   onOpenAdmin: () => void;
@@ -78,6 +79,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
         { label: 'Expenses', icon: Receipt, roles: ['OWNER', 'MANAGER'], onClick: onOpenExpenses },
         { label: 'Staff management', icon: UserCog, roles: ['OWNER', 'MANAGER'], onClick: onOpenStaff },
         { label: 'Opening cash', icon: Wallet, roles: ['OWNER'], onClick: onOpenOpeningCash },
+        { label: 'Blind cash close', icon: EyeOff, roles: ['CASHIER', 'MANAGER', 'OWNER'], onClick: onOpenBlindClose },
         { label: 'Shift summary', icon: Clock, roles: ['OWNER', 'MANAGER'], onClick: onOpenShiftSummary },
         { label: 'Printer settings', icon: Printer, onClick: onOpenPrinter },
         { label: 'Activity log', icon: ScrollText, roles: ['OWNER'], onClick: onOpenActivityLog },

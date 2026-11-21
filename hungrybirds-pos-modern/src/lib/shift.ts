@@ -8,10 +8,81 @@ import type { Expense, InventoryItem, Recipe, Sale } from './db/types';
 const SHIFT_START = 'shiftStartTime';
 const OPENING_CASH = 'shiftOpeningCash';
 export const CLOSED_SHIFT_MANUAL_COSTS_KEY = 'closedShiftManualCosts';
+export const CLOSED_SHIFT_REPORTS_KEY = 'closedShiftReports';
+
+export const PKR_DENOMINATIONS = [5000, 1000, 500, 100, 50, 20, 10] as const;
 
 export interface ClosedShiftManualCost {
   closedAt: string;
   cost: number;
+}
+
+export interface BlindCloseInput {
+  countedCash: number;
+  denominations?: Record<string, number>;
+  looseCoins?: number;
+  note?: string;
+}
+
+export interface ClosedShiftRecord {
+  id: string;
+  startedAt: string;
+  closedAt: string;
+  closedBy: string;
+  role?: string;
+  openingCash: number;
+  expectedDrawerCash: number;
+  countedCash: number;
+  variance: number;
+  netCash: number;
+  cardCollected: number;
+  onlineCollected: number;
+  totalSales: number;
+  orderCount: number;
+  denominations?: Record<string, number>;
+  looseCoins?: number;
+  note?: string;
+}
+
+function roundTwo(value: number): number {
+  const clean = Number(value);
+  if (!Number.isFinite(clean)) return 0;
+  return Math.round(clean * 100) / 100;
+}
+
+/** Sums PKR note counts across denominations plus optional loose coins. */
+export function computeDenominationTotal(
+  counts: Record<string, number>,
+  looseCoins = 0,
+): number {
+  let total = Math.max(0, roundTwo(looseCoins));
+  for (const denom of PKR_DENOMINATIONS) {
+    const qty = Math.max(0, Math.floor(Number(counts[String(denom)]) || 0));
+    total = roundTwo(total + qty * denom);
+  }
+  return total;
+}
+
+/** Computes drawer cash variance (`counted - expected`) and status without FP drift. */
+export function computeDrawerVariance(
+  expectedDrawerCash: number,
+  countedCash: number,
+): { variance: number; status: 'EXACT' | 'OVER' | 'SHORT' } {
+  const variance = roundTwo(roundTwo(countedCash) - roundTwo(expectedDrawerCash));
+  if (variance > 0) return { variance, status: 'OVER' };
+  if (variance < 0) return { variance, status: 'SHORT' };
+  return { variance: 0, status: 'EXACT' };
+}
+
+export async function getClosedShiftReports(): Promise<ClosedShiftRecord[]> {
+  const stored = await db.settings.get(CLOSED_SHIFT_REPORTS_KEY);
+  if (!stored?.value) return [];
+  try {
+    const parsed = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
+    return Array.isArray(parsed) ? (parsed as ClosedShiftRecord[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getClosedShiftManualCosts(): Promise<ClosedShiftManualCost[]> {
@@ -175,23 +246,55 @@ export function computeShiftUsage(
 /**
  * Ends the shift: snapshots (locks) current ingredient costs onto the shift's sales
  * and manual stock usage so future inventory price edits only affect new shifts,
+ * records the closed shift cash drawer variance (for blind closes & audits),
  * then resets the shift start time and opening cash.
  */
-export async function closeShift(user: string): Promise<string> {
+export async function closeShift(
+  user: string,
+  blindInput?: BlindCloseInput,
+  role?: string,
+): Promise<ClosedShiftRecord> {
   const now = new Date().toISOString();
-  const [startedAt, sales, inventory, recipes, stockDeltas, closedManual] = await Promise.all([
-    getShiftStart(),
+  const [report, sales, inventory, recipes, stockDeltas, closedManual, existingReports] = await Promise.all([
+    buildShiftReport(),
     db.sales.toArray(),
     db.inventory.toArray(),
     db.recipes.toArray(),
     getShiftStockDeltas(),
     getClosedShiftManualCosts(),
+    getClosedShiftReports(),
   ]);
 
-  const from = new Date(startedAt).getTime();
+  const from = new Date(report.startedAt).getTime();
   const shiftSales = sales.filter((s: Sale) => new Date(s.timestamp).getTime() >= from);
   const inventoryById = new Map(inventory.map((item) => [item.id, item]));
   const { manualCost } = computeShiftUsage(shiftSales, recipes, inventory, stockDeltas);
+
+  const countedCash =
+    blindInput?.countedCash !== undefined
+      ? Math.max(0, roundTwo(blindInput.countedCash))
+      : roundTwo(report.expectedDrawerCash);
+  const { variance } = computeDrawerVariance(report.expectedDrawerCash, countedCash);
+
+  const record: ClosedShiftRecord = {
+    id: `SHIFT_${Date.now()}`,
+    startedAt: report.startedAt,
+    closedAt: now,
+    closedBy: user,
+    role,
+    openingCash: roundTwo(report.openingCash),
+    expectedDrawerCash: roundTwo(report.expectedDrawerCash),
+    countedCash,
+    variance,
+    netCash: roundTwo(report.netCash),
+    cardCollected: roundTwo(report.cardCollected),
+    onlineCollected: roundTwo(report.onlineCollected),
+    totalSales: roundTwo(report.totalSales),
+    orderCount: report.orderCount,
+    denominations: blindInput?.denominations,
+    looseCoins: blindInput?.looseCoins ? Math.max(0, roundTwo(blindInput.looseCoins)) : undefined,
+    note: blindInput?.note?.trim() || undefined,
+  };
 
   await db.transaction('rw', db.sales, db.settings, async () => {
     for (const sale of shiftSales) {
@@ -206,13 +309,21 @@ export async function closeShift(user: string): Promise<string> {
         value: JSON.stringify([...closedManual, { closedAt: now, cost: manualCost }]),
       });
     }
+    await db.settings.put({
+      key: CLOSED_SHIFT_REPORTS_KEY,
+      value: JSON.stringify([record, ...existingReports].slice(0, 50)),
+    });
     await clearShiftStockDeltas();
     await db.settings.put({ key: SHIFT_START, value: now });
     await db.settings.delete(OPENING_CASH);
   });
 
-  await logAudit('SHIFT_CLOSE', `Shift closed at ${new Date(now).toLocaleString()}`, user);
-  return now;
+  await logAudit(
+    'SHIFT_CLOSE',
+    `Shift closed by ${user}: counted ${countedCash}, expected ${roundTwo(report.expectedDrawerCash)}, variance ${variance >= 0 ? `+${variance}` : variance}`,
+    user,
+  );
+  return record;
 }
 
 export interface ShiftReport {
@@ -229,6 +340,8 @@ export interface ShiftReport {
   cashCollected: number;
   changeGiven: number;
   netCash: number;
+  cardCollected: number;
+  onlineCollected: number;
   expectedDrawerCash: number;
   discountsByStaff: Array<{ user: string; amount: number }>;
   totalDiscounts: number;
@@ -263,6 +376,18 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     }, 0),
   );
   const changeGiven = sum((s) => Number(s.totalChange) || 0);
+  const cardCollected = sum((sale) =>
+    (sale.payments || []).reduce((total, payment) => {
+      if (payment.method !== 'Card') return total;
+      return total + (Number(payment.amount) || 0);
+    }, 0),
+  );
+  const onlineCollected = sum((sale) =>
+    (sale.payments || []).reduce((total, payment) => {
+      if (payment.method !== 'Online') return total;
+      return total + (Number(payment.amount) || 0);
+    }, 0),
+  );
 
   const staffDiscounts = new Map<string, number>();
   let totalDiscounts = 0;
@@ -297,6 +422,8 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     cashCollected,
     changeGiven,
     netCash: cashCollected - changeGiven,
+    cardCollected,
+    onlineCollected,
     expectedDrawerCash: openingCash + cashCollected - changeGiven,
     discountsByStaff: [...staffDiscounts].map(([user, amount]) => ({ user, amount })),
     totalDiscounts,

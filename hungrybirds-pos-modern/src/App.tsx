@@ -32,6 +32,8 @@ import { SalesAnalyticsModal } from './components/SalesAnalyticsModal';
 import { ProfitLossModal } from './components/ProfitLossModal';
 import { StaffModal } from './components/StaffModal';
 import { OpeningCashModal } from './components/OpeningCashModal';
+import { BlindCashModal } from './components/BlindCashModal';
+import { OwnerPinModal } from './components/OwnerPinModal';
 import { ShiftSummaryModal } from './components/ShiftSummaryModal';
 import { ActivityLogModal } from './components/ActivityLogModal';
 import { PrinterSettingsModal } from './components/PrinterSettingsModal';
@@ -80,6 +82,8 @@ function App() {
   const [pnlOpen, setPnlOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
   const [openingCashOpen, setOpeningCashOpen] = useState(false);
+  const [blindCloseOpen, setBlindCloseOpen] = useState(false);
+  const [pinForSalesHistory, setPinForSalesHistory] = useState(false);
   const [shiftSummaryOpen, setShiftSummaryOpen] = useState(false);
   const [activityLogOpen, setActivityLogOpen] = useState(false);
   const [printerOpen, setPrinterOpen] = useState(false);
@@ -327,7 +331,10 @@ function App() {
         payments,
         customer: customer.phone ? customer : undefined,
         deliveryInfo: charges.orderType === 'DELIVERY' ? customer : undefined,
-        totalReceived: totals.grandTotal,
+        totalReceived: payments.reduce(
+          (sum, p) => sum + (p.method === 'Cash' && p.cashGiven != null ? p.cashGiven : p.amount),
+          0,
+        ),
         totalChange: payments.reduce((sum, p) => sum + (Number(p.change) || 0), 0),
       };
       resetOrder();
@@ -478,6 +485,7 @@ function App() {
           onOpenPnl={() => setPnlOpen(true)}
           onOpenStaff={() => setStaffOpen(true)}
           onOpenOpeningCash={() => setOpeningCashOpen(true)}
+          onOpenBlindClose={() => setBlindCloseOpen(true)}
           onOpenShiftSummary={() => setShiftSummaryOpen(true)}
           onOpenActivityLog={() => setActivityLogOpen(true)}
           onOpenPrinter={() => setPrinterOpen(true)}
@@ -558,13 +566,33 @@ function App() {
                   <h3 className="font-display text-sm font-medium text-[#273238]">Recent Sales</h3>
                   <button
                     type="button"
-                    onClick={() => setSalesOpen(true)}
+                    onClick={() => {
+                      if (session.role === 'CASHIER' || session.role === 'WAITER') {
+                        setPinForSalesHistory(true);
+                      } else {
+                        setSalesOpen(true);
+                      }
+                    }}
                     className="text-xs font-medium text-[#2941e0] hover:underline px-2 py-1"
                   >
                     Manage
                   </button>
                 </div>
-                <RecentSales />
+                <RecentSales
+                  role={session.role}
+                  onReprint={async (sale) => {
+                    try {
+                      const how = await printReceipt(sale);
+                      notify(
+                        how === 'browser'
+                          ? `Reprinting Order #${sale.id} from browser.`
+                          : `Reprinted Order #${sale.id}.`,
+                      );
+                    } catch {
+                      notify('Failed to reprint receipt.');
+                    }
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -687,9 +715,30 @@ function App() {
         />
       )}
 
+      {blindCloseOpen && (
+        <BlindCashModal
+          username={session.username}
+          role={session.role}
+          onClose={() => setBlindCloseOpen(false)}
+          notify={notify}
+        />
+      )}
+
+      {pinForSalesHistory && (
+        <OwnerPinModal
+          action="Enter the owner PIN to view Sales History and past sale totals."
+          onClose={() => setPinForSalesHistory(false)}
+          onAuthorized={() => {
+            setPinForSalesHistory(false);
+            setSalesOpen(true);
+          }}
+        />
+      )}
+
       {shiftSummaryOpen && (
         <ShiftSummaryModal
           username={session.username}
+          role={session.role}
           onClose={() => setShiftSummaryOpen(false)}
           notify={notify}
           onClosed={() => setOpeningCashOpen(true)}
@@ -843,22 +892,44 @@ function SyncBadge() {
   );
 }
 
-function RecentSales() {
+function RecentSales({
+  role,
+  onReprint,
+}: {
+  role: UserRole;
+  onReprint: (sale: Sale) => void;
+}) {
   const sales = useLive(() => db.sales.orderBy('timestamp').reverse().limit(8).toArray(), []);
+  const hideTotals = role === 'CASHIER' || role === 'WAITER';
 
   if (!sales?.length) return <p className="text-xs text-[#616f75] py-4 text-center">No sales recorded yet.</p>;
 
   return (
     <ul className="space-y-2 text-xs max-h-[420px] overflow-y-auto custom-scrollbar">
-      {sales.map((sale) => (
-        <li key={sale.id} className="flex justify-between items-center gap-2 p-2.5 rounded-[10px] bg-[#f8fafd] border border-[#e0edff]">
-          <span className="text-[#526066] tabular-nums">
-            #{sale.id} · {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            {sale.tableNumber ? ` · ${sale.tableNumber}` : ''}
-          </span>
-          <span className="font-semibold text-[#000000] tabular-nums">{formatAmount(sale.total)}</span>
-        </li>
-      ))}
+      {sales.map((sale) => {
+        const itemCount = (sale.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+        return (
+          <li key={sale.id} className="flex justify-between items-center gap-2 p-2.5 rounded-[10px] bg-[#f8fafd] border border-[#e0edff]">
+            <span className="text-[#526066] tabular-nums min-w-0 truncate">
+              #{sale.id} · {new Date(sale.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              {sale.tableNumber ? ` · ${sale.tableNumber}` : ` · ${(sale.orderType || 'DINE_IN').replace('_', ' ')}`}
+              {hideTotals ? ` · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}` : ''}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {!hideTotals && (
+                <span className="font-semibold text-[#000000] tabular-nums">{formatAmount(sale.total)}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => onReprint(sale)}
+                className="text-[11px] font-semibold px-2.5 min-h-8 rounded-[6px] border border-[#788991] bg-white hover:bg-[#eff6ff] hover:text-[#2941e0] text-[#273238] transition"
+              >
+                Reprint
+              </button>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
