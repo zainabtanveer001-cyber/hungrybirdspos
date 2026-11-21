@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — UI/UX & WCAG 2.2 AA alignment Slices 9–11 complete; ready for live multi-width visual verification, push, or `/ship`)
-- **Active Branch:** `main` (local ahead of `origin/main` with Phase 2 docs + Slices 9–11)
+- **Current Phase:** Phase 3 (Build — Slices 9–12 complete; ready to push or run live multi-width visual verification / `/ship`)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slice 12)
 - **Last Updated:** 2026-11-21
 
 ## 1. What Was Done
@@ -44,11 +44,12 @@
   - **Slice 9 (`2b81133`):** Added verified WCAG 2.2 AA CSS tokens & global `:focus-visible` outline (`src/index.css`); upgraded `Modal.tsx` with `Esc` close, `aria-labelledby`, focus trap & focus return, and scrim close; eliminated mobile `"Hung..."` header truncation when Online orders are pending (`App.tsx`); fixed `MenuGrid.tsx` `role="group"` + clear-search button; upgraded `CartPanel.tsx` quantity steppers & remove buttons to `36×36px` with `#dc2626`/`#047857` contrast and equal 3-column mobile order-type toggle; added visible `12px` `<label>` elements across `CustomerPanel.tsx` and `LoginScreen.tsx`.
   - **Slice 10 (`1389e33`):** Added `src/lib/payment.ts` (`computeQuickTenderAmounts`, `computeCashBalance`) + `tests/payment.test.ts` (3 tests); migrated `PaymentModal.tsx` onto shared `<Modal>` with quick-tender PKR chips, double-submit `busy` guard, and WCAG AA `#047857` / `#2941e0` / `#dc2626` tokens.
   - **Slice 11 (`4c7c27f`):** Unified `KitchenDisplayModal.tsx`, `OnlineOrdersModal.tsx`, `ShiftSummaryModal.tsx`, `LiveStockPanel.tsx`, `ModifierModal.tsx`, `OwnerPinModal.tsx`, `HeldOrdersModal.tsx`, `ProfitLossModal.tsx`, `RefundModal.tsx`, and `SalesHistoryModal.tsx` onto the cobalt-and-paper token system (`≥ 11–12px` copy, `≥ 36px` touch targets, WCAG AA button contrast) and replaced native `window.prompt()` / `window.confirm()` dialogs with inline confirmation UI.
+  - **Slice 12 (`7ecf0d3`):** Added `decrementByMenuId()` (`src/lib/cart.ts` + 2 tests in `tests/cart.test.ts`), dish-card `36px` `- [qty] +` steppers on in-cart dishes (`MenuGrid.tsx`, keeping photo/title tappable and handling modifier groups via picker on `+` / latest-line decrement on `-`), `Clear` cart button with inline 2-step confirmation resetting the full draft order (`CartPanel.tsx` + `App.tsx`), and compact single-row Dine-In Table `<select>` dropdown (`Counter (No table)` + `T1`–`T12` with `Occupied (Held)` labels and amber `"Held"` badge) freeing vertical space for cart items.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **67 passed (67)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build` in `1.37s`, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `19 warnings` — down from `21`).
+- `cd hungrybirds-pos-modern && npm test` → **12 passed (12)** test files, **69 passed (69)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build` in `1.66s`, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `19 warnings`).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`).
 - **Live Browser QA:** Prior Slice 8 pass (`1366×768` & `390×844`) had **0** console errors; post-Slice 11 multi-width check (`375px` / `768px` / `1280px`) is pending Chrome remote debugging.
