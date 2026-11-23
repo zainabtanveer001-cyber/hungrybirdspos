@@ -54,11 +54,11 @@ export function CustomerPanel({
   const valid = !!normalizePhone(phone);
   const hasAnyValue = Boolean(phone || customer.name || customer.address || loyaltyPoints > 0);
   const inputCls =
-    'w-full px-3 h-10 border border-[#788991] rounded-[10px] bg-white text-sm text-[#000000] placeholder:text-[#616f75] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] transition';
+    'w-full px-3 h-9 border border-[#788991] rounded-[10px] bg-white text-sm text-[#000000] placeholder:text-[#616f75] focus:outline-none focus:ring-2 focus:ring-[#2941e0] focus:border-[#2941e0] transition';
 
   return (
-    <div className="mb-3 p-3.5 rounded-2xl border border-[#e0edff] bg-[#eff6ff]/70 space-y-2.5 text-sm">
-      <div className="flex justify-between items-center gap-2 border-b border-[#e0edff] pb-2">
+    <div className="p-3 rounded-2xl border border-[#e0edff] bg-[#eff6ff]/70 space-y-2 text-sm">
+      <div className="flex justify-between items-center gap-2 border-b border-[#e0edff] pb-1.5">
         <span className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[#273238]">
           <UserRound className="w-3.5 h-3.5 text-[#2941e0] shrink-0" aria-hidden />
           <span>{isDelivery ? 'Delivery Info' : 'Customer / Loyalty'}</span>
@@ -82,7 +82,7 @@ export function CustomerPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <label htmlFor={phoneId} className="block text-xs font-medium text-[#273238] mb-1">
             Phone Number{isDelivery ? ' *' : ''}
@@ -128,7 +128,7 @@ export function CustomerPanel({
       )}
 
       {valid && lookup && (
-        <div className="text-xs font-medium bg-white border border-[#e0edff] text-[#273238] p-2.5 rounded-[10px] tabular-nums">
+        <div className="text-xs font-medium bg-white border border-[#e0edff] text-[#273238] p-2 rounded-[10px] tabular-nums">
           Returning customer: <strong>{lookup.totalOrders || 0} orders</strong> · Spent{' '}
           <strong>{formatAmount(lookup.totalSpent || 0)}</strong> ·{' '}
           <strong className="text-[#2941e0]">{lookup.loyaltyPoints || 0} pts</strong>
@@ -136,13 +136,13 @@ export function CustomerPanel({
       )}
 
       {valid && newCustomer && (
-        <div className="text-xs font-medium bg-white border border-[#e0edff] text-[#526066] p-2.5 rounded-[10px]">
+        <div className="text-xs font-medium bg-white border border-[#e0edff] text-[#526066] p-2 rounded-[10px]">
           New customer — profile will be saved automatically on checkout.
         </div>
       )}
 
       {valid && loyaltyBalance > 0 && (
-        <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-300 p-2.5 rounded-[10px]">
+        <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-300 p-2 rounded-[10px]">
           <label htmlFor={redeemId} className="text-xs font-semibold text-amber-900">
             Redeem Points (max {loyaltyBalance}):
           </label>

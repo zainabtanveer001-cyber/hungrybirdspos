@@ -502,38 +502,38 @@ function App() {
         />
 
         <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 pb-28 lg:pb-4 grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-          {pendingOnlineCount > 0 && !onlineOrdersOpen && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={`lg:col-span-3 rounded-2xl bg-[#000524] border border-[#5b3ee0] px-4 py-3 text-white flex flex-wrap items-center justify-between gap-3 shadow-lg ${
-                onlineOrderPulse ? 'ring-2 ring-[#c5b9fa]' : ''
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c5b9fa] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#5b3ee0]" />
-                </span>
-                <BellRing className="w-4 h-4 text-[#c5b9fa] shrink-0" aria-hidden />
-                <p className="text-xs sm:text-sm font-medium">
-                  <strong>
-                    {pendingOnlineCount} new online {pendingOnlineCount === 1 ? 'order' : 'orders'}
-                  </strong>{' '}
-                  waiting to be accepted
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOnlineOrdersOpen(true)}
-                className="px-4 h-9 rounded-[8px] bg-[#5b3ee0] hover:bg-[#4c31c9] text-white text-xs font-semibold transition shrink-0"
-              >
-                View &amp; Accept
-              </button>
-            </div>
-          )}
-
           <div className="lg:col-span-2 space-y-4">
+            {pendingOnlineCount > 0 && !onlineOrdersOpen && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`rounded-2xl bg-[#000524] border border-[#5b3ee0] px-4 py-3 text-white flex flex-wrap items-center justify-between gap-3 shadow-lg ${
+                  onlineOrderPulse ? 'ring-2 ring-[#c5b9fa]' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#c5b9fa] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#5b3ee0]" />
+                  </span>
+                  <BellRing className="w-4 h-4 text-[#c5b9fa] shrink-0" aria-hidden />
+                  <p className="text-xs sm:text-sm font-medium">
+                    <strong>
+                      {pendingOnlineCount} new online {pendingOnlineCount === 1 ? 'order' : 'orders'}
+                    </strong>{' '}
+                    waiting to be accepted
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOnlineOrdersOpen(true)}
+                  className="px-4 h-9 rounded-[8px] bg-[#5b3ee0] hover:bg-[#4c31c9] text-white text-xs font-semibold transition shrink-0"
+                >
+                  View &amp; Accept
+                </button>
+              </div>
+            )}
+
             <MenuGrid
               onPick={pickItem}
               onDecrement={decrementMenuItem}
@@ -765,6 +765,11 @@ function App() {
             setCustomer(order.customer || {});
             setLoyaltyBalance(0);
             setActiveOnlineOrder(order);
+            if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+              setTimeout(() => {
+                document.getElementById('posCartMobileAnchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 120);
+            }
           }}
         />
       )}
