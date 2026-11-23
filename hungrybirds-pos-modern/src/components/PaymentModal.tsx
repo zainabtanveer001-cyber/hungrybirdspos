@@ -183,7 +183,7 @@ export function PaymentModal({
             {method === 'Cash' && (
               <div className="space-y-3">
                 <div>
-                  <label htmlFor="cashGiven" className="block text-xs font-medium text-[#273238] mb-1.5">
+                  <label htmlFor="cashGiven" className="block text-xs font-medium text-[#273238] mb-1.5 text-right">
                     Cash Received (Rs)
                   </label>
                   <input
@@ -276,7 +276,7 @@ export function PaymentModal({
 
             {splitSummary.cash > 0 && (
               <div className="p-3 rounded-[12px] bg-[#eff6ff]/70 border border-[#e0edff] space-y-2">
-                <label htmlFor="splitCashGiven" className="block text-xs font-semibold text-[#273238]">
+                <label htmlFor="splitCashGiven" className="block text-xs font-semibold text-[#273238] text-right">
                   Cash Received from Customer (for {formatAmount(splitSummary.cash)} Cash leg)
                 </label>
                 <input
