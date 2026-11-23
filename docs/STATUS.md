@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–20 complete; B&W line-art receipt logo & 20-byte BLE chunking committed locally)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slice 20)
+- **Current Phase:** Phase 3 (Build — Slices 9–21 complete; universal raster QR + Google Maps URL normalization + white-background receipts committed locally)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slices 20–21)
 - **Last Updated:** 2026-11-23
 
 ## 1. What Was Done
@@ -53,11 +53,12 @@
   - **Slice 18 (`6cd81b0`, `9f96f89` — `BUG-014`, `BUG-015`, `BUG-016`):** Eliminated Firestore Spark `429` quota exhaustion (`46K reads` on `76 writes`), `429` login lockout, and the reserved `__.*__` manifest ID `400` error (`src/lib/sync.ts`, `src/lib/syncMap.ts`, `src/lib/auth.ts`, `src/lib/db/types.ts`, `src/App.tsx`, `src/components/OnlineOrdersModal.tsx`): replaced 4s/12s full-collection `listAll()` polling across all 18 collections with a single-doc `tableOrders/sync_versions_v1` change manifest (`15s` active / `60s` idle polling), single-field incremental `:runQuery` polling for active `onlineOrders` (`25s` cadence + vanished-active single-doc reconciliation) and watermarked `sales`/`auditLogs` (plus `v_voids` sale-deletion tombstones), hidden-tab polling skip, `localStorage` single-tab leader election, bounded concurrency (`3` pull / `2` outbox), immediate `429` circuit breaker + exponential `Retry-After` backoff (`30s`–`300s`/`900s`, `"Quota paused"` badge with `5s` manual probe), `429`-resilient login (`CloudQuotaError` handling, `404`-only unknown-user detection, `authEmail`/`cloudUid`/`passwordHash` caching, `owner@hungrybirds.com` admin fallback during Firestore `429` with customer escalation protection), non-finite number encoding guard, and informative Firestore HTTP error messages. Expanded `tests/syncMap.test.ts` (17 tests) and `tests/sync.test.ts` (17 tests), and added `tests/auth.test.ts` (6 tests).
   - **Slice 19 (`7844832`):** Replaced placeholder SVG/canvas receipt rooster with the official Hungry Birds chef-chicken emblem (`src/lib/receiptLogo.ts`, `src/lib/receipt.ts`, `src/lib/printer.ts`, `src/components/PrinterSettingsModal.tsx`): cleaned outer sticker halo and centered artwork, embedded a <13 KB data-URI JPEG in browser HTML receipts and Live Thermal Receipt Preview, and encoded a centered 144×174 1-bit ESC/POS `GS v 0` raster bitmap (`560px`/80mm, `368px`/58mm) in receipts and `printTestReceipt()` without canvas/DOM dependency. Expanded `tests/receipt.test.ts` (13 tests).
   - **Slice 20 (`729c209`):** Fixed portable Bluetooth thermal printer stalling on the logo (`src/lib/receiptLogo.ts`, `src/lib/printer.ts`, `src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`): converted the logo to compact pure black-and-white line art (`7,561`-byte B&W PNG for HTML/preview at `15mm`/`18mm` and `56px`/`68px`, plus an unpadded `96×112` / `1,344`-byte 1-bit ESC/POS `GS v 0` raster centered via `ESC a 1` at `25.55%` black ink coverage — an `89%` raster payload reduction from `12,180` bytes), throttled Bluetooth LE writes to universal `20`-byte ATT MTU chunks at `20ms` pacing (`35ms` retry), and updated `tests/receipt.test.ts` (ink coverage, raster size, and `<=20`-byte chunking assertions).
+  - **Slice 21 (`ef7d1b5`):** Fixed Google Maps QR code printing/scanning and removed solid-black inverted sections (`src/lib/receiptQr.ts`, `src/lib/receipt.ts`, `src/lib/printer.ts`, `src/components/PrinterSettingsModal.tsx`, `tests/receipt.test.ts`): created `normalizeQrUrl()` (extracts URLs from Google Maps Share text, prepends `https://` to scheme-less links, strips tracking parameters like `entry`, `g_ep`, `coh`, `g_st` while preserving `/data=!...` & place/coordinate params), `encodeQrMatrix()` (level `L` for URLs > 80 chars), `buildQrSvg()` (`crispEdges`), and `buildQrRaster()` (universal `GS v 0` 1-bit bitmap replacing firmware-dependent `GS ( k` QR commands on both receipts and `printTestReceipt()`); removed `encoder.invert(true)` and black CSS/Tailwind backgrounds (`bg-black`, `background: #000`) from `DINE IN - COUNTER` / order-type banner, `TOTAL AMOUNT`, `KITCHEN ORDER (KOT)`, and `PRINTER TEST SLIP`, replacing them with black-on-white bordered rules.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **16 passed (16)** test files, **118 passed (118)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `763.64 kB` minified / `223.71 kB` gzip, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 88 files).
+- `cd hungrybirds-pos-modern && npm test` → **16 passed (16)** test files, **119 passed (119)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `765.18 kB` minified / `224.27 kB` gzip, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 89 files).
 - Repo root `npm test` → **4 passed (4)** test files, **60 passed (60)** tests; `npm run lint` → **EXIT 0** (`0 errors`, `3` ignored-file warnings).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities** (prior check).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
@@ -73,7 +74,7 @@
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 118 Vitest unit & regression tests
+npm test          # Run 119 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173
