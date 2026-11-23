@@ -4,6 +4,7 @@ import { DEFAULT_PRINTER_SETTINGS, getPrinterSettings, printRaw } from './printe
 import type { PrinterSettings } from './printer';
 import type { CartItem, Sale } from './db/types';
 import { EscPosEncoder } from './escpos';
+import { buildCenteredLogoRaster, RECEIPT_LOGO_DATA_URI } from './receiptLogo';
 
 export const RESTAURANT = {
   name: 'Hungry Birds Restaurant',
@@ -151,124 +152,13 @@ export function buildQrSvg(url: string, sizePx = 112): string {
 }
 
 /**
- * Renders the circular monochrome "HUNGRY BIRDS RESTAURANT" rooster stamp
- * onto a full-line-width offscreen canvas (560 dots = 70 bytes/row on 80mm;
- * 368 dots = 46 bytes/row on 58mm) with the stamp drawn at horizontal center (cx = width / 2).
- * Padding symmetrically to full printable width guarantees dead-center alignment on every printer.
+ * Builds a symmetrically padded 1-bit monochrome raster bitmap of the Hungry Birds chef logo
+ * for centered ESC/POS GS v 0 printing (560px / 70 bytes/row on 80mm; 368px / 46 bytes/row on 58mm).
  */
 export function buildLogoRaster(
   paperWidth: '58mm' | '80mm' = '80mm',
 ): { width: number; height: number; bytes: Uint8Array } | null {
-  if (typeof document === 'undefined') return null;
-  const width = paperWidth === '80mm' ? 560 : 368; // 70 bytes/row (80mm) or 46 bytes/row (58mm)
-  const height = 120;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.strokeStyle = '#000000';
-  ctx.fillStyle = '#000000';
-  const cx = width / 2;
-  const cy = height / 2;
-
-  ctx.lineWidth = 2.8;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 76, 54, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 71, 49, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 46, 31, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  const drawArcText = (str: string, radiusX: number, radiusY: number, startAngle: number, endAngle: number, bottom = false) => {
-    ctx.save();
-    ctx.font = 'bold 10px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const count = str.length;
-    for (let i = 0; i < count; i++) {
-      const t = count > 1 ? i / (count - 1) : 0.5;
-      const angle = startAngle + t * (endAngle - startAngle);
-      const x = cx + radiusX * Math.cos(angle);
-      const y = cy + radiusY * Math.sin(angle);
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(bottom ? angle - Math.PI / 2 : angle + Math.PI / 2);
-      ctx.fillText(str[i], 0, 0);
-      ctx.restore();
-    }
-    ctx.restore();
-  };
-
-  drawArcText('HUNGRY BIRDS', 58, 40, -Math.PI * 0.82, -Math.PI * 0.18, false);
-  drawArcText('RESTAURANT', 58, 40, Math.PI * 0.80, Math.PI * 0.20, true);
-
-  ctx.font = 'bold 11px Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('★', cx - 58, cy + 1);
-  ctx.fillText('★', cx + 58, cy + 1);
-
-  ctx.save();
-  ctx.translate(cx - 3, cy);
-  ctx.beginPath();
-  ctx.moveTo(-18, -8);
-  ctx.quadraticCurveTo(-15, -18, -8, -16);
-  ctx.lineTo(-10, -21);
-  ctx.lineTo(-5, -18);
-  ctx.lineTo(-4, -22);
-  ctx.lineTo(0, -17);
-  ctx.quadraticCurveTo(-2, -6, 6, -4);
-  ctx.quadraticCurveTo(18, -20, 26, -12);
-  ctx.quadraticCurveTo(18, -8, 14, -2);
-  ctx.quadraticCurveTo(25, -10, 28, 0);
-  ctx.quadraticCurveTo(19, -1, 14, 4);
-  ctx.quadraticCurveTo(22, 2, 23, 10);
-  ctx.quadraticCurveTo(10, 14, -4, 13);
-  ctx.quadraticCurveTo(-16, 11, -15, 0);
-  ctx.lineTo(-22, -5);
-  ctx.lineTo(-17, -7);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(-4, 12);
-  ctx.lineTo(-6, 22);
-  ctx.moveTo(3, 12);
-  ctx.lineTo(4, 22);
-  ctx.stroke();
-  ctx.restore();
-
-  const imgData = ctx.getImageData(0, 0, width, height).data;
-  const bytesPerRow = width / 8;
-  const packed = new Uint8Array(bytesPerRow * height);
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4;
-      const r = imgData[idx];
-      const g = imgData[idx + 1];
-      const b = imgData[idx + 2];
-      const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-      if (luminance < 160) {
-        packed[y * bytesPerRow + (x >> 3)] |= 0x80 >> (x & 7);
-      }
-    }
-  }
-
-  return { width, height, bytes: packed };
+  return buildCenteredLogoRaster(paperWidth);
 }
 
 function defaultThankYou(orderType: Sale['orderType']): string {
@@ -897,7 +787,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 1mm 1.5mm 4mm; }
   header { width: 100%; text-align: center; padding-bottom: 1.5mm; }
   .stamp-wrap { width: 100%; display: flex; justify-content: center; margin: 0 auto 1.5mm; }
-  .stamp-wrap svg { display: block; margin: 0 auto; }
+  .stamp-wrap img.receipt-logo { display: block; margin: 0 auto; width: ${settings.paperWidth === '58mm' ? '22mm' : '26mm'}; max-width: 100%; height: auto; }
   header h1 { margin: 1mm 0 0.5mm; font-size: 1.3em; font-weight: 900; letter-spacing: 0.02em; text-align: center; }
   .tagline { font-size: 0.85em; font-style: italic; margin-bottom: 1mm; }
   .addr { font-size: 0.88em; line-height: 1.25; }
@@ -951,20 +841,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
     ${
       profile.showLogo
         ? `<div class="stamp-wrap">
-      <svg width="118" height="84" viewBox="0 0 168 120" style="display:block;margin:0 auto;" xmlns="http://www.w3.org/2000/svg">
-        <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" stroke-width="2.8"/>
-        <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" stroke-width="1.2"/>
-        <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" stroke-width="1.6"/>
-        <text x="84" y="21" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1">HUNGRY BIRDS</text>
-        <text x="84" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="10.5" letter-spacing="1.5">RESTAURANT</text>
-        <text x="26" y="64" text-anchor="middle" font-size="11">★</text>
-        <text x="142" y="64" text-anchor="middle" font-size="11">★</text>
-        <g transform="translate(-3, 0)">
-          <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000"/>
-          <line x1="80" y1="72" x2="78" y2="82" stroke="#000" stroke-width="2"/>
-          <line x1="87" y1="72" x2="88" y2="82" stroke="#000" stroke-width="2"/>
-        </g>
-      </svg>
+      <img src="${RECEIPT_LOGO_DATA_URI}" alt="${escapeHtml(profile.name)}" class="receipt-logo" />
     </div>`
         : ''
     }

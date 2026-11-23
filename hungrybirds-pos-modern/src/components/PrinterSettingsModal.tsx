@@ -29,6 +29,7 @@ import type {
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
 import { formatBillTimestamp, formatDecimal, resolveReceiptProfile, RESTAURANT } from '../lib/receipt';
+import { RECEIPT_LOGO_DATA_URI } from '../lib/receiptLogo';
 import { Modal } from './Modal';
 
 const FONT_OPTIONS: Array<{ value: ReceiptFontSize; label: string }> = [
@@ -56,7 +57,7 @@ const BAUD_RATES = [9600, 19200, 38400, 57600, 115200];
 
 /** The "what to print" switches, in the order they appear on the receipt. */
 const PRINT_OPTIONS: Array<[keyof PrinterSettings, string]> = [
-  ['showLogo', 'Centered rooster stamp logo at top'],
+  ['showLogo', 'Hungry Birds logo at top'],
   ['printOrderDetails', 'Order details (Bill #, date, cashier, order type/table)'],
   ['printDeliveryDetails', 'Customer & delivery details (name, phone, address)'],
   ['printItemPrices', 'Item rate, qty, and amount columns'],
@@ -727,20 +728,12 @@ function LiveReceiptPreview({
 
         {profile.showLogo && (
           <div className="flex justify-center mb-1.5">
-            <svg width="96" height="68" viewBox="0 0 168 120" className="block mx-auto" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="84" cy="60" rx="76" ry="54" fill="none" stroke="#000" strokeWidth="2.8" />
-              <ellipse cx="84" cy="60" rx="71" ry="49" fill="none" stroke="#000" strokeWidth="1.2" />
-              <ellipse cx="84" cy="60" rx="46" ry="31" fill="none" stroke="#000" strokeWidth="1.6" />
-              <text x="84" y="21" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1">HUNGRY BIRDS</text>
-              <text x="84" y="105" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="bold" fontSize="10.5" letterSpacing="1.5">RESTAURANT</text>
-              <text x="26" y="64" textAnchor="middle" fontSize="11">★</text>
-              <text x="142" y="64" textAnchor="middle" fontSize="11">★</text>
-              <g transform="translate(-3, 0)">
-                <path d="M66 52 Q69 42 76 44 L74 39 L79 42 L80 38 L84 43 Q82 54 90 56 Q102 40 110 48 Q102 52 98 58 Q109 50 112 60 Q103 59 98 64 Q106 62 107 70 Q94 74 80 73 Q68 71 69 60 L62 55 L67 53 Z" fill="#000" />
-                <line x1="80" y1="72" x2="78" y2="82" stroke="#000" strokeWidth="2" />
-                <line x1="87" y1="72" x2="88" y2="82" stroke="#000" strokeWidth="2" />
-              </g>
-            </svg>
+            <img
+              src={RECEIPT_LOGO_DATA_URI}
+              alt={profile.name}
+              className="block mx-auto h-auto"
+              style={{ width: settings.paperWidth === '58mm' ? 76 : 92 }}
+            />
           </div>
         )}
 

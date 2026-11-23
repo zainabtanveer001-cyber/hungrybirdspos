@@ -1,5 +1,6 @@
 import { db } from './db';
 import { EscPosEncoder } from './escpos';
+import { buildCenteredLogoRaster } from './receiptLogo';
 
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
 export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
@@ -687,6 +688,11 @@ export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): 
   const encoder = new EscPosEncoder();
   encoder.initialize();
   encoder.align('center');
+  if (settings.showLogo !== false) {
+    const logo = buildCenteredLogoRaster(settings.paperWidth);
+    encoder.rasterImage(logo.width, logo.height, logo.bytes);
+    encoder.text('');
+  }
   encoder.bold(true);
   encoder.setSize(0, 1);
   encoder.text(headerText);

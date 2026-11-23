@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildLogoRaster,
   formatDate,
   generateEscPosReceipt,
   receiptDocument,
@@ -296,5 +297,43 @@ describe('receipt', () => {
     expect(html).toContain('ONLINE PAYMENT');
     expect(html).toContain('Order online');
     expect(html).toContain('<svg ');
+  });
+
+  it('embeds centered 1-bit chef logo raster in ESC/POS and data-URI JPEG in HTML receipt when showLogo is enabled', () => {
+    const raster80 = buildLogoRaster('80mm');
+    const raster58 = buildLogoRaster('58mm');
+    expect(raster80).not.toBeNull();
+    expect(raster58).not.toBeNull();
+    expect(raster80!.width).toBe(560);
+    expect(raster80!.height).toBe(174);
+    expect(raster80!.bytes.length).toBe(70 * 174);
+    expect(raster58!.width).toBe(368);
+    expect(raster58!.height).toBe(174);
+    expect(raster58!.bytes.length).toBe(46 * 174);
+
+    // Middle row has artwork bytes in center while outer margins remain blank (0x00)
+    const midRowOffset = 87 * 70;
+    expect(raster80!.bytes[midRowOffset]).toBe(0);
+    expect(raster80!.bytes[midRowOffset + 69]).toBe(0);
+    const centerSlice = raster80!.bytes.slice(midRowOffset + 26, midRowOffset + 44);
+    expect(centerSlice.some((b) => b !== 0)).toBe(true);
+
+    const hasRasterCmd = (buf: Uint8Array) => {
+      for (let i = 0; i < buf.length - 3; i += 1) {
+        if (buf[i] === 0x1d && buf[i + 1] === 0x76 && buf[i + 2] === 0x30) return true;
+      }
+      return false;
+    };
+
+    const withLogo = generateEscPosReceipt(sale, { ...settings, showLogo: true });
+    const withoutLogo = generateEscPosReceipt(sale, { ...settings, showLogo: false });
+    expect(hasRasterCmd(withLogo)).toBe(true);
+    expect(hasRasterCmd(withoutLogo)).toBe(false);
+
+    const htmlWithLogo = receiptDocument(sale, { ...settings, showLogo: true });
+    const htmlWithoutLogo = receiptDocument(sale, { ...settings, showLogo: false });
+    expect(htmlWithLogo).toContain('<img src="data:image/jpeg;base64,');
+    expect(htmlWithLogo).toContain('class="receipt-logo"');
+    expect(htmlWithoutLogo).not.toContain('class="receipt-logo"');
   });
 });
