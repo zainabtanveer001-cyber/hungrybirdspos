@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
-  cloudOrderToLocal, cloudSaleToLocal, decodeFields, documentId, encodeFields,
-  localOrderPatch, mergePulledSnapshot, reconcileMirrorCollection,
+  buildActiveOnlineOrdersQuery,
+  buildIncrementalQuery,
+  cloudOrderToLocal,
+  cloudSaleToLocal,
+  computeBackoffMs,
+  computeWatermarkQueryFloor,
+  decodeFields,
+  diffRemoteVersions,
+  documentId,
+  encodeFields,
+  localOrderPatch,
+  mergePulledSnapshot,
+  mergeSeenVersions,
+  parseSyncVersionsDoc,
+  reconcileMirrorCollection,
 } from '../src/lib/syncMap';
 
 describe('firestore value codec', () => {
@@ -159,6 +172,91 @@ describe('cross-device mirror reconciliation (category/menu/inventory deletes)',
     expect(merged).toEqual({
       CAT_1: 't1',
       CAT_JUST_CREATED: 't3',
+    });
+  });
+});
+
+describe('version manifest, 429 backoff & incremental query builders', () => {
+  it('parses per-collection device stamps and voided sale tombstones from __sync_versions__', () => {
+    const parsed = parseSyncVersionsDoc({
+      fields: encodeFields({
+        c_categories: { d_devA: '100_1', d_devB: '100_2' },
+        c_sales: { d_devA: '100_3' },
+        v_voids: {
+          d_devA: JSON.stringify(['CLOUD_1', 'CLOUD_2']),
+          d_devB: 'not-valid-json',
+        },
+      }),
+    });
+    expect(parsed.collections).toEqual({
+      categories: { d_devA: '100_1', d_devB: '100_2' },
+      sales: { d_devA: '100_3' },
+    });
+    expect(parsed.voidedSaleIds).toEqual(['CLOUD_1', 'CLOUD_2']);
+    expect(parseSyncVersionsDoc(null)).toEqual({ collections: {}, voidedSaleIds: [] });
+  });
+
+  it('diffs only remote device stamps and ignores selfDeviceId echoes', () => {
+    const remote = {
+      categories: { d_self: '999_1', d_other: '200_1' },
+      menu: { d_self: '888_1', d_other: '100_1' },
+      sales: { d_other: '300_1' },
+    };
+    const seen = {
+      categories: { d_self: '100_1', d_other: '100_1' },
+      menu: { d_self: '100_1', d_other: '100_1' },
+      sales: {},
+    };
+    const dirty = diffRemoteVersions(remote, seen, 'd_self', ['categories', 'menu', 'sales', 'inventory']);
+    expect(dirty).toEqual(['categories', 'sales']);
+
+    const updatedSeen = mergeSeenVersions(seen, remote, ['categories']);
+    expect(updatedSeen.categories).toEqual({ d_self: '999_1', d_other: '200_1' });
+    expect(updatedSeen.menu).toEqual({ d_self: '100_1', d_other: '100_1' });
+  });
+
+  it('computes exponential 429 backoff capped at 300s and respects Retry-After up to 900s', () => {
+    expect(computeBackoffMs(1)).toBe(30_000);
+    expect(computeBackoffMs(2)).toBe(60_000);
+    expect(computeBackoffMs(3)).toBe(120_000);
+    expect(computeBackoffMs(5)).toBe(300_000);
+    expect(computeBackoffMs(1, '45')).toBe(45_000);
+    expect(computeBackoffMs(1, '1200')).toBe(900_000);
+  });
+
+  it('computes watermark query floor with overlap window and builds single-field Firestore queries', () => {
+    expect(computeWatermarkQueryFloor('2026-11-23T12:00:00.000Z', 10 * 60_000)).toBe('2026-11-23T11:50:00.000Z');
+    expect(computeWatermarkQueryFloor('invalid-date', 60_000)).toBe('invalid-date');
+
+    expect(buildActiveOnlineOrdersQuery()).toEqual({
+      from: [{ collectionId: 'onlineOrders' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'status' },
+          op: 'IN',
+          value: {
+            arrayValue: {
+              values: [
+                { stringValue: 'PENDING' },
+                { stringValue: 'ACCEPTED' },
+                { stringValue: 'PREPARING' },
+                { stringValue: 'OUT_FOR_DELIVERY' },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    expect(buildIncrementalQuery('sales', 'updatedAt', '2026-11-23T11:50:00.000Z')).toEqual({
+      from: [{ collectionId: 'sales' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'updatedAt' },
+          op: 'GREATER_THAN_OR_EQUAL',
+          value: { stringValue: '2026-11-23T11:50:00.000Z' },
+        },
+      },
     });
   });
 });

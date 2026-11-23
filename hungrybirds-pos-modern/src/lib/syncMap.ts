@@ -202,3 +202,136 @@ export function mergePulledSnapshot(
   }
   return next;
 }
+
+export type SyncVersionsMap = Record<string, Record<string, string>>;
+
+/** Parses `tableOrders/__sync_versions__` into per-collection device stamps and voided sale tombstones. */
+export function parseSyncVersionsDoc(doc: any): { collections: SyncVersionsMap; voidedSaleIds: string[] } {
+  if (!doc?.fields || typeof doc.fields !== 'object') {
+    return { collections: {}, voidedSaleIds: [] };
+  }
+  const decoded = decodeFields(doc.fields);
+  const collections: SyncVersionsMap = {};
+  const voidSet = new Set<string>();
+
+  for (const [key, value] of Object.entries(decoded)) {
+    if (key.startsWith('c_') && value && typeof value === 'object' && !Array.isArray(value)) {
+      const colName = key.slice(2);
+      const deviceStamps: Record<string, string> = {};
+      for (const [deviceId, stamp] of Object.entries(value)) {
+        if (typeof stamp === 'string') deviceStamps[deviceId] = stamp;
+      }
+      collections[colName] = deviceStamps;
+    } else if (key === 'v_voids' && value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const rawList of Object.values(value)) {
+        let parsed: unknown = rawList;
+        if (typeof rawList === 'string') {
+          try {
+            parsed = JSON.parse(rawList);
+          } catch {
+            parsed = null;
+          }
+        }
+        if (Array.isArray(parsed)) {
+          for (const id of parsed) {
+            if (typeof id === 'string' && id) voidSet.add(id);
+          }
+        }
+      }
+    }
+  }
+
+  return { collections, voidedSaleIds: [...voidSet] };
+}
+
+/** Returns collections modified by any remote device (`deviceId !== selfDeviceId`) since `seen`. */
+export function diffRemoteVersions(
+  remote: SyncVersionsMap,
+  seen: SyncVersionsMap,
+  selfDeviceId: string,
+  collections: readonly string[],
+): string[] {
+  const dirty: string[] = [];
+  for (const collection of collections) {
+    const remoteMap = remote[collection];
+    if (!remoteMap) continue;
+    const seenMap = seen[collection] ?? {};
+    for (const [deviceId, stamp] of Object.entries(remoteMap)) {
+      if (deviceId === selfDeviceId) continue;
+      if (stamp !== seenMap[deviceId]) {
+        dirty.push(collection);
+        break;
+      }
+    }
+  }
+  return dirty;
+}
+
+/** Updates seen per-collection remote versions only for collections that were pulled cleanly. */
+export function mergeSeenVersions(
+  seen: SyncVersionsMap,
+  remote: SyncVersionsMap,
+  syncedCollections: Iterable<string>,
+): SyncVersionsMap {
+  const next: SyncVersionsMap = { ...seen };
+  for (const collection of syncedCollections) {
+    next[collection] = { ...(remote[collection] ?? {}) };
+  }
+  return next;
+}
+
+/** Computes 429 cooldown duration (exponential 30s -> 300s, honoring `Retry-After` up to 900s). */
+export function computeBackoffMs(streak: number, retryAfterHeader?: string | null): number {
+  const expMs = Math.min(300_000, 30_000 * 2 ** Math.max(0, streak - 1));
+  const raw = retryAfterHeader?.trim();
+  if (!raw) return expMs;
+
+  let headerMs = 0;
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    headerMs = Math.round(Number(raw) * 1000);
+  } else {
+    const until = Date.parse(raw);
+    if (!Number.isNaN(until)) headerMs = until - Date.now();
+  }
+  if (headerMs > 0) return Math.min(900_000, Math.max(expMs, headerMs));
+  return expMs;
+}
+
+/** Subtracts an overlap safety window from an ISO watermark so clock skew never skips updates. */
+export function computeWatermarkQueryFloor(watermarkIso: string, overlapMs: number): string {
+  const ms = Date.parse(watermarkIso);
+  if (Number.isNaN(ms)) return watermarkIso;
+  return new Date(Math.max(0, ms - overlapMs)).toISOString();
+}
+
+const ACTIVE_ONLINE_STATUSES = ['PENDING', 'ACCEPTED', 'PREPARING', 'OUT_FOR_DELIVERY'] as const;
+
+export function buildActiveOnlineOrdersQuery(): Record<string, unknown> {
+  return {
+    from: [{ collectionId: 'onlineOrders' }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath: 'status' },
+        op: 'IN',
+        value: {
+          arrayValue: {
+            values: ACTIVE_ONLINE_STATUSES.map((status) => ({ stringValue: status })),
+          },
+        },
+      },
+    },
+  };
+}
+
+export function buildIncrementalQuery(collectionId: string, fieldPath: string, sinceIso: string): Record<string, unknown> {
+  return {
+    from: [{ collectionId }],
+    where: {
+      fieldFilter: {
+        field: { fieldPath },
+        op: 'GREATER_THAN_OR_EQUAL',
+        value: { stringValue: sinceIso },
+      },
+    },
+  };
+}

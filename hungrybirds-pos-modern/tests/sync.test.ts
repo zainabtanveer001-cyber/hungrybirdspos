@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { decodeValue, encodeFields } from '../src/lib/syncMap';
 
 const ALL_COLLECTION_NAMES = [
   'categories',
@@ -164,6 +165,7 @@ const mockDb = {
     put: async (row: any) => {
       activeStore.onlineOrders.set(row.id, { ...row });
     },
+    toArray: async () => [...activeStore.onlineOrders.values()],
     where: () => ({
       equals: (cloudId: string) => ({
         first: async () => [...activeStore.onlineOrders.values()].find((o) => o.cloudId === cloudId),
@@ -219,6 +221,8 @@ function createMockCloud() {
   let failDeletesWith: number | null = null;
   let failGets = false;
   let failRefresh = false;
+  let failWith429: { retryAfter?: string } | null = null;
+  const requests: Array<{ method: string; path: string }> = [];
 
   const nextTime = () => `2026-11-21T10:00:${String(tick++).padStart(2, '0')}Z`;
 
@@ -235,9 +239,47 @@ function createMockCloud() {
     }
 
     const parsed = new URL(urlStr);
-    const marker = '/documents/';
-    const idx = parsed.pathname.indexOf(marker);
-    const relPath = idx >= 0 ? parsed.pathname.slice(idx + marker.length) : '';
+    const marker = '/documents';
+    const docIdx = parsed.pathname.indexOf(marker);
+    const tail = docIdx >= 0 ? parsed.pathname.slice(docIdx + marker.length) : parsed.pathname;
+    requests.push({ method, path: tail });
+
+    if (failWith429) {
+      const headers = failWith429.retryAfter ? { 'Retry-After': failWith429.retryAfter } : undefined;
+      return new Response(
+        JSON.stringify({ error: { code: 429, status: 'RESOURCE_EXHAUSTED' } }),
+        { status: 429, headers },
+      );
+    }
+
+    if (tail === ':runQuery' && method === 'POST') {
+      if (failGets) throw new TypeError('Network unreachable');
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      const sq = body.structuredQuery ?? {};
+      const colId = sq.from?.[0]?.collectionId;
+      const store = collections[colId];
+      if (!store) return new Response(JSON.stringify([{ readTime: nextTime() }]), { status: 200 });
+
+      const filter = sq.where?.fieldFilter;
+      let matching = [...store.values()];
+      if (filter) {
+        const fieldPath = filter.field?.fieldPath as string;
+        const op = filter.op as string;
+        if (op === 'IN') {
+          const allowed = (filter.value?.arrayValue?.values ?? []).map(decodeValue);
+          matching = matching.filter((d) => allowed.includes(decodeValue(d.fields?.[fieldPath])));
+        } else if (op === 'GREATER_THAN_OR_EQUAL') {
+          const floor = String(decodeValue(filter.value) ?? '');
+          matching = matching.filter((d) => String(decodeValue(d.fields?.[fieldPath]) ?? '') >= floor);
+        }
+      }
+      const rows = matching.length
+        ? matching.map((document) => ({ document, readTime: nextTime() }))
+        : [{ readTime: nextTime() }];
+      return new Response(JSON.stringify(rows), { status: 200 });
+    }
+
+    const relPath = tail.startsWith('/') ? tail.slice(1) : tail;
     const [col, rawDocId] = relPath.split('/');
     const docId = rawDocId ? decodeURIComponent(rawDocId) : undefined;
     const store = collections[col];
@@ -269,9 +311,28 @@ function createMockCloud() {
 
     if (method === 'PATCH' && docId) {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
+      const masks = parsed.searchParams.getAll('updateMask.fieldPaths');
+      let nextFields: Record<string, any> = body.fields ?? {};
+      if (masks.length > 0) {
+        nextFields = { ...(store.get(docId)?.fields ?? {}) };
+        for (const maskPath of masks) {
+          if (maskPath.includes('.')) {
+            const [topKey, subKey] = maskPath.split('.');
+            const subVal = body.fields?.[topKey]?.mapValue?.fields?.[subKey];
+            if (subVal !== undefined) {
+              const prevSub = nextFields[topKey]?.mapValue?.fields ?? {};
+              nextFields[topKey] = {
+                mapValue: { fields: { ...prevSub, [subKey]: subVal } },
+              };
+            }
+          } else if (body.fields && maskPath in body.fields) {
+            nextFields[maskPath] = body.fields[maskPath];
+          }
+        }
+      }
       const doc: CloudDoc = {
         name: `projects/test-proj/databases/(default)/documents/${col}/${docId}`,
-        fields: body.fields ?? {},
+        fields: nextFields,
         updateTime: nextTime(),
       };
       store.set(docId, doc);
@@ -292,6 +353,10 @@ function createMockCloud() {
   return {
     collections,
     fetchMock,
+    requests,
+    clearRequests() {
+      requests.length = 0;
+    },
     setFailDeletes(status: number | null) {
       failDeletesWith = status;
     },
@@ -301,10 +366,14 @@ function createMockCloud() {
     setFailRefresh(value: boolean) {
       failRefresh = value;
     },
+    setFail429(value: { retryAfter?: string } | null) {
+      failWith429 = value;
+    },
   };
 }
 
 let storage: MemoryStorage;
+const loadedSyncModules: Array<typeof import('../src/lib/sync')> = [];
 
 beforeEach(() => {
   vi.resetModules();
@@ -315,6 +384,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const mod of loadedSyncModules) mod.stopSync();
+  loadedSyncModules.length = 0;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -324,7 +395,9 @@ async function loadSyncWithToken(expiresAt = Date.now() + 3_600_000) {
     'hb.syncToken',
     JSON.stringify({ idToken: 'valid-token', refreshToken: 'refresh-token', expiresAt }),
   );
-  return import('../src/lib/sync');
+  const mod = await import('../src/lib/sync');
+  loadedSyncModules.push(mod);
+  return mod;
 }
 
 describe('cross-device category deletion sync (end-to-end with mock Firestore)', () => {
@@ -691,5 +764,292 @@ describe('live multi-device operational sync (held orders, sale updates, shift s
     expect(deviceB.settings.has('shiftOpeningCash')).toBe(false);
     const reports = JSON.parse(deviceB.settings.get('closedShiftReports')?.value);
     expect(reports[0]).toMatchObject({ id: 'SHIFT_1', closedBy: 'cashier', variance: -200 });
+  });
+});
+
+describe('Firestore 429 quota protection & incremental/manifest sync efficiency', () => {
+  it('trips 429 circuit breaker immediately, makes zero requests during cooldown, and recovers on manual probe', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-11-23T12:00:00Z'));
+      const cloud = createMockCloud();
+      vi.stubGlobal('fetch', cloud.fetchMock);
+      cloud.setFail429({ retryAfter: '45' });
+
+      const sync = await loadSyncWithToken();
+      await sync.syncNow({ mode: 'poll' });
+
+      // Aborted on the very first 429 without storming all 18 collections
+      expect(cloud.requests.length).toBe(1);
+      expect(sync.isRateLimited()).toBe(true);
+      expect(sync.getSyncStatus()).toMatchObject({
+        state: 'error',
+        rateLimited: true,
+        retryAt: Date.now() + 45_000,
+      });
+
+      // Calls during cooldown issue zero network requests
+      cloud.clearRequests();
+      await sync.syncNow({ mode: 'poll' });
+      expect(cloud.requests.length).toBe(0);
+
+      // Advance > 5s and run manual probe once quota is healthy again
+      vi.setSystemTime(new Date('2026-11-23T12:00:06Z'));
+      cloud.setFail429(null);
+      await sync.syncNow({ mode: 'poll', manual: true });
+
+      expect(sync.isRateLimited()).toBe(false);
+      expect(sync.getSyncStatus()).toMatchObject({
+        state: 'idle',
+        rateLimited: false,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses <= 2 reads in idle poll mode and never storms all 18 collections', async () => {
+    const cloud = createMockCloud();
+    vi.stubGlobal('fetch', cloud.fetchMock);
+
+    const deviceA = createDeviceStore();
+    deviceA.categories.set('cat_1', { id: 'cat_1', name: 'Burgers' });
+    activeStore = deviceA;
+    const syncA = await loadSyncWithToken();
+    await syncA.syncNow({ mode: 'full' });
+
+    cloud.clearRequests();
+    await syncA.syncNow({ mode: 'poll' });
+
+    expect(cloud.requests.length).toBeLessThanOrEqual(2);
+    expect(cloud.requests.every((r) => r.path === '/tableOrders/__sync_versions__')).toBe(true);
+  });
+
+  it('pulls ONLY the changed collection via __sync_versions__ when Device A edits a category', async () => {
+    const cloud = createMockCloud();
+    vi.stubGlobal('fetch', cloud.fetchMock);
+
+    const deviceA = createDeviceStore();
+    deviceA.categories.set('cat_1', { id: 'cat_1', name: 'Burgers' });
+    activeStore = deviceA;
+    const syncA = await loadSyncWithToken();
+    await syncA.syncNow({ mode: 'full' });
+
+    const deviceB = createDeviceStore();
+    activeStore = deviceB;
+    vi.resetModules();
+    const syncB = await loadSyncWithToken();
+    await syncB.syncNow({ mode: 'full' });
+    expect(deviceB.categories.has('cat_1')).toBe(true);
+
+    // Device A adds CAT_BBQ and flushes version manifest
+    activeStore = deviceA;
+    vi.resetModules();
+    const syncA2 = await loadSyncWithToken();
+    deviceA.categories.set('CAT_BBQ', { id: 'CAT_BBQ', name: 'BBQ' });
+    await syncA2.pushCategory('CAT_BBQ');
+    await syncA2.flushVersionManifest();
+
+    // Device B polls: fetches __sync_versions__ + ONLY categories
+    activeStore = deviceB;
+    vi.resetModules();
+    const syncB2 = await loadSyncWithToken();
+    cloud.clearRequests();
+    await syncB2.syncNow({ mode: 'poll' });
+
+    expect(deviceB.categories.has('CAT_BBQ')).toBe(true);
+    const paths = cloud.requests.map((r) => r.path);
+    expect(paths).toContain('/tableOrders/__sync_versions__');
+    expect(paths).toContain('/categories');
+    expect(paths).not.toContain('/menu');
+    expect(paths).not.toContain('/inventory');
+    expect(paths).not.toContain('/suppliers');
+    expect(paths).not.toContain('/expenses');
+  });
+
+  it('pulls new sales via incremental :runQuery and deletes voided sales via v_voids without listAll(sales)', async () => {
+    const cloud = createMockCloud();
+    vi.stubGlobal('fetch', cloud.fetchMock);
+
+    const deviceA = createDeviceStore();
+    deviceA.sales.set(1, {
+      id: 1,
+      timestamp: '2026-11-23T09:00:00Z',
+      orderType: 'DINE_IN',
+      serverUser: 'cashier',
+      items: [],
+      subtotal: 500,
+      discountPercent: 0,
+      discountAmount: 0,
+      deliveryCharge: 0,
+      packingCharge: 0,
+      taxPercent: 0,
+      taxAmount: 0,
+      otherCharge: 0,
+      total: 500,
+      payments: [{ method: 'Cash', amount: 500 }],
+      totalReceived: 500,
+      totalChange: 0,
+    });
+    activeStore = deviceA;
+    const syncA = await loadSyncWithToken();
+    await syncA.pushSale(1);
+    await syncA.flushVersionManifest();
+
+    const deviceB = createDeviceStore();
+    activeStore = deviceB;
+    vi.resetModules();
+    const syncB = await loadSyncWithToken();
+    await syncB.syncNow({ mode: 'full' });
+    expect([...deviceB.sales.values()].some((s) => s.cloudId === 'CLOUD_1')).toBe(true);
+
+    // Device A records Sale #2
+    activeStore = deviceA;
+    vi.resetModules();
+    const syncA2 = await loadSyncWithToken();
+    deviceA.sales.set(2, {
+      id: 2,
+      timestamp: '2026-11-23T10:00:00Z',
+      orderType: 'TAKEAWAY',
+      serverUser: 'cashier',
+      items: [],
+      subtotal: 900,
+      discountPercent: 0,
+      discountAmount: 0,
+      deliveryCharge: 0,
+      packingCharge: 0,
+      taxPercent: 0,
+      taxAmount: 0,
+      otherCharge: 0,
+      total: 900,
+      payments: [{ method: 'Card', amount: 900 }],
+      totalReceived: 900,
+      totalChange: 0,
+    });
+    await syncA2.pushSale(2);
+    await syncA2.flushVersionManifest();
+
+    // Device B polls: pulls Sale #2 via :runQuery with ZERO GET /sales list reads
+    activeStore = deviceB;
+    vi.resetModules();
+    const syncB2 = await loadSyncWithToken();
+    cloud.clearRequests();
+    await syncB2.syncNow({ mode: 'poll' });
+
+    expect([...deviceB.sales.values()].some((s) => s.cloudId === 'CLOUD_2')).toBe(true);
+    expect(cloud.requests.some((r) => r.method === 'POST' && r.path === ':runQuery')).toBe(true);
+    expect(cloud.requests.some((r) => r.method === 'GET' && r.path === '/sales')).toBe(false);
+
+    // Device A voids Sale #1 -> Device B removes CLOUD_1 via v_voids tombstone
+    activeStore = deviceA;
+    vi.resetModules();
+    const syncA3 = await loadSyncWithToken();
+    deviceA.sales.delete(1);
+    await syncA3.deleteSale('CLOUD_1');
+
+    activeStore = deviceB;
+    vi.resetModules();
+    const syncB3 = await loadSyncWithToken();
+    cloud.clearRequests();
+    await syncB3.syncNow({ mode: 'poll' });
+
+    expect([...deviceB.sales.values()].some((s) => s.cloudId === 'CLOUD_1')).toBe(false);
+    expect([...deviceB.sales.values()].some((s) => s.cloudId === 'CLOUD_2')).toBe(true);
+    expect(cloud.requests.some((r) => r.method === 'GET' && r.path === '/sales')).toBe(false);
+  });
+
+  it('queries only active onlineOrders and reconciles orders that transition to COMPLETED', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-11-23T12:00:00Z'));
+      const cloud = createMockCloud();
+      vi.stubGlobal('fetch', cloud.fetchMock);
+
+      cloud.collections.onlineOrders.set('ORDER_PENDING', {
+        name: 'projects/test-proj/databases/(default)/documents/onlineOrders/ORDER_PENDING',
+        fields: encodeFields({
+          status: 'PENDING',
+          orderType: 'DELIVERY',
+          total: 1200,
+          createdAt: '2026-11-23T11:55:00Z',
+          customer: { name: 'Ali', phone: '03001112233', address: 'Block B' },
+          items: [{ id: 'm1', menuItemId: 'm1', name: 'Zinger', price: 1200, qty: 1 }],
+        }),
+        updateTime: '2026-11-23T11:55:00Z',
+      });
+      cloud.collections.onlineOrders.set('ORDER_OLD_DONE', {
+        name: 'projects/test-proj/databases/(default)/documents/onlineOrders/ORDER_OLD_DONE',
+        fields: encodeFields({
+          status: 'COMPLETED',
+          orderType: 'DELIVERY',
+          total: 500,
+          createdAt: '2026-11-20T10:00:00Z',
+          customer: { name: 'Old', phone: '03000000000', address: 'Old St' },
+          items: [],
+        }),
+        updateTime: '2026-11-20T10:05:00Z',
+      });
+
+      const deviceA = createDeviceStore();
+      activeStore = deviceA;
+      const sync = await loadSyncWithToken();
+      await sync.syncNow({ mode: 'full' });
+
+      expect([...deviceA.onlineOrders.values()].map((o) => o.cloudId)).toEqual(['ORDER_PENDING']);
+      expect(cloud.requests.some((r) => r.method === 'GET' && r.path === '/onlineOrders')).toBe(false);
+
+      // Transition ORDER_PENDING to COMPLETED in cloud; after >=25s poll reconciles it with 1 doc GET
+      const prev = cloud.collections.onlineOrders.get('ORDER_PENDING')!;
+      cloud.collections.onlineOrders.set('ORDER_PENDING', {
+        ...prev,
+        fields: { ...prev.fields, status: { stringValue: 'COMPLETED' } },
+        updateTime: '2026-11-23T12:00:20Z',
+      });
+      vi.setSystemTime(new Date('2026-11-23T12:00:30Z'));
+      cloud.clearRequests();
+      await sync.syncNow({ mode: 'poll' });
+
+      const updated = [...deviceA.onlineOrders.values()].find((o) => o.cloudId === 'ORDER_PENDING');
+      expect(updated?.status).toBe('COMPLETED');
+      expect(cloud.requests.some((r) => r.method === 'GET' && r.path === '/onlineOrders/ORDER_PENDING')).toBe(true);
+      expect(cloud.requests.some((r) => r.method === 'GET' && r.path === '/onlineOrders')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('makes zero requests on scheduled polls when document.hidden is true', async () => {
+    vi.useFakeTimers();
+    try {
+      const cloud = createMockCloud();
+      vi.stubGlobal('fetch', cloud.fetchMock);
+      const docMock = {
+        hidden: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+      const winMock = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+      vi.stubGlobal('document', docMock);
+      vi.stubGlobal('window', winMock);
+
+      const sync = await loadSyncWithToken();
+      sync.startSync();
+      for (let i = 0; i < 30 && sync.getSyncStatus().state !== 'idle'; i += 1) {
+        await vi.advanceTimersByTimeAsync(50);
+      }
+      expect(sync.getSyncStatus().state).toBe('idle');
+      cloud.clearRequests();
+
+      docMock.hidden = true;
+      await vi.advanceTimersByTimeAsync(65_000);
+      expect(cloud.requests).toEqual([]);
+
+      sync.stopSync();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

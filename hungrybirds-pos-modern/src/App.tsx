@@ -885,17 +885,24 @@ function SyncBadge() {
     );
   }
   const error = status.state === 'error';
+  const label = error
+    ? status.rateLimited
+      ? 'Quota paused'
+      : 'Sync issue'
+    : status.state === 'syncing'
+      ? 'Syncing'
+      : 'Synced';
   return (
     <button
       type="button"
-      onClick={() => void syncNow()}
+      onClick={() => void syncNow({ mode: 'full', manual: true })}
       title={error ? `Sync error: ${status.error}` : status.lastSync ? `Last synced ${new Date(status.lastSync).toLocaleTimeString()}` : 'Syncing'}
       className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 sm:px-3 h-9 rounded-[8px] border shrink-0 transition ${
         error ? 'text-red-700 bg-red-50 border-red-300 hover:bg-red-100' : 'text-emerald-800 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
       }`}
     >
       <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${status.state === 'syncing' ? 'animate-spin' : ''}`} aria-hidden />
-      <span className="hidden sm:inline">{error ? 'Sync issue' : status.state === 'syncing' ? 'Syncing' : 'Synced'}</span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }

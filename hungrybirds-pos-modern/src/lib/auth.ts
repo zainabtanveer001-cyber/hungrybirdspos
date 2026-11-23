@@ -10,7 +10,7 @@ import type { User, UserRole } from './db/types';
 // The web config is public by design (it ships in the legacy app.js too), so the
 // defaults let a deploy work without env vars; VITE_* wins when it is set.
 const AUTH_EMAIL_DOMAIN = 'hungrybirds-pos.local';
-
+const ADMIN_FALLBACK_EMAILS = new Set(['owner@hungrybirds.com']);
 
 const ROLES: UserRole[] = ['OWNER', 'MANAGER', 'CASHIER', 'WAITER'];
 
@@ -23,9 +23,15 @@ export function normalizeUsername(value: string): string {
 /** Network/server failure: the only case where the local accounts may stand in for the cloud. */
 class OfflineError extends Error {}
 
+/** Firestore daily Spark quota / rate limit (429); Identity Toolkit auth may still be healthy. */
+class CloudQuotaError extends OfflineError {}
+
 async function cloudFetch(url: string, init: RequestInit): Promise<Response> {
   try {
     const res = await fetch(url, { ...init, signal: AbortSignal.timeout(6000) });
+    if (res.status === 429) {
+      throw new CloudQuotaError('Cloud database daily quota limit reached (Firestore 429).');
+    }
     if (res.status >= 500) throw new OfflineError('Cloud unavailable.');
     return res;
   } catch (err) {
@@ -43,7 +49,8 @@ async function firestoreGet(path: string, idToken?: string): Promise<FirestoreDo
     `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents/${path}?key=${config.apiKey}`,
     { headers: idToken ? { Authorization: `Bearer ${idToken}` } : {} },
   );
-  if (!res.ok) return null;
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Cloud lookup failed (HTTP ${res.status}).`);
   const fields = (await res.json()).fields ?? {};
   return Object.fromEntries(Object.entries(fields).map(([k, v]: [string, any]) => [k, v.stringValue ?? v.booleanValue]));
 }
@@ -123,45 +130,137 @@ export function initializeApp(): Promise<void> {
   return bootstrap;
 }
 
+async function findLocalUser(input: string): Promise<User | undefined> {
+  if (input.includes('@')) {
+    const all = await db.users.toArray();
+    return all.find((u) => u.authEmail?.toLowerCase() === input.toLowerCase());
+  }
+  return db.users.where('username').equals(input).first();
+}
+
+async function upsertVerifiedUser(user: User, extra: { authEmail?: string; cloudUid?: string; passwordHash?: string }): Promise<User> {
+  const fields: Partial<User> = {
+    role: user.role,
+    active: true,
+    ...(extra.authEmail ? { authEmail: extra.authEmail } : {}),
+    ...(extra.cloudUid ? { cloudUid: extra.cloudUid } : {}),
+    ...(extra.passwordHash ? { passwordHash: extra.passwordHash } : {}),
+  };
+  const existing = user.id
+    ? user
+    : await db.users.where('username').equals(user.username).first();
+  if (existing?.id) {
+    await db.users.update(existing.id, fields);
+    return { ...existing, ...fields, id: existing.id };
+  }
+  const id = await db.users.add({ ...user, ...fields });
+  return { ...user, ...fields, id };
+}
+
+async function resolveQuotaFallbackUser(
+  uid: string,
+  email: string,
+  input: string,
+  passwordHash: string,
+): Promise<User> {
+  const allLocal = await db.users.toArray();
+  const normalizedEmail = email.toLowerCase();
+  let matched =
+    allLocal.find((u) => u.cloudUid === uid) ??
+    allLocal.find((u) => u.authEmail?.toLowerCase() === normalizedEmail) ??
+    (!input.includes('@') ? allLocal.find((u) => u.username === input) : undefined);
+
+  if (!matched && ADMIN_FALLBACK_EMAILS.has(normalizedEmail)) {
+    const owners = allLocal.filter((u) => u.role === 'OWNER');
+    matched =
+      owners.find((u) => u.username !== 'owner') ??
+      owners[0] ?? { username: normalizedEmail.split('@')[0], role: 'OWNER' as UserRole, active: true };
+  }
+
+  if (!matched) {
+    throw new Error('Cloud database quota limit reached (Firestore 429). Cannot verify staff role on this device until quota resets.');
+  }
+  if (matched.active === false) {
+    throw new Error('This account is disabled. Contact the Owner.');
+  }
+  if (!ROLES.includes(matched.role)) {
+    throw new Error('This account does not have POS access.');
+  }
+  return upsertVerifiedUser(matched, { authEmail: email, cloudUid: uid, passwordHash });
+}
+
 /**
  * Legacy cloud login, as the original app did it: username -> auth email via
  * `usernameDirectory`, sign in, then read the role from `users/{uid}`.
- * Throws when the cloud is unconfigured or the account/password is wrong.
+ * Gracefully degrades when Firestore returns 429 (Spark daily quota) while
+ * Identity Toolkit auth (`firebaseSignIn`) or local cached credentials remain valid.
  */
 async function cloudSignIn(input: string, password: string): Promise<User> {
-  // The sign-in field accepts either the username or the auth email.
+  const localUser = await findLocalUser(input);
+  let firestoreQuotaHit = false;
+  let usedGuessedEmail = false;
   let email: string;
+
   if (input.includes('@')) {
     email = input.trim();
   } else {
-    const dir = await firestoreGet(`usernameDirectory/${encodeURIComponent(input)}`);
-    if (!dir) throw new Error('Username not found or account is not configured.');
-    if (dir.active === false) throw new Error('This account is disabled. Contact the Owner.');
-    email = dir.authEmail ?? `${input}@${AUTH_EMAIL_DOMAIN}`;
+    try {
+      const dir = await firestoreGet(`usernameDirectory/${encodeURIComponent(input)}`);
+      if (!dir) throw new Error('Username not found or account is not configured.');
+      if (dir.active === false) throw new Error('This account is disabled. Contact the Owner.');
+      email = dir.authEmail ?? `${input}@${AUTH_EMAIL_DOMAIN}`;
+    } catch (err) {
+      if (!(err instanceof CloudQuotaError)) throw err;
+      firestoreQuotaHit = true;
+      usedGuessedEmail = !localUser?.authEmail;
+      email = localUser?.authEmail ?? `${input}@${AUTH_EMAIL_DOMAIN}`;
+    }
   }
 
-  const { uid, idToken, refreshToken, expiresIn } = await firebaseSignIn(email, password);
+  let authResult: { uid: string; idToken: string; refreshToken?: string; expiresIn?: string };
+  try {
+    authResult = await firebaseSignIn(email, password);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Incorrect password.' && firestoreQuotaHit && usedGuessedEmail) {
+      if (localUser && localUser.active !== false && localUser.passwordHash && localUser.passwordHash === (await sha256(password))) {
+        return localUser;
+      }
+      throw new Error(
+        'Cloud database quota limit reached (Firestore 429). Try signing in with your full email address (e.g. owner@hungrybirds.com) or retry after quota resets.',
+      );
+    }
+    throw err;
+  }
+
+  const { uid, idToken, refreshToken, expiresIn } = authResult;
   rememberToken(idToken, refreshToken, Number(expiresIn));
-  const profile = (await firestoreGet(`users/${uid}`, idToken)) ?? {};
-  if (profile.active === false) throw new Error('This account is disabled. Contact the Owner.');
+
+  const passwordHash = await sha256(password);
+  let profile: FirestoreDoc = null;
+  if (!firestoreQuotaHit) {
+    try {
+      profile = await firestoreGet(`users/${uid}`, idToken);
+    } catch (err) {
+      if (!(err instanceof CloudQuotaError)) throw err;
+      firestoreQuotaHit = true;
+    }
+  }
+
+  if (firestoreQuotaHit) {
+    return resolveQuotaFallbackUser(uid, email, input, passwordHash);
+  }
+
+  const resolvedProfile = profile ?? {};
+  if (resolvedProfile.active === false) throw new Error('This account is disabled. Contact the Owner.');
 
   // Customer accounts sign in to the same Firebase project but have no staff role.
-  if (!ROLES.includes(profile.role as UserRole)) throw new Error('This account does not have POS access.');
+  if (!ROLES.includes(resolvedProfile.role as UserRole)) throw new Error('This account does not have POS access.');
 
-  const username = (profile.username as string) ?? input.split('@')[0];
-  const user: User = {
-    username,
-    role: profile.role as UserRole,
-    active: true,
-  };
-  const existing = await db.users.where('username').equals(username).first();
-  if (existing?.id) {
-    await db.users.update(existing.id, { role: user.role, active: true });
-    user.id = existing.id;
-  } else {
-    user.id = await db.users.add(user);
-  }
-  return user;
+  const username = (resolvedProfile.username as string) ?? input.split('@')[0];
+  return upsertVerifiedUser(
+    { username, role: resolvedProfile.role as UserRole, active: true },
+    { authEmail: email, cloudUid: uid, passwordHash },
+  );
 }
 
 export async function signIn(username: string, password: string): Promise<User> {
@@ -175,14 +274,21 @@ export async function signIn(username: string, password: string): Promise<User> 
     // A definitive cloud answer (wrong password, unknown/disabled user) must not be
     // overridden by the seeded local accounts; only an unreachable cloud may.
     if (!(err instanceof OfflineError)) throw err;
-  }
 
-  const user = await db.users.where('username').equals(normalized).first();
-  if (!user) throw new Error('Cloud unreachable and no local account for this username.');
-  if (user.active === false) throw new Error('This account is disabled. Contact the Owner.');
-  if (!user.passwordHash || user.passwordHash !== (await sha256(password))) throw new Error('Incorrect password.');
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
-  return user;
+    const user = await findLocalUser(normalized);
+    if (!user || !user.passwordHash) {
+      if (err instanceof CloudQuotaError) {
+        throw new Error(
+          'Cloud database quota limit reached (Firestore 429). Try signing in with your full email address (e.g. owner@hungrybirds.com) or retry after the daily quota resets.',
+        );
+      }
+      if (!user) throw new Error('Cloud unreachable and no local account for this username.');
+    }
+    if (user.active === false) throw new Error('This account is disabled. Contact the Owner.');
+    if (!user.passwordHash || user.passwordHash !== (await sha256(password))) throw new Error('Incorrect password.');
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: user.id, username: user.username, role: user.role }));
+    return user;
+  }
 }
 
 export function signOut(): void {

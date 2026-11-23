@@ -91,7 +91,7 @@ export function OnlineOrdersModal({
               onClick={async () => {
                 setSyncing(true);
                 try {
-                  const changed = await syncNow();
+                  const changed = await syncNow({ collections: ['onlineOrders'], manual: true });
                   notify(changed ? 'Online order inbox refreshed.' : 'Everything is already up to date.');
                 } finally {
                   setSyncing(false);

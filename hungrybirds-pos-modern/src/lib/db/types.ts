@@ -323,6 +323,8 @@ export interface User {
   id?: number;
   username: string;
   passwordHash?: string;
+  authEmail?: string;
+  cloudUid?: string;
   role: UserRole;
   active: boolean;
 }
