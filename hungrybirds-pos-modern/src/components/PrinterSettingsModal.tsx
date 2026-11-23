@@ -57,7 +57,7 @@ const BAUD_RATES = [9600, 19200, 38400, 57600, 115200];
 
 /** The "what to print" switches, in the order they appear on the receipt. */
 const PRINT_OPTIONS: Array<[keyof PrinterSettings, string]> = [
-  ['showLogo', 'Hungry Birds logo at top'],
+  ['showLogo', 'Hungry Birds B&W logo at top'],
   ['printOrderDetails', 'Order details (Bill #, date, cashier, order type/table)'],
   ['printDeliveryDetails', 'Customer & delivery details (name, phone, address)'],
   ['printItemPrices', 'Item rate, qty, and amount columns'],
@@ -732,7 +732,7 @@ function LiveReceiptPreview({
               src={RECEIPT_LOGO_DATA_URI}
               alt={profile.name}
               className="block mx-auto h-auto"
-              style={{ width: settings.paperWidth === '58mm' ? 76 : 92 }}
+              style={{ width: settings.paperWidth === '58mm' ? 56 : 68 }}
             />
           </div>
         )}

@@ -152,8 +152,8 @@ export function buildQrSvg(url: string, sizePx = 112): string {
 }
 
 /**
- * Builds a symmetrically padded 1-bit monochrome raster bitmap of the Hungry Birds chef logo
- * for centered ESC/POS GS v 0 printing (560px / 70 bytes/row on 80mm; 368px / 46 bytes/row on 58mm).
+ * Returns the compact 1-bit monochrome B&W line-art raster bitmap of the Hungry Birds chef logo
+ * for centered ESC/POS GS v 0 printing (96x112 px / 12 bytes/row = 1,344 bytes on 58mm and 80mm).
  */
 export function buildLogoRaster(
   paperWidth: '58mm' | '80mm' = '80mm',
@@ -787,7 +787,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 1mm 1.5mm 4mm; }
   header { width: 100%; text-align: center; padding-bottom: 1.5mm; }
   .stamp-wrap { width: 100%; display: flex; justify-content: center; margin: 0 auto 1.5mm; }
-  .stamp-wrap img.receipt-logo { display: block; margin: 0 auto; width: ${settings.paperWidth === '58mm' ? '22mm' : '26mm'}; max-width: 100%; height: auto; }
+  .stamp-wrap img.receipt-logo { display: block; margin: 0 auto; width: ${settings.paperWidth === '58mm' ? '15mm' : '18mm'}; max-width: 100%; height: auto; }
   header h1 { margin: 1mm 0 0.5mm; font-size: 1.3em; font-weight: 900; letter-spacing: 0.02em; text-align: center; }
   .tagline { font-size: 0.85em; font-style: italic; margin-bottom: 1mm; }
   .addr { font-size: 0.88em; line-height: 1.25; }

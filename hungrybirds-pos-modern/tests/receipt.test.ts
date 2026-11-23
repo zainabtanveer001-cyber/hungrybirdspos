@@ -194,6 +194,13 @@ describe('receipt', () => {
     await printRaw(new Uint8Array([0x1b, 0x40, 0x4f, 0x4b, 0x0a]));
     expect(writtenChunks.length).toBe(2);
 
+    // Multi-chunk payloads are strictly capped at 20 bytes to honor universal BLE ATT MTU limits
+    const beforeLarge = writtenChunks.length;
+    await printRaw(new Uint8Array(55).fill(0x41));
+    const largeChunks = writtenChunks.slice(beforeLarge);
+    expect(largeChunks.length).toBe(3);
+    expect(largeChunks.every((c) => c.byteLength <= 20)).toBe(true);
+
     await disconnectPrinterDevice();
     expect(getPrinterDevice()).toBeNull();
   });
@@ -299,40 +306,46 @@ describe('receipt', () => {
     expect(html).toContain('<svg ');
   });
 
-  it('embeds centered 1-bit chef logo raster in ESC/POS and data-URI JPEG in HTML receipt when showLogo is enabled', () => {
+  it('embeds compact B&W line-art chef logo raster (<= 2 KB) in ESC/POS and B&W PNG in HTML receipt when showLogo is enabled', () => {
     const raster80 = buildLogoRaster('80mm');
     const raster58 = buildLogoRaster('58mm');
     expect(raster80).not.toBeNull();
     expect(raster58).not.toBeNull();
-    expect(raster80!.width).toBe(560);
-    expect(raster80!.height).toBe(174);
-    expect(raster80!.bytes.length).toBe(70 * 174);
-    expect(raster58!.width).toBe(368);
-    expect(raster58!.height).toBe(174);
-    expect(raster58!.bytes.length).toBe(46 * 174);
+    expect(raster80!.width).toBe(96);
+    expect(raster80!.height).toBe(112);
+    expect(raster80!.bytes.length).toBe(12 * 112);
+    expect(raster80!.bytes.length).toBeLessThanOrEqual(2048);
+    expect(raster58!.width).toBe(96);
+    expect(raster58!.height).toBe(112);
+    expect(raster58!.bytes.length).toBe(12 * 112);
 
-    // Middle row has artwork bytes in center while outer margins remain blank (0x00)
-    const midRowOffset = 87 * 70;
-    expect(raster80!.bytes[midRowOffset]).toBe(0);
-    expect(raster80!.bytes[midRowOffset + 69]).toBe(0);
-    const centerSlice = raster80!.bytes.slice(midRowOffset + 26, midRowOffset + 44);
-    expect(centerSlice.some((b) => b !== 0)).toBe(true);
+    // Line-art B&W conversion stays light (< 35% black ink coverage) so BLE thermal heads don't stall
+    let setBits = 0;
+    for (const byte of raster80!.bytes) {
+      for (let bit = 0; bit < 8; bit += 1) {
+        if ((byte >> bit) & 1) setBits += 1;
+      }
+    }
+    const inkCoverage = setBits / (raster80!.bytes.length * 8);
+    expect(inkCoverage).toBeGreaterThan(0.08);
+    expect(inkCoverage).toBeLessThan(0.35);
 
-    const hasRasterCmd = (buf: Uint8Array) => {
-      for (let i = 0; i < buf.length - 3; i += 1) {
-        if (buf[i] === 0x1d && buf[i + 1] === 0x76 && buf[i + 2] === 0x30) return true;
+    const hasCmd = (buf: Uint8Array, seq: number[]) => {
+      for (let i = 0; i <= buf.length - seq.length; i += 1) {
+        if (seq.every((b, offset) => buf[i + offset] === b)) return true;
       }
       return false;
     };
 
     const withLogo = generateEscPosReceipt(sale, { ...settings, showLogo: true });
     const withoutLogo = generateEscPosReceipt(sale, { ...settings, showLogo: false });
-    expect(hasRasterCmd(withLogo)).toBe(true);
-    expect(hasRasterCmd(withoutLogo)).toBe(false);
+    expect(hasCmd(withLogo, [0x1b, 0x61, 0x01])).toBe(true);
+    expect(hasCmd(withLogo, [0x1d, 0x76, 0x30])).toBe(true);
+    expect(hasCmd(withoutLogo, [0x1d, 0x76, 0x30])).toBe(false);
 
     const htmlWithLogo = receiptDocument(sale, { ...settings, showLogo: true });
     const htmlWithoutLogo = receiptDocument(sale, { ...settings, showLogo: false });
-    expect(htmlWithLogo).toContain('<img src="data:image/jpeg;base64,');
+    expect(htmlWithLogo).toContain('<img src="data:image/png;base64,');
     expect(htmlWithLogo).toContain('class="receipt-logo"');
     expect(htmlWithoutLogo).not.toContain('class="receipt-logo"');
   });

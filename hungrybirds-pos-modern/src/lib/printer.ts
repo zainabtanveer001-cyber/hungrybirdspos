@@ -640,11 +640,13 @@ async function printViaBluetooth(bytes: Uint8Array): Promise<void> {
   }
 
   try {
-    await writeChunks(activeCharacteristic, bytes, 64, 15);
+    // 20-byte writes match the universal BLE ATT MTU default (23 - 3) with 20ms pacing
+    // so portable thermal printers do not overrun their RX buffer mid-raster.
+    await writeChunks(activeCharacteristic, bytes, 20, 20);
   } catch {
     const freshServer = device.gatt.connected ? device.gatt : await device.gatt.connect();
     activeCharacteristic = await resolveWritableCharacteristic(freshServer);
-    await writeChunks(activeCharacteristic, bytes, 20, 20);
+    await writeChunks(activeCharacteristic, bytes, 20, 35);
   }
 }
 
