@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–22 complete; pinned cart footer for loaded website delivery orders committed locally)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slice 22)
+- **Current Phase:** Phase 3 (Build — Slices 9–23 complete; right-aligned Cash Received label in PaymentModal committed locally)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slice 23)
 - **Last Updated:** 2026-11-23
 
 ## 1. What Was Done
@@ -55,11 +55,12 @@
   - **Slice 20 (`729c209`):** Fixed portable Bluetooth thermal printer stalling on the logo (`src/lib/receiptLogo.ts`, `src/lib/printer.ts`, `src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`): converted the logo to compact pure black-and-white line art (`7,561`-byte B&W PNG for HTML/preview at `15mm`/`18mm` and `56px`/`68px`, plus an unpadded `96×112` / `1,344`-byte 1-bit ESC/POS `GS v 0` raster centered via `ESC a 1` at `25.55%` black ink coverage — an `89%` raster payload reduction from `12,180` bytes), throttled Bluetooth LE writes to universal `20`-byte ATT MTU chunks at `20ms` pacing (`35ms` retry), and updated `tests/receipt.test.ts` (ink coverage, raster size, and `<=20`-byte chunking assertions).
   - **Slice 21 (`ef7d1b5`):** Fixed Google Maps QR code printing/scanning and removed solid-black inverted sections (`src/lib/receiptQr.ts`, `src/lib/receipt.ts`, `src/lib/printer.ts`, `src/components/PrinterSettingsModal.tsx`, `tests/receipt.test.ts`): created `normalizeQrUrl()` (extracts URLs from Google Maps Share text, prepends `https://` to scheme-less links, strips tracking parameters like `entry`, `g_ep`, `coh`, `g_st` while preserving `/data=!...` & place/coordinate params), `encodeQrMatrix()` (level `L` for URLs > 80 chars), `buildQrSvg()` (`crispEdges`), and `buildQrRaster()` (universal `GS v 0` 1-bit bitmap replacing firmware-dependent `GS ( k` QR commands on both receipts and `printTestReceipt()`); removed `encoder.invert(true)` and black CSS/Tailwind backgrounds (`bg-black`, `background: #000`) from `DINE IN - COUNTER` / order-type banner, `TOTAL AMOUNT`, `KITCHEN ORDER (KOT)`, and `PRINTER TEST SLIP`, replacing them with black-on-white bordered rules.
   - **Slice 22 (`40e87e9`):** Fixed website (`DELIVERY`) orders pushing cart action buttons off-screen (`src/components/CartPanel.tsx`, `src/components/CustomerPanel.tsx`, `src/App.tsx`, `tests/cartPanel.test.tsx`): refactored `CartPanel` into a 3-zone flex layout (`lg:overflow-hidden` outer, fixed header, `flex-1 min-h-0 lg:overflow-y-auto` scrollable middle containing table/delivery customer details/delivery charge/items/breakdown, and `shrink-0` pinned footer keeping `Total Due`, `Hold`, and `Checkout & Print` always visible), compacted `CustomerPanel` spacing, kept the `pendingOnlineCount` alert banner inside the left column above `MenuGrid` so the sticky cart remains top-aligned, and added mobile scroll-to-cart on `OnlineOrdersModal.onAccept`. Added 2 regression tests in `tests/cartPanel.test.tsx`.
+  - **Slice 23 (`378ce94`):** Right-aligned the `Cash Received (Rs)` and split-payment `Cash Received from Customer` labels above the right-aligned cash inputs in `src/components/PaymentModal.tsx`; added regression check in `tests/paymentModal.test.tsx` (1 test).
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **17 passed (17)** test files, **121 passed (121)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `765.55 kB` minified / `224.32 kB` gzip, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 90 files).
+- `cd hungrybirds-pos-modern && npm test` → **18 passed (18)** test files, **122 passed (122)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `765.57 kB` minified / `224.33 kB` gzip, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 91 files).
 - Repo root `npm test` → **4 passed (4)** test files, **60 passed (60)** tests; `npm run lint` → **EXIT 0** (`0 errors`, `3` ignored-file warnings).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities** (prior check).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
@@ -75,7 +76,7 @@
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 121 Vitest unit & regression tests
+npm test          # Run 122 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173
