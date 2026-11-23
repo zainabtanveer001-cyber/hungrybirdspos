@@ -24,7 +24,7 @@ import type { SyncVersionsMap } from './syncMap';
 import type { OnlineOrder, Sale } from './db/types';
 
 // Firestore REST, same reasoning as auth.ts: the `firebase` package broke the
-// Vercel/Rolldown build. Using a tiny `tableOrders/__sync_versions__` manifest +
+// Vercel/Rolldown build. Using a tiny `tableOrders/sync_versions_v1` manifest +
 // incremental `:runQuery` watermarks avoids polling unchanged collections.
 const TOKEN_KEY = 'hb.syncToken';
 const SNAPSHOT_KEY = 'sync.snapshot';
@@ -35,7 +35,7 @@ const DEVICE_ID_KEY = 'sync.deviceId';
 const LOCAL_VOIDS_KEY = 'sync.localVoids';
 const CATEGORIES_INITIALIZED_KEY = 'categoriesInitialized';
 const SETTING_PREFIX = 'setting_';
-const SYNC_VERSIONS_DOC_ID = '__sync_versions__';
+const SYNC_VERSIONS_DOC_ID = 'sync_versions_v1';
 
 const LEADER_KEY = 'hb.syncLeader';
 const LEADER_TTL_MS = 25_000;
@@ -326,7 +326,18 @@ async function rest(
     }
     if (!res.ok) {
       if (res.status === 401) forgetToken();
-      setStatus({ state: 'error', rateLimited: false, retryAt: undefined, error: `Firestore ${res.status}` });
+      const errJson = await res.json().catch(() => null);
+      const rawDetail = typeof errJson?.error?.message === 'string' ? errJson.error.message.trim() : '';
+      const shortDetail = rawDetail.length > 140 ? `${rawDetail.slice(0, 140)}...` : rawDetail;
+      if (shortDetail) {
+        console.warn(`Firestore ${res.status} (${method}): ${shortDetail}`);
+      }
+      setStatus({
+        state: 'error',
+        rateLimited: false,
+        retryAt: undefined,
+        error: shortDetail ? `Firestore ${res.status}: ${shortDetail}` : `Firestore ${res.status}`,
+      });
       return null;
     }
     rateLimitStreak = 0;
@@ -513,7 +524,7 @@ let deviceIdCache: string | null = null;
 async function getDeviceId(): Promise<string> {
   if (deviceIdCache) return deviceIdCache;
   const row = await db.settings.get(DEVICE_ID_KEY);
-  if (typeof row?.value === 'string' && row.value.startsWith('d_')) {
+  if (typeof row?.value === 'string' && /^d_[a-z0-9]{6,16}$/.test(row.value)) {
     deviceIdCache = row.value;
     return deviceIdCache;
   }
@@ -606,7 +617,7 @@ async function runFlushVersionManifest(): Promise<void> {
   }
 }
 
-/** Publishes pending per-collection device version stamps to `tableOrders/__sync_versions__`. */
+/** Publishes pending per-collection device version stamps to `tableOrders/sync_versions_v1`. */
 export function flushVersionManifest(): Promise<void> {
   if (manifestInFlight) {
     return manifestInFlight.then(() => {
@@ -1270,7 +1281,7 @@ function normalizeSyncArgs(arg: boolean | SyncOptions): Required<Pick<SyncOption
   };
 }
 
-/** Flushes queued local writes, polls `tableOrders/__sync_versions__`, and pulls only dirty/due collections. */
+/** Flushes queued local writes, polls `tableOrders/sync_versions_v1`, and pulls only dirty/due collections. */
 export function syncNow(options: boolean | SyncOptions = true): Promise<boolean> {
   const opts = normalizeSyncArgs(options);
   inFlight ??= (async () => {

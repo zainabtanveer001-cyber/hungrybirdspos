@@ -27,7 +27,10 @@ export function encodeValue(value: unknown): any {
   if (value === null || value === undefined) return { nullValue: null };
   if (typeof value === 'string') return { stringValue: value };
   if (typeof value === 'boolean') return { booleanValue: value };
-  if (typeof value === 'number') return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return { nullValue: null };
+    return Number.isInteger(value) ? { integerValue: String(value) } : { doubleValue: value };
+  }
   if (Array.isArray(value)) return { arrayValue: { values: value.map(encodeValue) } };
   if (typeof value === 'object') return { mapValue: { fields: encodeFields(value as Record<string, unknown>) } };
   return { nullValue: null };
@@ -205,7 +208,7 @@ export function mergePulledSnapshot(
 
 export type SyncVersionsMap = Record<string, Record<string, string>>;
 
-/** Parses `tableOrders/__sync_versions__` into per-collection device stamps and voided sale tombstones. */
+/** Parses `tableOrders/sync_versions_v1` into per-collection device stamps and voided sale tombstones. */
 export function parseSyncVersionsDoc(doc: any): { collections: SyncVersionsMap; voidedSaleIds: string[] } {
   if (!doc?.fields || typeof doc.fields !== 'object') {
     return { collections: {}, voidedSaleIds: [] };

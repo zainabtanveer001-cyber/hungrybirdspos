@@ -286,6 +286,20 @@ function createMockCloud() {
 
     if (!store) return new Response(JSON.stringify({}), { status: 404 });
 
+    // Real Cloud Firestore rejects any document ID matching __.*__ with HTTP 400 INVALID_ARGUMENT.
+    if (docId && /^__.*__$/.test(docId)) {
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: 400,
+            status: 'INVALID_ARGUMENT',
+            message: `Document name "${docId}" cannot match "__.*__".`,
+          },
+        }),
+        { status: 400 },
+      );
+    }
+
     if (method === 'GET' && !docId) {
       if (failGets) throw new TypeError('Network unreachable');
       return new Response(JSON.stringify({ documents: [...store.values()] }), { status: 200 });
@@ -822,10 +836,10 @@ describe('Firestore 429 quota protection & incremental/manifest sync efficiency'
     await syncA.syncNow({ mode: 'poll' });
 
     expect(cloud.requests.length).toBeLessThanOrEqual(2);
-    expect(cloud.requests.every((r) => r.path === '/tableOrders/__sync_versions__')).toBe(true);
+    expect(cloud.requests.every((r) => r.path === '/tableOrders/sync_versions_v1')).toBe(true);
   });
 
-  it('pulls ONLY the changed collection via __sync_versions__ when Device A edits a category', async () => {
+  it('pulls ONLY the changed collection via sync_versions_v1 when Device A edits a category', async () => {
     const cloud = createMockCloud();
     vi.stubGlobal('fetch', cloud.fetchMock);
 
@@ -850,7 +864,7 @@ describe('Firestore 429 quota protection & incremental/manifest sync efficiency'
     await syncA2.pushCategory('CAT_BBQ');
     await syncA2.flushVersionManifest();
 
-    // Device B polls: fetches __sync_versions__ + ONLY categories
+    // Device B polls: fetches sync_versions_v1 + ONLY categories
     activeStore = deviceB;
     vi.resetModules();
     const syncB2 = await loadSyncWithToken();
@@ -859,7 +873,7 @@ describe('Firestore 429 quota protection & incremental/manifest sync efficiency'
 
     expect(deviceB.categories.has('CAT_BBQ')).toBe(true);
     const paths = cloud.requests.map((r) => r.path);
-    expect(paths).toContain('/tableOrders/__sync_versions__');
+    expect(paths).toContain('/tableOrders/sync_versions_v1');
     expect(paths).toContain('/categories');
     expect(paths).not.toContain('/menu');
     expect(paths).not.toContain('/inventory');
@@ -1051,5 +1065,22 @@ describe('Firestore 429 quota protection & incremental/manifest sync efficiency'
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('never hits reserved __.*__ document IDs and surfaces Firestore 400 error details clearly', async () => {
+    const cloud = createMockCloud();
+    vi.stubGlobal('fetch', cloud.fetchMock);
+    const sync = await loadSyncWithToken();
+
+    await sync.syncNow({ mode: 'full' });
+    expect(sync.getSyncStatus().state).toBe('idle');
+    expect(cloud.requests.some((r) => /\/__[^/]+__/.test(r.path))).toBe(false);
+
+    // If a corrupt/reserved ID were ever pushed directly, Firestore 400 detail is preserved
+    activeStore.categories.set('__bad__', { id: '__bad__', name: 'Bad' });
+    await sync.pushCategory('__bad__');
+    expect(sync.getSyncStatus().state).toBe('error');
+    expect(sync.getSyncStatus().error).toContain('Firestore 400');
+    expect(sync.getSyncStatus().error).toContain('__.*__');
   });
 });

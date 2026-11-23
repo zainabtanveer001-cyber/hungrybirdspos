@@ -36,10 +36,12 @@ describe('firestore value codec', () => {
     expect(Number.isInteger(decoded.price)).toBe(true);
   });
 
-  it('drops undefined but keeps explicit null', () => {
-    const fields = encodeFields({ a: 1, b: undefined, c: null });
-    expect(Object.keys(fields)).toEqual(['a', 'c']);
+  it('drops undefined, encodes NaN/Infinity as nullValue, and keeps explicit null', () => {
+    const fields = encodeFields({ a: 1, b: undefined, c: null, d: NaN, e: Infinity });
+    expect(Object.keys(fields)).toEqual(['a', 'c', 'd', 'e']);
     expect(fields.c).toEqual({ nullValue: null });
+    expect(fields.d).toEqual({ nullValue: null });
+    expect(fields.e).toEqual({ nullValue: null });
   });
 
   it('reads the document id off a full resource name', () => {
@@ -177,7 +179,7 @@ describe('cross-device mirror reconciliation (category/menu/inventory deletes)',
 });
 
 describe('version manifest, 429 backoff & incremental query builders', () => {
-  it('parses per-collection device stamps and voided sale tombstones from __sync_versions__', () => {
+  it('parses per-collection device stamps and voided sale tombstones from sync_versions_v1', () => {
     const parsed = parseSyncVersionsDoc({
       fields: encodeFields({
         c_categories: { d_devA: '100_1', d_devB: '100_2' },
