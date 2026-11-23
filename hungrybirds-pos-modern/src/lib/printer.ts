@@ -1,6 +1,7 @@
 import { db } from './db';
 import { EscPosEncoder } from './escpos';
 import { buildCenteredLogoRaster } from './receiptLogo';
+import { buildQrRaster } from './receiptQr';
 
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
 export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
@@ -680,7 +681,7 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
 }
 
 /**
- * Sends a styled ESC/POS test slip to verify alignment, inverted banners, bold text, and optional QR printing.
+ * Sends a clean white-background ESC/POS test slip to verify alignment, bold text, logo, and optional QR printing.
  */
 export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): Promise<void> {
   const settings = await getPrinterSettings().catch(() => DEFAULT_PRINTER_SETTINGS);
@@ -699,9 +700,8 @@ export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): 
   encoder.setSize(0, 1);
   encoder.text(headerText);
   encoder.setSize(0, 0);
-  encoder.invert(true);
-  encoder.text('  PRINTER TEST SLIP  ');
-  encoder.invert(false);
+  encoder.text(light);
+  encoder.text('PRINTER TEST SLIP');
   encoder.bold(false);
   encoder.text(heavy);
   encoder.text(`Mode: ${(settings.connectionType || 'bluetooth').toUpperCase()}  |  Paper: ${settings.paperWidth}`);
@@ -711,9 +711,14 @@ export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): 
   encoder.bold(false);
   encoder.text(light);
   if (settings.qrUrl?.trim()) {
-    encoder.qrCode(settings.qrUrl.trim(), settings.paperWidth === '80mm' ? 5 : 4);
-    encoder.text(settings.qrLabel?.trim() || 'Scan to verify QR');
-    encoder.text(light);
+    const qr = buildQrRaster(settings.qrUrl, settings.paperWidth);
+    if (qr) {
+      encoder.text('');
+      encoder.rasterImage(qr.width, qr.height, qr.bytes);
+      encoder.text('');
+      encoder.text(settings.qrLabel?.trim() || 'Scan to verify QR');
+      encoder.text(light);
+    }
   }
   encoder.feed(3);
   encoder.cut();

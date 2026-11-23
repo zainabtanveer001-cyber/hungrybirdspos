@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bluetooth, Cable, Check, Cpu, Printer, Wifi, X } from 'lucide-react';
-import { encode as encodeQr } from 'uqr';
+import { encodeQrMatrix, normalizeQrUrl } from '../lib/receiptQr';
 import {
   disconnectPrinterDevice,
   disconnectSerialPrinter,
@@ -61,7 +61,7 @@ const PRINT_OPTIONS: Array<[keyof PrinterSettings, string]> = [
   ['printOrderDetails', 'Order details (Bill #, date, cashier, order type/table)'],
   ['printDeliveryDetails', 'Customer & delivery details (name, phone, address)'],
   ['printItemPrices', 'Item rate, qty, and amount columns'],
-  ['printTotals', 'Subtotal, discounts, loyalty, charges & highlighted total'],
+  ['printTotals', 'Subtotal, discounts, loyalty, charges & total amount'],
   ['printPayments', 'Payment method, cash received, change & PAID stamp'],
   ['printFooter', 'Online payment box, QR code & thank-you footer'],
 ];
@@ -178,6 +178,8 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   }
 
   const connectionType = settings?.connectionType || 'bluetooth';
+  const rawQrUrl = settings?.qrUrl ?? '';
+  const normalizedQrUrl = useMemo(() => normalizeQrUrl(rawQrUrl), [rawQrUrl]);
 
   return (
     <Modal
@@ -626,12 +628,23 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                   QR Code URL (optional — reviews, menu, or WhatsApp)
                 </span>
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={settings.qrUrl ?? ''}
                   onChange={(e) => setSettings({ ...settings, qrUrl: e.target.value })}
-                  placeholder="https://g.page/r/... or https://wa.me/923257867774"
+                  placeholder="https://maps.app.goo.gl/... or https://wa.me/923257867774"
                   className="w-full px-3 h-9 text-xs border border-[#788991] rounded-[8px] bg-white text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2941e0]"
                 />
+                {normalizedQrUrl && normalizedQrUrl !== rawQrUrl.trim() && (
+                  <span className="block text-[11px] text-[#273238] mt-1 break-all">
+                    Encoded URL: {normalizedQrUrl}
+                  </span>
+                )}
+                {normalizedQrUrl.length > 120 && (
+                  <span className="block text-[11px] text-[#616f75] mt-0.5">
+                    Tip: For fastest scanning on small thermal paper, use Google Maps → Share → Copy link (maps.app.goo.gl/...).
+                  </span>
+                )}
               </label>
               <label className="block">
                 <span className="block text-xs font-medium text-[#273238] mb-1">QR caption</span>
@@ -684,14 +697,7 @@ function LiveReceiptPreview({
   previewTime: number;
 }) {
   const profile = resolveReceiptProfile(settings);
-  const qrMatrix = useMemo(() => {
-    if (!profile.qrUrl) return null;
-    try {
-      return encodeQr(profile.qrUrl, { ecc: 'M', border: 2 });
-    } catch {
-      return null;
-    }
-  }, [profile.qrUrl]);
+  const qrMatrix = useMemo(() => encodeQrMatrix(profile.qrUrl, 4), [profile.qrUrl]);
 
   const sampleLines: Array<[string, string]> = preview?.lines.length
     ? preview.lines
@@ -711,7 +717,7 @@ function LiveReceiptPreview({
       >
         {settings.printKitchenTicket && (
           <>
-            <div className="bg-black text-white text-center font-black py-1 px-2 text-[11px] tracking-wider">
+            <div className="border-y-2 border-black text-black text-center font-black py-1 px-2 text-[11px] tracking-wider">
               KITCHEN ORDER (KOT)
             </div>
             <div className="text-center font-bold text-[11px] mt-1">{sampleBadge}</div>
@@ -745,7 +751,7 @@ function LiveReceiptPreview({
           {profile.phone && <div className="font-bold mt-0.5">Tel: {profile.phone}</div>}
         </div>
 
-        <div className="bg-black text-white text-center font-bold py-1 px-2 mt-2 text-[11px] tracking-wider">
+        <div className="border-y border-black text-black text-center font-black py-1 px-2 mt-2 text-[11px] tracking-wider">
           {sampleBadge}
         </div>
         <div className="text-center text-[10px] text-[#526066] mt-0.5">*** Customer Copy ***</div>
@@ -789,8 +795,7 @@ function LiveReceiptPreview({
 
         {settings.printTotals && (
           <>
-            <div className="border-t-2 border-black mt-2 pt-1.5" />
-            <div className="bg-black text-white flex justify-between items-center font-black px-2 py-1.5 text-xs">
+            <div className="mt-2 border-y-2 border-black text-black flex justify-between items-center font-black py-1.5 text-xs">
               <span>TOTAL AMOUNT</span>
               <span className="tabular-nums">Rs {formatDecimal(sampleTotal)}</span>
             </div>
@@ -841,9 +846,10 @@ function LiveReceiptPreview({
             {qrMatrix && (
               <div className="text-center pt-1">
                 <svg
-                  width={settings.paperWidth === '58mm' ? 80 : 96}
-                  height={settings.paperWidth === '58mm' ? 80 : 96}
+                  width={settings.paperWidth === '58mm' ? 104 : 124}
+                  height={settings.paperWidth === '58mm' ? 104 : 124}
                   viewBox={`0 0 ${qrMatrix.size} ${qrMatrix.size}`}
+                  shapeRendering="crispEdges"
                   className="block mx-auto bg-white"
                   role="img"
                   aria-label="Receipt QR code preview"

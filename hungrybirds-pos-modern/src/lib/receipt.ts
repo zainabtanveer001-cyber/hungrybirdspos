@@ -1,10 +1,12 @@
-import { renderSVG } from 'uqr';
 import { formatAmount } from './format';
 import { DEFAULT_PRINTER_SETTINGS, getPrinterSettings, printRaw } from './printer';
 import type { PrinterSettings } from './printer';
 import type { CartItem, Sale } from './db/types';
 import { EscPosEncoder } from './escpos';
 import { buildCenteredLogoRaster, RECEIPT_LOGO_DATA_URI } from './receiptLogo';
+import { buildQrRaster, buildQrSvg, normalizeQrUrl } from './receiptQr';
+
+export { buildQrRaster, buildQrSvg, normalizeQrUrl };
 
 export const RESTAURANT = {
   name: 'Hungry Birds Restaurant',
@@ -133,22 +135,10 @@ export function resolveReceiptProfile(settings: PrinterSettings) {
     accountTitle: settings.accountTitle !== undefined ? settings.accountTitle.trim() : RESTAURANT.accountTitle,
     accountMethod: settings.accountMethod !== undefined ? settings.accountMethod.trim() : RESTAURANT.accountMethod,
     accountNumber: settings.accountNumber !== undefined ? settings.accountNumber.trim() : RESTAURANT.accountNumber,
-    qrUrl: (settings.qrUrl || '').trim(),
+    qrUrl: normalizeQrUrl(settings.qrUrl || ''),
     qrLabel: (settings.qrLabel || '').trim() || 'Scan to order or leave a review',
     showLogo: settings.showLogo !== false,
   };
-}
-
-/** Generates a crisp offline SVG QR code for browser printing and live preview. */
-export function buildQrSvg(url: string, sizePx = 112): string {
-  const clean = (url || '').trim();
-  if (!clean) return '';
-  try {
-    const raw = renderSVG(clean, { ecc: 'M', border: 2, pixelSize: 4 });
-    return raw.replace('<svg ', `<svg width="${sizePx}" height="${sizePx}" style="display:block;margin:0 auto;" `);
-  } catch {
-    return '';
-  }
 }
 
 /**
@@ -168,10 +158,10 @@ function defaultThankYou(orderType: Sale['orderType']): string {
 }
 
 /**
- * Encodes the sale into premium raw ESC/POS bytes (80mm = 47 cols, 58mm = 31 cols)
- * featuring inverted order-type & total banners, crisp typography hierarchy,
+ * Encodes the sale into raw ESC/POS bytes (80mm = 47 cols, 58mm = 31 cols)
+ * with clean white-background typography, ruled order-type & total sections,
  * word-wrapped items with indented modifiers/notes, payment & change details,
- * framed digital payment info, and optional native GS ( k QR code.
+ * framed digital payment info, and universal 1-bit raster QR codes.
  */
 export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Uint8Array {
   const encoder = new EscPosEncoder();
@@ -186,12 +176,11 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   // 0. Optional Kitchen Order Ticket (KOT)
   if (settings.printKitchenTicket) {
     encoder.align('center');
+    encoder.text(heavyRule);
     encoder.bold(true);
-    encoder.invert(true);
     encoder.setSize(0, 1);
-    encoder.text('  KITCHEN ORDER (KOT)  ');
+    encoder.text('KITCHEN ORDER (KOT)');
     encoder.setSize(0, 0);
-    encoder.invert(false);
     encoder.text(orderBadge);
     encoder.bold(false);
     encoder.text(`Bill #HBR-${sale.id ?? ''}  |  ${formatBillTimestamp(sale.timestamp)}`);
@@ -259,11 +248,10 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   }
 
   encoder.text('');
-  // 3. Executive Inverted Order-Type Banner + Copy Label
+  // 3. Framed White-Background Order-Type Section + Copy Label
+  encoder.text(lightRule);
   encoder.bold(true);
-  encoder.invert(true);
-  encoder.text(`  ${orderBadge}  `);
-  encoder.invert(false);
+  encoder.text(orderBadge);
   encoder.bold(false);
   encoder.text('*** Customer Copy ***');
 
@@ -403,14 +391,12 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
       encoder.text(lightRule);
     }
 
-    const totalLeft = ' TOTAL AMOUNT';
-    const totalRight = `Rs ${formatDecimal(sale.total)} `;
+    const totalLeft = 'TOTAL AMOUNT';
+    const totalRight = `Rs ${formatDecimal(sale.total)}`;
     encoder.bold(true);
-    encoder.invert(true);
     encoder.setSize(0, 1);
     encoder.text(formatTwoCol(totalLeft, totalRight, cols));
     encoder.setSize(0, 0);
-    encoder.invert(false);
     encoder.bold(false);
 
     if (sale.refundedAmount) {
@@ -464,10 +450,15 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     }
 
     if (profile.qrUrl) {
-      encoder.align('center');
-      encoder.qrCode(profile.qrUrl, settings.paperWidth === '80mm' ? 5 : 4);
-      encoder.text(profile.qrLabel);
-      encoder.text(lightRule);
+      const qr = buildQrRaster(profile.qrUrl, settings.paperWidth);
+      if (qr) {
+        encoder.align('center');
+        encoder.text('');
+        encoder.rasterImage(qr.width, qr.height, qr.bytes);
+        encoder.text('');
+        encoder.text(profile.qrLabel);
+        encoder.text(lightRule);
+      }
     }
 
     encoder.align('center');
@@ -747,7 +738,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
          </div>`
       : '';
 
-  const qrSvg = profile.qrUrl ? buildQrSvg(profile.qrUrl, settings.paperWidth === '58mm' ? 88 : 108) : '';
+  const qrSvg = profile.qrUrl ? buildQrSvg(profile.qrUrl, settings.paperWidth === '58mm' ? 112 : 132) : '';
   const hasAccount = Boolean(profile.accountTitle || profile.accountMethod || profile.accountNumber);
 
   const footer = settings.printFooter
@@ -792,7 +783,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   .tagline { font-size: 0.85em; font-style: italic; margin-bottom: 1mm; }
   .addr { font-size: 0.88em; line-height: 1.25; }
   .tel { font-weight: bold; font-size: 0.92em; margin-top: 0.5mm; }
-  .inv-banner { background: #000; color: #fff; font-weight: 900; text-align: center; padding: 1.2mm 2mm; margin: 2mm 0 1mm; letter-spacing: 0.06em; font-size: 0.95em; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .inv-banner { background: #fff; color: #000; border-top: 1px solid #000; border-bottom: 1px solid #000; font-weight: 900; text-align: center; padding: 1.2mm 2mm; margin: 2mm 0 1mm; letter-spacing: 0.06em; font-size: 0.95em; }
   .copy-tag { font-size: 0.85em; letter-spacing: 0.05em; text-align: center; }
   p { margin: 0; }
   .title { display: none; }
@@ -816,7 +807,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   .row span:last-child { white-space: nowrap; }
   .strong { font-weight: bold; }
   .muted { font-size: 0.88em; }
-  .grand-bar { display: flex; justify-content: space-between; align-items: center; gap: 2mm; background: #000; color: #fff; font-weight: 900; padding: 1.8mm 2mm; margin: 1.8mm 0 1mm; font-size: 1.05em; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .grand-bar { display: flex; justify-content: space-between; align-items: center; gap: 2mm; background: #fff; color: #000; border-top: 2px solid #000; border-bottom: 2px solid #000; font-weight: 900; padding: 1.6mm 0.5mm; margin: 1.5mm 0 1mm; font-size: 1.08em; }
   .grand-amt { font-size: 1.15em; white-space: nowrap; }
   .count-row { font-size: 0.88em; font-weight: bold; }
   .paid-stamp { text-align: center; font-weight: 900; letter-spacing: 0.08em; margin-top: 1.2mm; font-size: 0.9em; }

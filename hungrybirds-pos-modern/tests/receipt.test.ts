@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLogoRaster,
+  buildQrRaster,
+  buildQrSvg,
   formatDate,
   generateEscPosReceipt,
+  normalizeQrUrl,
   receiptDocument,
   receiptLines,
   receiptText,
@@ -205,7 +208,7 @@ describe('receipt', () => {
     expect(getPrinterDevice()).toBeNull();
   });
 
-  it('encodes executive ESC/POS receipt with inverted banners, cashier, split delivery info, payments, totals, and zero non-ASCII artifacts', () => {
+  it('encodes white-background ESC/POS receipt with cashier, split delivery info, payments, totals, raster QR, and zero non-ASCII text artifacts', () => {
     const richSale: Sale = {
       ...sale,
       items: [
@@ -226,9 +229,10 @@ describe('receipt', () => {
 
     const bytes = generateEscPosReceipt(richSale, {
       ...settings,
+      showLogo: false,
       printKitchenTicket: false,
-      qrUrl: 'https://wa.me/923257867774',
-      qrLabel: 'Scan to order on WhatsApp',
+      qrUrl: 'https://maps.app.goo.gl/hb12345?g_st=aw',
+      qrLabel: 'Scan to leave a review',
     });
     const decoded = new TextDecoder().decode(bytes);
 
@@ -262,18 +266,34 @@ describe('receipt', () => {
     expect(decoded).toContain('ONLINE PAYMENT');
     expect(decoded).toContain('Zeeshan Shafiq');
     expect(decoded).toContain('Jazzcash/Easypaisa');
-    expect(decoded).toContain('Scan to order on WhatsApp');
-    expect(decoded).not.toContain('\u00A0');
+    expect(decoded).toContain('Scan to leave a review');
 
-    // Verify ESC/POS inverted highlight command (GS B 1 -> 0x1d 0x42 0x01)
-    let hasInvertOn = false;
-    let hasQrCmd = false;
-    for (let i = 0; i < bytes.length - 3; i += 1) {
-      if (bytes[i] === 0x1d && bytes[i + 1] === 0x42 && bytes[i + 2] === 0x01) hasInvertOn = true;
-      if (bytes[i] === 0x1d && bytes[i + 1] === 0x28 && bytes[i + 2] === 0x6b) hasQrCmd = true;
-    }
-    expect(hasInvertOn).toBe(true);
-    expect(hasQrCmd).toBe(true);
+    // Pure-text ESC/POS receipt must not contain UTF-8 NBSP (\u00A0)
+    const textOnlyBytes = generateEscPosReceipt(richSale, {
+      ...settings,
+      showLogo: false,
+      qrUrl: '',
+    });
+    expect(new TextDecoder().decode(textOnlyBytes)).not.toContain('\u00A0');
+
+    // Verify inverted black background command (GS B 1 -> 0x1d 0x42 0x01) is removed,
+    // including when KOT is enabled, and QR is emitted as universal GS v 0 raster (not GS ( k)
+    const withKotBytes = generateEscPosReceipt(richSale, {
+      ...settings,
+      showLogo: false,
+      printKitchenTicket: true,
+      qrUrl: 'https://maps.app.goo.gl/hb12345',
+    });
+    const hasSeq = (buf: Uint8Array, seq: number[]) => {
+      for (let i = 0; i <= buf.length - seq.length; i += 1) {
+        if (seq.every((b, offset) => buf[i + offset] === b)) return true;
+      }
+      return false;
+    };
+    expect(hasSeq(bytes, [0x1d, 0x42, 0x01])).toBe(false);
+    expect(hasSeq(withKotBytes, [0x1d, 0x42, 0x01])).toBe(false);
+    expect(hasSeq(bytes, [0x1d, 0x76, 0x30])).toBe(true);
+    expect(hasSeq(bytes, [0x1d, 0x28, 0x6b])).toBe(false);
   });
 
   it('word-wraps long dish names cleanly without mid-word breaks and renders offline QR SVG in HTML receipt', () => {
@@ -348,5 +368,46 @@ describe('receipt', () => {
     expect(htmlWithLogo).toContain('<img src="data:image/png;base64,');
     expect(htmlWithLogo).toContain('class="receipt-logo"');
     expect(htmlWithoutLogo).not.toContain('class="receipt-logo"');
+  });
+
+  it('normalizes Google Maps share URLs, builds byte-aligned QR bitmaps, and removes black backgrounds from HTML receipts', () => {
+    expect(normalizeQrUrl('Hungry Birds Restaurant\nhttps://maps.app.goo.gl/abc123?g_st=aw.')).toBe(
+      'https://maps.app.goo.gl/abc123',
+    );
+    expect(normalizeQrUrl('maps.app.goo.gl/xyz789')).toBe('https://maps.app.goo.gl/xyz789');
+
+    const longMapsUrl =
+      'https://www.google.com/maps/place/Hungry+Birds+Restaurant/@31.5924782,74.4123456,17z/data=!3m1!4b1!4m6!3m5!1s0x391911c123456789:0xabcdef1234567890!8m2!3d31.5924782!4d74.4149205?cid=987654321&entry=ttu&g_ep=EgoyMDI2MTExMS4wIKXMDSoASAFQAw%3D%3D';
+    const normalizedLong = normalizeQrUrl(longMapsUrl);
+    expect(normalizedLong).toContain('/data=!3m1!4b1!');
+    expect(normalizedLong).toContain('cid=987654321');
+    expect(normalizedLong).not.toContain('entry=');
+    expect(normalizedLong).not.toContain('g_ep=');
+
+    const shortRaster = buildQrRaster('https://maps.app.goo.gl/abc123', '58mm');
+    expect(shortRaster).not.toBeNull();
+    expect(shortRaster!.width % 8).toBe(0);
+    expect(shortRaster!.width).toBeLessThanOrEqual(352);
+    expect(shortRaster!.bytes.length).toBe((shortRaster!.width / 8) * shortRaster!.height);
+    expect(shortRaster!.bytes.some((b) => b !== 0)).toBe(true);
+
+    const longRaster58 = buildQrRaster(longMapsUrl, '58mm');
+    expect(longRaster58).not.toBeNull();
+    expect(longRaster58!.width % 8).toBe(0);
+    expect(longRaster58!.width).toBeLessThanOrEqual(352);
+    expect(longRaster58!.bytes.length).toBe((longRaster58!.width / 8) * longRaster58!.height);
+
+    const svg = buildQrSvg(longMapsUrl, 132);
+    expect(svg).toContain('<svg ');
+    expect(svg).toContain('shape-rendering="crispEdges"');
+
+    const html = receiptDocument(sale, {
+      ...settings,
+      qrUrl: 'https://maps.app.goo.gl/abc123?g_st=aw',
+    });
+    expect(html).not.toContain('background: #000');
+    expect(html).toContain('.inv-banner { background: #fff; color: #000;');
+    expect(html).toContain('.grand-bar { display: flex;');
+    expect(html).toContain('background: #fff; color: #000; border-top: 2px solid #000;');
   });
 });
