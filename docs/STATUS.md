@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–18 complete; `BUG-014`–`BUG-016` fixed and committed locally)
-- **Active Branch:** `main` (local ahead of `origin/main` with `BUG-016` fix)
+- **Current Phase:** Phase 3 (Build — Slices 9–19 complete; Hungry Birds chef logo added to receipts and committed locally)
+- **Active Branch:** `main` (local ahead of `origin/main` with Slice 19)
 - **Last Updated:** 2026-11-23
 
 ## 1. What Was Done
@@ -51,26 +51,27 @@
   - **Slice 16 (`c061540`):** Added **Split Tender Payments** (`src/lib/payment.ts`, `PaymentModal.tsx` — fast single-method default + `Split Payment` across `Cash`, `Card`, `Online` with `Fill rest` helpers and cash-leg change), **Blind Cash Drawer Close & Visibility Controls** (`BlindCashModal.tsx` with direct total & PKR note/coin counter hiding expected drawer cash & sales; `RecentSales` hiding rupee totals for `CASHIER`/`WAITER` while keeping `Reprint`; `Recent Sales -> Manage` gated behind `OwnerPinModal` for `CASHIER`/`WAITER`; Owner/Manager variance history + Cash/Card/Online breakdown in `ShiftSummaryModal.tsx` & `src/lib/shift.ts`), and **Live Multi-Device Sync** (`src/lib/sync.ts` — 4s Tier 1 / 12s Tier 2 parallel polling, loop-free automatic Dexie hooks with `runAsRemoteApply`, `BroadcastChannel('hb-pos-sync')`, update/void-aware `sales`, operational collections `heldOrders`, `deliveries`, `expenses`, `suppliers`, `stockIn`, `supplierPayments`, `staff`, `attendance`, `leaves`, `salaryPayments`, `advancePayments`, `auditLogs`, and shared shop settings in `/tableOrders/setting_<key>`). Added `tests/shift.test.ts` (3 tests) + expanded `tests/payment.test.ts` (6 tests) and `tests/sync.test.ts` (10 tests).
   - **Slice 17 (`23f4d44`):** Added **Food Category Sales Breakdown & Filtering** (`src/lib/categoryAnalytics.ts`, `analytics.ts`, `shift.ts`, `cart.ts`, `sales.ts`, `App.tsx`, `SalesAnalyticsModal.tsx`, `SalesHistoryModal.tsx`, `ShiftSummaryModal.tsx`): stamps `categoryId`/`categoryName` on cart/sale items while falling back to live menu/category mappings, computes net category revenue after proportional order/loyalty discounts and refunds (`unitsSold`, `orderCount`, `% share`), updates `getPeriodSummary(categoryId?)` and `getAnalytics(period, categoryId?)` cards/trend charts/top items/top customers when filtered by category, adds category breakdown tiles, click-to-filter category pills, mixed-order category share badges, and Category CSV exports to `SalesAnalyticsModal` and `SalesHistoryModal`, and displays `Sales by food category` inside `ShiftSummaryModal`. Added `tests/categoryAnalytics.test.ts` (4 tests).
   - **Slice 18 (`6cd81b0`, `9f96f89` — `BUG-014`, `BUG-015`, `BUG-016`):** Eliminated Firestore Spark `429` quota exhaustion (`46K reads` on `76 writes`), `429` login lockout, and the reserved `__.*__` manifest ID `400` error (`src/lib/sync.ts`, `src/lib/syncMap.ts`, `src/lib/auth.ts`, `src/lib/db/types.ts`, `src/App.tsx`, `src/components/OnlineOrdersModal.tsx`): replaced 4s/12s full-collection `listAll()` polling across all 18 collections with a single-doc `tableOrders/sync_versions_v1` change manifest (`15s` active / `60s` idle polling), single-field incremental `:runQuery` polling for active `onlineOrders` (`25s` cadence + vanished-active single-doc reconciliation) and watermarked `sales`/`auditLogs` (plus `v_voids` sale-deletion tombstones), hidden-tab polling skip, `localStorage` single-tab leader election, bounded concurrency (`3` pull / `2` outbox), immediate `429` circuit breaker + exponential `Retry-After` backoff (`30s`–`300s`/`900s`, `"Quota paused"` badge with `5s` manual probe), `429`-resilient login (`CloudQuotaError` handling, `404`-only unknown-user detection, `authEmail`/`cloudUid`/`passwordHash` caching, `owner@hungrybirds.com` admin fallback during Firestore `429` with customer escalation protection), non-finite number encoding guard, and informative Firestore HTTP error messages. Expanded `tests/syncMap.test.ts` (17 tests) and `tests/sync.test.ts` (17 tests), and added `tests/auth.test.ts` (6 tests).
+  - **Slice 19 (`7844832`):** Replaced placeholder SVG/canvas receipt rooster with the official Hungry Birds chef-chicken emblem (`src/lib/receiptLogo.ts`, `src/lib/receipt.ts`, `src/lib/printer.ts`, `src/components/PrinterSettingsModal.tsx`): cleaned outer sticker halo and centered artwork, embedded a <13 KB data-URI JPEG in browser HTML receipts and Live Thermal Receipt Preview, and encoded a centered 144×174 1-bit ESC/POS `GS v 0` raster bitmap (`560px`/80mm, `368px`/58mm) in receipts and `printTestReceipt()` without canvas/DOM dependency. Expanded `tests/receipt.test.ts` (13 tests).
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **16 passed (16)** test files, **117 passed (117)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `745.47 kB` minified / `206.28 kB` gzip, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 87 files).
+- `cd hungrybirds-pos-modern && npm test` → **16 passed (16)** test files, **118 passed (118)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `776.14 kB` minified / `233.06 kB` gzip, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 88 files).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities** (prior check).
 - `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
 - `npm run lint` (root) → **EXIT 0** (`0 errors`, `3` pre-existing warnings).
 - **Live Browser QA:** Prior Slice 8 pass (`1366×768` & `390×844`) had **0** console errors; post-Slice 11 multi-width check (`375px` / `768px` / `1280px`) is pending Chrome remote debugging.
 
 ## 3. Known Gaps & Deferred Items
-- **Pending post-polish visual verification (`docs/DESIGN.md` §10):** Live multi-width Chrome verification of Slices 9–18 at `375px`, `768px`, and `1280px` (plus `320px` overflow check) is pending Chrome remote debugging (`DevToolsActivePort`).
+- **Pending post-polish visual verification (`docs/DESIGN.md` §10):** Live multi-width Chrome verification of Slices 9–19 at `375px`, `768px`, and `1280px` (plus `320px` overflow check) is pending Chrome remote debugging (`DevToolsActivePort`).
 - **Offline fallback default credentials (`AUD-005`):** Fresh offline installs seed `owner`, `manager`, `cashier`, and `waiter` with password `1234` (SHA-256) in local IndexedDB for offline fallback when Firebase is unreachable. Cloud authentication always takes precedence when online.
-- **Cosmetic / S4 items deferred:** Single-chunk bundle size warning (`~745 kB` minified / `206 kB` gzip).
+- **Cosmetic / S4 items deferred:** Single-chunk bundle size warning (`~776 kB` minified / `233 kB` gzip).
 
 ## 4. How to Run
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 117 Vitest unit & regression tests
+npm test          # Run 118 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173
