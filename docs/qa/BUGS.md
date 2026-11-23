@@ -246,3 +246,19 @@ Evidence: Login screenshot showing `"Username not found or account is not config
 Environment: `58831a2` / `main`.
 Status: verified (fixed in `6cd81b0` — `db/types.ts`, `auth.ts`, `tests/auth.test.ts`)
 ```
+
+---
+
+```
+BUG-016 [S1 critical]
+Title: Version manifest doc ID `__sync_versions__` triggers Firestore REST HTTP `400 INVALID_ARGUMENT` because Cloud Firestore reserves IDs matching `__.*__`
+Steps to reproduce:
+  1. Sign into cloud sync on deployment `6cd81b0` where `SYNC_VERSIONS_DOC_ID = '__sync_versions__'`.
+  2. Observe every `syncNow()` cycle fail immediately with `Sync error: Firestore 400`.
+Expected vs actual:
+  Expected: Version manifest GET/PATCH uses a non-reserved doc ID (`tableOrders/sync_versions_v1`), `encodeValue()` guards `NaN`/`Infinity`, and any real HTTP 400 JSON error message is surfaced clearly.
+  Actual: Cloud Firestore rejects any document ID matching `^__.*__$` with HTTP `400 INVALID_ARGUMENT` on both `GET` and `PATCH`; additionally `encodeValue()` emitted `{ doubleValue: NaN }` -> `null` JSON and `rest()` hid the JSON `error.message`.
+Evidence: Live deploy `6cd81b0` reporting `Firestore 400`; verified in `tests/syncMap.test.ts` (17 tests) and `tests/sync.test.ts` (17 tests with mock Firestore enforcing `/^__.*__$/` -> HTTP 400).
+Environment: `6cd81b0` / `main`.
+Status: verified (fixed in `9f96f89` — `sync.ts`, `syncMap.ts`, `tests/sync.test.ts`, `tests/syncMap.test.ts`)
+```
