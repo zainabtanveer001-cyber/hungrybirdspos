@@ -214,3 +214,35 @@ Evidence: Code root-cause analysis in `sync.ts`, `auth.ts`, `menu.ts`; verified 
 Environment: `805176b` / `main`.
 Status: verified (fixed in `0e9c3d1` — `syncMap.ts`, `sync.ts`, `auth.ts`, `menu.ts`, `App.tsx`, `InventoryModal.tsx`, `tests/syncMap.test.ts`, `tests/sync.test.ts`)
 ```
+
+---
+
+```
+BUG-014 [S1 critical]
+Title: Full-collection 4s/12s Firestore polling exhausts Firebase Spark 50K daily read quota (`46K reads` vs `76 writes`), triggering persistent HTTP `429` sync failures
+Steps to reproduce:
+  1. Sign into a cloud account and leave 1–2 POS browser tabs running under normal use.
+  2. Observe Firebase Console Spark quota climb rapidly (~46K reads in ~2 hours with only 76 writes) until Firestore REST endpoints return HTTP `429 RESOURCE_EXHAUSTED` and the header badge stays stuck on `Sync issue`.
+Expected vs actual:
+  Expected: Idle polling consumes minimal reads (`1–2` reads/poll), hidden/secondary tabs do not multiply Firestore traffic, historical `sales`/`onlineOrders`/`auditLogs` are queried incrementally rather than re-listed on every poll, and any `429` pauses sync with exponential backoff without storming.
+  Actual: `startSync()` polled all 8 Tier-1 collections every 4s and all 18 collections every 12s via full-collection `listAll()` GETs even when idle or hidden, fired all 18 GETs in parallel via `Promise.all` with no `429` circuit breaker/backoff, and re-read full `sales`, `onlineOrders`, and `auditLogs` history repeatedly.
+Evidence: Firebase Console billable metrics screenshot (`46K` Reads vs `76` Writes) + `hungrybirds-pos-modern/src/lib/sync.ts`; verified with `tests/syncMap.test.ts` (17 tests) and `tests/sync.test.ts` (16 tests including 429 circuit breaker, `<= 2` idle poll read budget, selective `__sync_versions__` diffing, incremental `:runQuery` on `sales`/`auditLogs`/`onlineOrders`, `v_voids` tombstones, and hidden-tab `0` requests).
+Environment: `58831a2` / `main` (Vercel production build).
+Status: verified (fixed in `6cd81b0` — `syncMap.ts`, `sync.ts`, `App.tsx`, `OnlineOrdersModal.tsx`, `tests/syncMap.test.ts`, `tests/sync.test.ts`)
+```
+
+---
+
+```
+BUG-015 [S1 critical]
+Title: Signing in by username (`rehan919`) during Firestore `429` falsely displays `"Username not found or account is not configured."` and blocks access even when Identity Toolkit auth works
+Steps to reproduce:
+  1. Wait until Firestore returns HTTP `429` (Spark daily read quota exhausted).
+  2. Attempt to sign in on `LoginScreen` using a staff username (`rehan919`).
+Expected vs actual:
+  Expected: Firestore `429` is never misreported as an unknown username; cached returning staff and allowlisted admin email (`owner@hungrybirds.com`) can sign in via Identity Toolkit (`signInWithPassword`) or verified cached credentials, non-staff customer accounts remain blocked from POS access, and unprimed devices show actionable `429` quota guidance.
+  Actual: `cloudFetch()` only threw `OfflineError` for `status >= 500`, while `firestoreGet()` returned `null` for any `!res.ok` (including `429`), causing `cloudSignIn()` to throw `"Username not found or account is not configured."`; additionally `cloudSignIn()` did not cache `authEmail`, `cloudUid`, or `passwordHash` locally.
+Evidence: Login screenshot showing `"Username not found or account is not configured."` for `rehan919` + Firebase `46K` Spark chart; verified with 6 unit/integration tests in `hungrybirds-pos-modern/tests/auth.test.ts`.
+Environment: `58831a2` / `main`.
+Status: verified (fixed in `6cd81b0` — `db/types.ts`, `auth.ts`, `tests/auth.test.ts`)
+```
