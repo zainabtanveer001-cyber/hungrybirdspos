@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bluetooth, Cable, Check, Cpu, Printer, Wifi, X } from 'lucide-react';
+import { AlertTriangle, Bluetooth, Cable, Check, Cpu, Printer, Wifi, X } from 'lucide-react';
 import { encodeQrMatrix, normalizeQrUrl } from '../lib/receiptQr';
 import {
   disconnectPrinterDevice,
@@ -9,6 +9,7 @@ import {
   getPrinterSettings,
   getSerialPrinterPort,
   getUsbPrinterDevice,
+  isUsbAccessDeniedError,
   pairPrinterDevice,
   pairSerialPrinter,
   pairUsbPrinter,
@@ -28,7 +29,7 @@ import type {
 } from '../lib/printer';
 import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
-import { formatBillTimestamp, formatDecimal, resolveReceiptProfile, RESTAURANT } from '../lib/receipt';
+import { formatBillTimestamp, formatDecimal, printBrowserTestReceipt, resolveReceiptProfile, RESTAURANT } from '../lib/receipt';
 import { RECEIPT_LOGO_DATA_URI } from '../lib/receiptLogo';
 import { Modal } from './Modal';
 
@@ -47,8 +48,9 @@ const DATE_OPTIONS: Array<{ value: DateFormat; label: string }> = [
 ];
 
 const CONNECTION_TYPES: Array<{ value: PrinterConnectionType; label: string; icon: typeof Bluetooth }> = [
+  { value: 'browser', label: 'System / Windows (USB)', icon: Printer },
   { value: 'bluetooth', label: 'Bluetooth (BLE)', icon: Bluetooth },
-  { value: 'usb', label: 'USB Cable', icon: Cable },
+  { value: 'usb', label: 'USB Cable (Raw)', icon: Cable },
   { value: 'serial', label: 'Serial / COM Port', icon: Cpu },
   { value: 'lan', label: 'LAN / Wi-Fi IP', icon: Wifi },
 ];
@@ -78,6 +80,7 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
   const [serialPort, setSerialPort] = useState<SerialPortLike | null>(() => getSerialPrinterPort());
   const [connecting, setConnecting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [usbAccessDenied, setUsbAccessDenied] = useState(false);
   const [previewTime] = useState(() => Date.now());
 
   useEffect(() => {
@@ -118,12 +121,16 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
       return;
     }
     setConnecting(true);
+    setUsbAccessDenied(false);
     try {
       const picked = await pairUsbPrinter();
       setUsbDevice(picked);
       notify(`Connected to ${picked.productName || 'USB thermal printer'}.`);
     } catch (err) {
       if ((err as DOMException)?.name !== 'NotFoundError') {
+        if (isUsbAccessDeniedError(err)) {
+          setUsbAccessDenied(true);
+        }
         notify(err instanceof Error ? err.message : 'Could not connect USB printer.');
       }
     } finally {
@@ -155,9 +162,17 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
     setTesting(true);
     try {
       await savePrinterSettings(settings);
-      await printTestReceipt(settings.headerText || RESTAURANT.name);
-      notify(`Test receipt sent via ${settings.connectionType.toUpperCase()}.`);
+      if (settings.connectionType === 'browser') {
+        await printBrowserTestReceipt(settings);
+        notify('Test receipt opened for your system printer.');
+      } else {
+        await printTestReceipt(settings.headerText || RESTAURANT.name);
+        notify(`Test receipt sent via ${settings.connectionType.toUpperCase()}.`);
+      }
     } catch (err) {
+      if (isUsbAccessDeniedError(err)) {
+        setUsbAccessDenied(true);
+      }
       const message = err instanceof Error ? err.message : 'Test print failed.';
       notify(message);
     } finally {
@@ -203,7 +218,7 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
         <div className="space-y-3">
           <section className="p-3 rounded-xl border border-gray-200 bg-white space-y-3">
             <SectionTitle>Thermal Printer Connection</SectionTitle>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {CONNECTION_TYPES.map((item) => {
                 const Icon = item.icon;
                 const active = connectionType === item.value;
@@ -211,19 +226,49 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                   <button
                     key={item.value}
                     type="button"
-                    onClick={() => setSettings({ ...settings, connectionType: item.value })}
-                    className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold border transition ${
+                    onClick={() => {
+                      setUsbAccessDenied(false);
+                      setSettings({ ...settings, connectionType: item.value });
+                    }}
+                    className={`flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-xl text-xs font-bold border transition ${
                       active
                         ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                         : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden />
-                    <span>{item.label}</span>
+                    <span className="truncate">{item.label}</span>
                   </button>
                 );
               })}
             </div>
+
+            {connectionType === 'browser' && (
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" aria-hidden />
+                  <span className="text-gray-800 font-medium">
+                    Uses your installed Windows / macOS USB or network printer driver (no WebUSB Access Denied error)
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={testPrint}
+                    disabled={testing}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+                  >
+                    <Printer className="w-3.5 h-3.5" aria-hidden />
+                    {testing ? 'Opening...' : 'Test Print'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-700 leading-relaxed">
+                  Select your USB thermal printer once in the Chrome/Edge print dialog and uncheck headers &amp; footers.
+                  For <strong>1-click silent printing</strong> without the popup, launch Chrome or Edge with{' '}
+                  <code className="px-1 py-0.5 bg-white border border-emerald-200 rounded text-[10px]">--kiosk-printing</code>.
+                </p>
+              </div>
+            )}
 
             {connectionType === 'bluetooth' && (
               <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 space-y-2">
@@ -312,6 +357,7 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                         onClick={() => {
                           disconnectUsbPrinter().catch(() => {});
                           setUsbDevice(null);
+                          setUsbAccessDenied(false);
                           notify('USB printer disconnected.');
                         }}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white border border-gray-200 text-gray-700 hover:bg-gray-100"
@@ -321,8 +367,60 @@ export function PrinterSettingsModal({ username, notify, preview, onClose }: {
                     </>
                   )}
                 </div>
+
+                {usbAccessDenied && (
+                  <div
+                    role="alert"
+                    className="p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 space-y-2 text-xs"
+                  >
+                    <div className="flex items-start gap-2 font-semibold">
+                      <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" aria-hidden />
+                      <span>
+                        Windows blocked WebUSB (<code>Access denied</code>) because your printer’s Windows driver (<code>usbprint.sys</code>) is holding the USB port.
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUsbAccessDenied(false);
+                          setSettings({ ...settings, connectionType: 'browser' });
+                          notify('Switched to System / Windows (USB) mode. Click Save Settings or Test Print.');
+                        }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-[#2941e0] text-white hover:bg-[#1f35c4] transition"
+                      >
+                        Use System / Windows Printer (Recommended)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUsbAccessDenied(false);
+                          setSettings({ ...settings, connectionType: 'serial' });
+                          notify('Switched to Serial / COM Port mode.');
+                        }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-amber-400 text-amber-950 hover:bg-amber-100 transition"
+                      >
+                        Try Serial / COM Port
+                      </button>
+                    </div>
+                    <details className="text-[11px] text-amber-900">
+                      <summary className="cursor-pointer font-semibold underline">
+                        Advanced: Enable raw WebUSB on Windows (Zadig) or Linux
+                      </summary>
+                      <ul className="list-disc pl-4 mt-1.5 space-y-1">
+                        <li>
+                          <strong>Windows (Zadig):</strong> Download Zadig → Options → List All Devices → select your thermal printer → replace driver with <strong>WinUSB</strong>. (Note: replacing the driver stops regular Windows apps like Notepad/Word from seeing that printer until reverted.)
+                        </li>
+                        <li>
+                          <strong>Linux:</strong> Add a <code>udev</code> rule granting user read/write permission to the printer’s USB vendor/product ID.
+                        </li>
+                      </ul>
+                    </details>
+                  </div>
+                )}
+
                 <p className="text-[10px] text-gray-500">
-                  Direct WebUSB ESC/POS printing. If Windows claims the USB printer as a virtual COM port, use <strong>Serial / COM Port</strong> instead.
+                  Direct WebUSB ESC/POS requires <strong>WinUSB</strong> on Windows (or Android OTG). If you installed the standard Windows printer driver, switch to <strong>System / Windows (USB)</strong> or <strong>Serial / COM Port</strong>.
                 </p>
               </div>
             )}

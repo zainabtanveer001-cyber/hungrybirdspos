@@ -477,27 +477,13 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   return encoder.build();
 }
 
-/**
- * Prints to the paired thermal printer, else to the browser's print dialog
- * via a hidden iframe (the POS tab keeps its cart and open modals).
- */
-export async function printReceipt(sale: Sale): Promise<'thermal' | 'browser'> {
-  const settings = await getPrinterSettings();
-
-  try {
-    const bytes = generateEscPosReceipt(sale, settings);
-    await printRaw(bytes);
-    return 'thermal';
-  } catch (e) {
-    console.warn('Direct thermal print failed, falling back to browser print:', e);
-  }
-
+async function printHtmlViaFrame(html: string): Promise<void> {
   const frame = document.createElement('iframe');
   frame.setAttribute('aria-hidden', 'true');
   frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
   document.body.appendChild(frame);
 
-  frame.srcdoc = receiptDocument(sale, settings);
+  frame.srcdoc = html;
   await new Promise<void>((resolve) => {
     frame.addEventListener('load', () => resolve(), { once: true });
     setTimeout(resolve, 2000);
@@ -512,6 +498,81 @@ export async function printReceipt(sale: Sale): Promise<'thermal' | 'browser'> {
   win.addEventListener('afterprint', cleanUp, { once: true });
   win.focus();
   win.print();
+}
+
+/**
+ * Builds a clean white-background 58mm/80mm test receipt HTML document
+ * for System / Windows Printer (USB) test printing without raw ESC/POS commands.
+ */
+export function buildTestReceiptDocument(settings: PrinterSettings): string {
+  const profile = resolveReceiptProfile(settings);
+  const width = settings.paperWidth === '58mm' ? '54mm' : '76mm';
+  const qrSvg = profile.qrUrl ? buildQrSvg(profile.qrUrl, settings.paperWidth === '58mm' ? 112 : 132) : '';
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Printer Test Slip</title><style>
+  @page { size: ${settings.paperWidth} auto; margin: 2mm; }
+  * { box-sizing: border-box; }
+  html, body { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0; color: #000; background: #fff; }
+  body { font: ${FONT_PT[settings.receiptFontSize] ?? '10.5pt'}/1.35 "Courier New", Courier, monospace; }
+  main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 1mm 1.5mm 4mm; text-align: center; }
+  .stamp-wrap { width: 100%; display: flex; justify-content: center; margin: 0 auto 1.5mm; }
+  .stamp-wrap img.receipt-logo { display: block; margin: 0 auto; width: ${settings.paperWidth === '58mm' ? '15mm' : '18mm'}; max-width: 100%; height: auto; }
+  h1 { margin: 1mm 0 0.5mm; font-size: 1.25em; font-weight: 900; }
+  .banner { background: #fff; color: #000; border-top: 1px solid #000; border-bottom: 1px solid #000; font-weight: 900; padding: 1.2mm 2mm; margin: 2mm 0; letter-spacing: 0.06em; }
+  .heavy-rule { margin: 2mm 0; border-top: 2px solid #000; }
+  .rule { margin: 1.8mm 0; border-top: 1px dashed #000; }
+  .status { font-weight: 900; margin: 1.2mm 0; }
+  .qr-wrap { padding: 1.5mm 0; }
+  .qr-label { font-size: 0.85em; margin-top: 1mm; }
+  </style></head><body><main>
+  ${
+    profile.showLogo
+      ? `<div class="stamp-wrap"><img src="${RECEIPT_LOGO_DATA_URI}" alt="${escapeHtml(profile.name)}" class="receipt-logo" /></div>`
+      : ''
+  }
+  <h1>${escapeHtml(profile.name)}</h1>
+  <div class="banner">PRINTER TEST SLIP</div>
+  <div class="heavy-rule"></div>
+  <p>Mode: SYSTEM PRINTER | Paper: ${escapeHtml(settings.paperWidth)}</p>
+  <p>${escapeHtml(formatBillTimestamp(new Date()))}</p>
+  <p class="status">Status: CONNECTED &amp; READY</p>
+  <div class="rule"></div>
+  ${
+    qrSvg
+      ? `<div class="qr-wrap">${qrSvg}<p class="qr-label">${escapeHtml(profile.qrLabel)}</p></div><div class="rule"></div>`
+      : ''
+  }
+  <p>Configured for Windows / macOS printer spooler.</p>
+  </main></body></html>`;
+}
+
+/** Sends a test slip through the OS / browser print dialog for System Printer mode. */
+export async function printBrowserTestReceipt(settings: PrinterSettings): Promise<void> {
+  await printHtmlViaFrame(buildTestReceiptDocument(settings));
+}
+
+/**
+ * Prints to the configured system printer when `connectionType === 'browser'`,
+ * otherwise sends raw ESC/POS to the paired thermal printer and falls back to the
+ * browser's print dialog via a hidden iframe (the POS tab keeps its cart and open modals).
+ */
+export async function printReceipt(sale: Sale): Promise<'thermal' | 'system' | 'browser'> {
+  const settings = await getPrinterSettings();
+
+  if (settings.connectionType === 'browser') {
+    await printHtmlViaFrame(receiptDocument(sale, settings));
+    return 'system';
+  }
+
+  try {
+    const bytes = generateEscPosReceipt(sale, settings);
+    await printRaw(bytes);
+    return 'thermal';
+  } catch (e) {
+    console.warn('Direct thermal print failed, falling back to browser print:', e);
+  }
+
+  await printHtmlViaFrame(receiptDocument(sale, settings));
   return 'browser';
 }
 

@@ -11,7 +11,7 @@
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://www.gstatic.com https://www.googleapis.com https://firebaseapp.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://*.firebase.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://www.gstatic.com https://www.googleapis.com https://firebaseapp.com; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebasestorage.app https://*.firebase.com http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; worker-src 'self'; frame-ancestors 'none'"
 
 [[headers]]
   for = "/sw.js"

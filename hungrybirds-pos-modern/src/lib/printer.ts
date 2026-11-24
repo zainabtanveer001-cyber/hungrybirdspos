@@ -5,7 +5,7 @@ import { buildQrRaster } from './receiptQr';
 
 export type ReceiptFontSize = 'small' | 'normal' | 'large';
 export type DateFormat = 'locale' | 'iso' | 'dmy' | 'mdy' | 'time';
-export type PrinterConnectionType = 'bluetooth' | 'usb' | 'serial' | 'lan';
+export type PrinterConnectionType = 'bluetooth' | 'usb' | 'serial' | 'lan' | 'browser';
 
 export type BluetoothCharacteristicLike = {
   uuid?: string;
@@ -52,6 +52,7 @@ export interface UsbEndpointLike {
 }
 
 export interface UsbAlternateInterfaceLike {
+  alternateSetting?: number;
   interfaceClass?: number;
   endpoints: UsbEndpointLike[];
 }
@@ -73,6 +74,9 @@ export interface UsbDeviceLike {
   close(): Promise<void>;
   selectConfiguration(configurationValue: number): Promise<void>;
   claimInterface(interfaceNumber: number): Promise<void>;
+  selectAlternateInterface?(interfaceNumber: number, alternateSetting: number): Promise<void>;
+  releaseInterface?(interfaceNumber: number): Promise<void>;
+  clearHalt?(direction: 'in' | 'out', endpointNumber: number): Promise<void>;
   transferOut(endpointNumber: number, data: BufferSource): Promise<{ status?: string }>;
 }
 
@@ -260,6 +264,33 @@ export function getUsbPrinterDevice(): UsbDeviceLike | null {
   return activeUsbDevice;
 }
 
+export function setUsbPrinterDevice(device: UsbDeviceLike | null): void {
+  activeUsbDevice = device;
+}
+
+const USB_ACCESS_DENIED_MESSAGE =
+  'Windows blocked direct WebUSB access because the printer driver is holding the device. Switch to "System / Windows (USB)" mode (recommended — works with your existing driver) or "Serial / COM Port", or bind WinUSB via Zadig.';
+
+export class UsbAccessDeniedError extends Error {
+  readonly code = 'USB_ACCESS_DENIED' as const;
+
+  constructor(message = USB_ACCESS_DENIED_MESSAGE) {
+    super(message);
+    this.name = 'UsbAccessDeniedError';
+  }
+}
+
+export function isUsbAccessDeniedError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') {
+    return typeof err === 'string' && /access denied|unable to claim interface|protected class/i.test(err);
+  }
+  if (err instanceof UsbAccessDeniedError) return true;
+  const candidate = err as { code?: unknown; name?: unknown; message?: unknown };
+  if (candidate.code === 'USB_ACCESS_DENIED' || candidate.name === 'SecurityError') return true;
+  const msg = typeof candidate.message === 'string' ? candidate.message : '';
+  return /access denied|unable to claim interface|protected class|insufficient permissions/i.test(msg);
+}
+
 export function getSerialPrinterPort(): SerialPortLike | null {
   return activeSerialPort;
 }
@@ -380,26 +411,94 @@ export async function disconnectUsbPrinter(): Promise<void> {
   }
 }
 
+const USB_PRINTER_CLASS = 7;
+const USB_TRANSFER_CHUNK = 4096;
+
+interface UsbEndpointCandidate {
+  interfaceNumber: number;
+  alternateSetting: number;
+  endpointNumber: number;
+  priority: number;
+}
+
 async function openAndClaimUsbPrinter(device: UsbDeviceLike): Promise<number> {
+  const openedByUs = !device.opened;
   if (!device.opened) {
-    await device.open();
-  }
-  if (!device.configuration) {
-    await device.selectConfiguration(1);
-  }
-  const interfaces = device.configuration?.interfaces ?? [];
-  for (const iface of interfaces) {
-    const alternates = iface.alternates?.length ? iface.alternates : [iface.alternate];
-    for (const alt of alternates) {
-      const outEndpoint = alt?.endpoints?.find((ep) => ep.direction === 'out' && ep.type === 'bulk')
-        ?? alt?.endpoints?.find((ep) => ep.direction === 'out');
-      if (outEndpoint) {
-        await device.claimInterface(iface.interfaceNumber);
-        return outEndpoint.endpointNumber;
+    try {
+      await device.open();
+    } catch (err) {
+      if (isUsbAccessDeniedError(err)) {
+        throw new UsbAccessDeniedError();
       }
+      throw err;
     }
   }
-  throw new Error('No bulk OUT endpoint found on the selected USB device.');
+
+  try {
+    if (!device.configuration) {
+      await device.selectConfiguration(1);
+    }
+
+    const interfaces = device.configuration?.interfaces ?? [];
+    const candidates: UsbEndpointCandidate[] = [];
+
+    for (const iface of interfaces) {
+      const alternates = (iface.alternates?.length ? iface.alternates : [iface.alternate]).filter(Boolean);
+      for (const alt of alternates) {
+        const outEndpoint =
+          alt.endpoints?.find((ep) => ep.direction === 'out' && ep.type === 'bulk') ??
+          alt.endpoints?.find((ep) => ep.direction === 'out');
+        if (!outEndpoint) continue;
+        // Prefer standard USB Printer Class (0x07) with bulk OUT over auxiliary HID/vendor interfaces
+        const priority =
+          (alt.interfaceClass === USB_PRINTER_CLASS ? 0 : 2) +
+          (outEndpoint.type === 'bulk' ? 0 : 1);
+        candidates.push({
+          interfaceNumber: iface.interfaceNumber,
+          alternateSetting: Number(alt.alternateSetting ?? 0),
+          endpointNumber: outEndpoint.endpointNumber,
+          priority,
+        });
+      }
+    }
+
+    candidates.sort((a, b) => a.priority - b.priority);
+
+    let lastError: unknown = null;
+    for (const candidate of candidates) {
+      try {
+        await device.claimInterface(candidate.interfaceNumber);
+        if (candidate.alternateSetting > 0 && typeof device.selectAlternateInterface === 'function') {
+          await device.selectAlternateInterface(candidate.interfaceNumber, candidate.alternateSetting);
+        }
+        return candidate.endpointNumber;
+      } catch (err) {
+        lastError = err;
+        try {
+          await device.releaseInterface?.(candidate.interfaceNumber);
+        } catch {
+          // Ignore cleanup failure before trying next interface
+        }
+      }
+    }
+
+    if (lastError) {
+      throw isUsbAccessDeniedError(lastError) ? new UsbAccessDeniedError() : lastError;
+    }
+    throw new Error('No bulk OUT endpoint found on the selected USB device.');
+  } catch (err) {
+    if (openedByUs && device.opened) {
+      try {
+        await device.close();
+      } catch {
+        // Ignore close cleanup failure
+      }
+    }
+    if (isUsbAccessDeniedError(err)) {
+      throw new UsbAccessDeniedError();
+    }
+    throw err;
+  }
 }
 
 async function printViaUsb(bytes: Uint8Array): Promise<void> {
@@ -423,9 +522,16 @@ async function printViaUsb(bytes: Uint8Array): Promise<void> {
     throw new Error('No USB printer connected. Click "Connect USB Printer" in Printer Settings.');
   }
   const endpointNumber = await openAndClaimUsbPrinter(activeUsbDevice);
-  const copy = new Uint8Array(bytes.byteLength);
-  copy.set(bytes);
-  await activeUsbDevice.transferOut(endpointNumber, copy);
+  for (let offset = 0; offset < bytes.byteLength; offset += USB_TRANSFER_CHUNK) {
+    const slice = bytes.subarray(offset, offset + USB_TRANSFER_CHUNK);
+    const copy = new Uint8Array(slice.byteLength);
+    copy.set(slice);
+    const result = await activeUsbDevice.transferOut(endpointNumber, copy);
+    if (result?.status === 'stall' && typeof activeUsbDevice.clearHalt === 'function') {
+      await activeUsbDevice.clearHalt('out', endpointNumber);
+      await activeUsbDevice.transferOut(endpointNumber, copy);
+    }
+  }
 }
 
 /**
@@ -654,7 +760,10 @@ async function printViaBluetooth(bytes: Uint8Array): Promise<void> {
 /**
  * Sends raw ESC/POS bytes to the configured thermal printer (Bluetooth, USB, Serial, or LAN/Wi-Fi).
  */
-export async function printRaw(bytes: Uint8Array): Promise<void> {
+export async function printRaw(
+  bytes: Uint8Array,
+  connectionOverride?: PrinterConnectionType,
+): Promise<void> {
   let settings = DEFAULT_PRINTER_SETTINGS;
   try {
     settings = await getPrinterSettings();
@@ -662,8 +771,11 @@ export async function printRaw(bytes: Uint8Array): Promise<void> {
     // Use defaults when IndexedDB is unavailable in unit tests
   }
 
-  const mode = settings.connectionType || 'bluetooth';
+  const mode = connectionOverride ?? settings.connectionType ?? 'bluetooth';
 
+  if (mode === 'browser') {
+    throw new Error('System / Windows Printer mode prints through the browser print dialog.');
+  }
   if (mode === 'usb') {
     await printViaUsb(bytes);
     return;

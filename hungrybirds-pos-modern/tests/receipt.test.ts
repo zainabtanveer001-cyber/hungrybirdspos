@@ -3,6 +3,7 @@ import {
   buildLogoRaster,
   buildQrRaster,
   buildQrSvg,
+  buildTestReceiptDocument,
   formatDate,
   generateEscPosReceipt,
   normalizeQrUrl,
@@ -409,5 +410,198 @@ describe('receipt', () => {
     expect(html).toContain('.inv-banner { background: #fff; color: #000;');
     expect(html).toContain('.grand-bar { display: flex;');
     expect(html).toContain('background: #fff; color: #000; border-top: 2px solid #000;');
+  });
+
+  it('translates WebUSB Access denied errors into UsbAccessDeniedError and closes leaked handles on claim failure', async () => {
+    const { pairUsbPrinter, isUsbAccessDeniedError, UsbAccessDeniedError, disconnectUsbPrinter } = await import(
+      '../src/lib/printer'
+    );
+    const origUsb = Object.getOwnPropertyDescriptor(navigator, 'usb');
+
+    try {
+      let closeCalls = 0;
+      const accessDeniedDev = {
+        vendorId: 0x0483,
+        productId: 0x5743,
+        opened: false,
+        open: async () => {
+          const err = new Error("Failed to execute 'open' on 'USBDevice': Access denied.");
+          err.name = 'SecurityError';
+          throw err;
+        },
+        close: async () => {
+          closeCalls += 1;
+        },
+        selectConfiguration: async () => {},
+        claimInterface: async () => {},
+        transferOut: async () => ({ status: 'ok' }),
+      };
+
+      Object.defineProperty(navigator, 'usb', {
+        configurable: true,
+        value: { requestDevice: async () => accessDeniedDev },
+      });
+
+      let captured: unknown = null;
+      try {
+        await pairUsbPrinter();
+      } catch (err) {
+        captured = err;
+      }
+      expect(captured).toBeInstanceOf(UsbAccessDeniedError);
+      expect(isUsbAccessDeniedError(captured)).toBe(true);
+      expect((captured as Error).message).toContain('System / Windows (USB)');
+      expect(closeCalls).toBe(0);
+
+      // Simulate open() succeeding but Windows rejecting claimInterface() -> must close opened handle cleanly
+      let leakedCloseCalls = 0;
+      const claimDeniedDev = {
+        vendorId: 0x0483,
+        productId: 0x5743,
+        opened: false,
+        configuration: {
+          interfaces: [
+            {
+              interfaceNumber: 0,
+              alternate: {
+                interfaceClass: 7,
+                endpoints: [{ endpointNumber: 1, direction: 'out' as const, type: 'bulk' as const }],
+              },
+              alternates: [],
+            },
+          ],
+        },
+        open: async () => {
+          claimDeniedDev.opened = true;
+        },
+        close: async () => {
+          claimDeniedDev.opened = false;
+          leakedCloseCalls += 1;
+        },
+        selectConfiguration: async () => {},
+        claimInterface: async () => {
+          throw new Error('Unable to claim interface.');
+        },
+        transferOut: async () => ({ status: 'ok' }),
+      };
+
+      Object.defineProperty(navigator, 'usb', {
+        configurable: true,
+        value: { requestDevice: async () => claimDeniedDev },
+      });
+
+      let claimErr: unknown = null;
+      try {
+        await pairUsbPrinter();
+      } catch (err) {
+        claimErr = err;
+      }
+      expect(claimErr).toBeInstanceOf(UsbAccessDeniedError);
+      expect(leakedCloseCalls).toBe(1);
+    } finally {
+      await disconnectUsbPrinter();
+      if (origUsb) Object.defineProperty(navigator, 'usb', origUsb);
+      else delete (navigator as { usb?: unknown }).usb;
+    }
+  });
+
+  it('claims Printer Class (0x07) interface on composite USB printers, chunks 4KB transfers, and clears endpoint stalls', async () => {
+    const { pairUsbPrinter, printRaw, getUsbPrinterDevice, disconnectUsbPrinter } = await import('../src/lib/printer');
+    const origUsb = Object.getOwnPropertyDescriptor(navigator, 'usb');
+
+    try {
+      const claimed: number[] = [];
+      const selectedAlt: Array<[number, number]> = [];
+      const clearHalts: Array<[string, number]> = [];
+      const transferredSizes: number[] = [];
+      let stallOnce = true;
+
+      const compositeDev = {
+        productName: 'XP-80 Composite USB',
+        vendorId: 0x0416,
+        productId: 0x5011,
+        opened: false,
+        configuration: {
+          interfaces: [
+            {
+              interfaceNumber: 0,
+              alternate: {
+                alternateSetting: 0,
+                interfaceClass: 3, // HID interface claimed by OS
+                endpoints: [{ endpointNumber: 1, direction: 'out' as const, type: 'interrupt' as const }],
+              },
+              alternates: [],
+            },
+            {
+              interfaceNumber: 1,
+              alternate: {
+                alternateSetting: 1,
+                interfaceClass: 7, // USB Printer Class
+                endpoints: [{ endpointNumber: 2, direction: 'out' as const, type: 'bulk' as const }],
+              },
+              alternates: [],
+            },
+          ],
+        },
+        open: async () => {
+          compositeDev.opened = true;
+        },
+        close: async () => {
+          compositeDev.opened = false;
+        },
+        selectConfiguration: async () => {},
+        claimInterface: async (ifaceNum: number) => {
+          if (ifaceNum === 0) throw new Error('Unable to claim interface.');
+          claimed.push(ifaceNum);
+        },
+        selectAlternateInterface: async (ifaceNum: number, alt: number) => {
+          selectedAlt.push([ifaceNum, alt]);
+        },
+        clearHalt: async (dir: 'in' | 'out', ep: number) => {
+          clearHalts.push([dir, ep]);
+        },
+        transferOut: async (_ep: number, data: BufferSource) => {
+          if (stallOnce) {
+            stallOnce = false;
+            return { status: 'stall' };
+          }
+          transferredSizes.push((data as ArrayBufferView).byteLength);
+          return { status: 'ok' };
+        },
+      };
+
+      Object.defineProperty(navigator, 'usb', {
+        configurable: true,
+        value: { requestDevice: async () => compositeDev },
+      });
+
+      const paired = await pairUsbPrinter();
+      expect(paired.productName).toBe('XP-80 Composite USB');
+      expect(getUsbPrinterDevice()).toBe(compositeDev);
+      expect(claimed).toEqual([1]);
+      expect(selectedAlt).toEqual([[1, 1]]);
+
+      await printRaw(new Uint8Array(10000).fill(0x55), 'usb');
+      expect(clearHalts).toEqual([['out', 2]]);
+      expect(transferredSizes).toEqual([4096, 4096, 1808]);
+    } finally {
+      await disconnectUsbPrinter();
+      if (origUsb) Object.defineProperty(navigator, 'usb', origUsb);
+      else delete (navigator as { usb?: unknown }).usb;
+    }
+  });
+
+  it('builds a clean white-background HTML test slip for System / Windows Printer mode', () => {
+    const html = buildTestReceiptDocument({
+      ...settings,
+      connectionType: 'browser',
+      qrUrl: 'https://maps.app.goo.gl/abc123?g_st=aw',
+    });
+
+    expect(html).toContain('PRINTER TEST SLIP');
+    expect(html).toContain('SYSTEM PRINTER');
+    expect(html).toContain('<img src="data:image/png;base64,');
+    expect(html).toContain('<svg ');
+    expect(html).not.toContain('background: #000');
   });
 });
