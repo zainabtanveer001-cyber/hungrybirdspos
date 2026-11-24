@@ -262,3 +262,66 @@ Evidence: Live deploy `6cd81b0` reporting `Firestore 400`; verified in `tests/sy
 Environment: `6cd81b0` / `main`.
 Status: verified (fixed in `9f96f89` — `sync.ts`, `syncMap.ts`, `tests/sync.test.ts`, `tests/syncMap.test.ts`)
 ```
+
+---
+
+```
+BUG-017 [S1 high]
+Title: Cash refunds are not deducted from `netCash` or `expectedDrawerCash` in `buildShiftReport()`, causing false Blind Cash Close shortages, while `paidRatio()` misprices discounted delivery and `Rs 0` comped orders
+Steps to reproduce:
+  1. Complete a Cash sale, refund an item out of the drawer via `RefundModal`, and run Blind Cash Close (`shift.ts`).
+  2. Complete a Delivery order with an order discount where delivery fee pushes `sale.total >= gross`, or a `Rs 0` 100%-discounted order, and open `RefundModal`.
+Expected vs actual:
+  Expected: Refunds deduct from `netCash`, `expectedDrawerCash`, `cardCollected`, and `onlineCollected` by tender method; `paidRatio()` prorates by `(gross - discountAmount - loyaltyDiscount) / gross` (returning `0` on `Rs 0` comped sales).
+  Actual: `expectedDrawerCash` ignored all refunds; `paidRatio()` returned `1` whenever `total >= gross` or `total === 0`.
+Evidence: `src/lib/shift.ts`, `src/lib/refunds.ts`, `src/components/RefundModal.tsx`; verified in `tests/shift.test.ts` (`4` tests) and `tests/refunds.test.ts` (`7` tests).
+Status: verified (fixed in `shift.ts`, `refunds.ts`, `RefundModal.tsx`, `db/types.ts`)
+```
+
+---
+
+```
+BUG-018 [S1 high]
+Title: `restoreInventory()` double-restores stock when voiding or reopening a partially refunded sale, and voiding/reopening/refunding never reverses customer CRM loyalty points or spend
+Steps to reproduce:
+  1. Partially refund 2 of 3 units on a sale (ingredients return to stock), then Void (`returnStock: true`) or `Edit` (re-open) the sale.
+  2. Void, refund, or re-open and re-checkout a sale tied to a CRM phone number.
+Expected vs actual:
+  Expected: `restoreInventory()` returns only `qty - refundedQty` ingredients and modifiers (`excludeRefunded = true`); `onReopen` loads unrefunded quantities into the cart; `adjustCustomerForRefund` and `reverseCustomerSale` telescope `totalOrders`, `totalSpent`, and `loyaltyPoints` cleanly.
+  Actual: `restoreInventory()` restored full `qty`, `onReopen` reloaded refunded units, and `db.customers` points/spend remained inflated.
+Evidence: `src/lib/sales.ts`, `src/lib/customers.ts`, `src/components/SalesHistoryModal.tsx`, `src/App.tsx`; verified in `tests/salesIntegrity.test.ts` (`2` tests).
+Status: verified (fixed in `sales.ts`, `customers.ts`, `refunds.ts`, `SalesHistoryModal.tsx`, `App.tsx`)
+```
+
+---
+
+```
+BUG-019 [S2 medium]
+Title: Website order acceptance drops delivery fee/discount and loses its `onlineOrder` link when held; logout leaves customer/discount state in cart; non-owners are locked out of setting fresh opening cash; `paySalary()` permits duplicate monthly payouts
+Steps to reproduce:
+  1. Accept a discounted/delivery website order, hold it, then resume and check out.
+  2. Switch users on the same tab via `Logout` after selecting a customer/discount.
+  3. Close a shift as Cashier/Manager (deleting `shiftOpeningCash`) and attempt to set next shift's float.
+  4. Double-click or concurrently call `paySalary()` for the same employee and period.
+Expected vs actual:
+  Expected: `deriveOnlineOrderCharges()` preserves delivery fee and discounts, `HeldOrder` retains `onlineOrderId`/`onlineOrderCloudId`, `await closeOnlineOrder(saleId)` logs failures cleanly; logout runs `resetOrder()`; Manager/Cashier can set opening cash when `existingFloat === 0` (PIN-gated only when overriding `> 0`); `paySalary()` rejects duplicate `(staffId, year, month)` payouts inside the transaction.
+  Actual: Website order fees/discounts and hold links were lost, logout left customer PII and charges in state, `Opening cash` was hidden for Managers/Cashiers, and `paySalary()` lacked a duplicate guard.
+Evidence: `src/lib/onlineOrders.ts`, `src/lib/held.ts`, `src/lib/staff.ts`, `src/components/Sidebar.tsx`, `src/components/OpeningCashModal.tsx`, `src/App.tsx`; verified in `tests/onlineOrders.test.ts` (`4` tests) and `tests/payroll.test.ts` (`4` tests).
+Status: verified (fixed)
+```
+
+---
+
+```
+BUG-020 [S3 low]
+Title: Sidebar KDS badge ignores active kitchen sales tickets, `ExpensesModal` week starts on Sunday and undercounts legacy approved rows, and `SuppliersModal`/`StaffModal` use blocking `window.confirm()` dialogs
+Steps to reproduce:
+  1. Complete a dine-in sale and inspect the Sidebar `Kitchen display (KDS)` badge vs inside `KitchenDisplayModal`.
+  2. Filter `ExpensesModal` by `This week` on a Monday or inspect legacy expenses with `status === undefined`.
+  3. Click delete on a supplier or staff member.
+Expected vs actual:
+  Expected: KDS badge matches active held + 4h non-SERVED sales tickets; Expenses week starts on Monday (`analytics.ts`) and uses `isApproved()`; supplier/staff deletion uses non-blocking inline `Confirm`/`Cancel` buttons.
+  Actual: KDS badge showed only `heldCount`, Expenses week started Sunday and checked `e.status === 'APPROVED'`, and delete triggered `window.confirm()`.
+Evidence: `src/components/Sidebar.tsx`, `src/components/ExpensesModal.tsx`, `src/components/SuppliersModal.tsx`, `src/components/StaffModal.tsx`.
+Status: verified (fixed)
+```

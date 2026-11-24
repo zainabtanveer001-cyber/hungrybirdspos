@@ -1,7 +1,7 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 (Build — Slices 9–26 complete; receipt footer contact wording updated to For Delivery Contact)
-- **Active Branch:** `main` (local ahead of `origin/main` with Slice 26)
+- **Current Phase:** Phase 5 Complete (Security & Quality Audit + Bug Remediation across `SEC-01`..`SEC-06` and `BUG-017`..`BUG-020`)
+- **Active Branch:** `main`
 - **Last Updated:** 2026-11-24
 
 ## 1. What Was Done
@@ -59,15 +59,18 @@
   - **Slice 24 (`f011138`):** Resolved Windows WebUSB `Failed to execute 'open' on 'USBDevice': Access denied.` (`src/lib/printer.ts`, `src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`, `vercel.json`, `netlify.toml`, `tests/receipt.test.ts`): added a first-class **`System / Windows (USB)`** (`browser`) connection mode that prints 58mm/80mm receipts and a new `buildTestReceiptDocument()` / `printBrowserTestReceipt()` test slip directly through the installed OS printer spooler without failing with `"Printer unavailable"`; added `UsbAccessDeniedError` / `isUsbAccessDeniedError()` classification, Printer Class (`0x07`) prioritized interface claiming, alternate-interface selection, open-handle leak cleanup, `4096`-byte `transferOut` chunking, and `clearHalt()` stall recovery; added an inline amber recovery card on USB `Access denied` offering 1-click switch to `System / Windows (USB)` or `Serial / COM Port` plus Zadig/udev instructions; and allowed loopback `127.0.0.1` / `localhost` targets in CSP `connect-src`. Expanded `tests/receipt.test.ts` (17 tests).
   - **Slice 25 (`e13a657`):** Made every word on receipts bold for maximum thermal legibility (`src/lib/receipt.ts`, `src/lib/printer.ts`, `src/components/PrinterSettingsModal.tsx`, `tests/receipt.test.ts`): enabled `ESC E 1` (`encoder.bold(true)`) across the entire `generateEscPosReceipt` and `printTestReceipt` output (re-asserted after `cut()` and `rasterImage()` calls with zero `bold(false)` resets), set `font-weight: 700` globally on `*` and `body` in `receiptDocument` and `buildTestReceiptDocument`, updated `LiveReceiptPreview` to `font-bold text-[#000000]`, and verified `ESC E 1` / `font-weight: 700` assertions in `tests/receipt.test.ts`.
   - **Slice 26 (`e61dc44`):** Replaced `"Order & Support:"` with `"For Delivery Contact:"` across ESC/POS receipts (with `wrapWords` so 58mm receipts wrap cleanly without splitting the phone number), HTML print receipts (`receiptDocument`), and `LiveReceiptPreview` (`src/lib/receipt.ts`, `src/components/PrinterSettingsModal.tsx`, `tests/receipt.test.ts`).
+- **Security Hardening & Bug Remediation (`SEC-01`..`SEC-06`, `BUG-017`..`BUG-020`):**
+  - Hardened `firestore.rules` (`onlineOrders` IDOR/create validation, `coupons` one-way/monotonic updates, role-scoped `isAdmin`/`isManagerOrOwner`/`isCashierOrAbove` helpers with `active != false`, and `setting_ownerPinHash` owner-only writes).
+  - Hardened `auth.ts`, `staffAccounts.ts`, `backup.ts`, `export-data.html`, `vercel.json`, and `netlify.toml` (deferred `rememberToken()` until verified, added `verifyStoredSession()` on boot, Auth rollback on failed staff creation, backup secret redaction + import row sanitization, DOM-safe `export-data.html`, and stripped `'unsafe-eval'`/`cdnjs`/`unpkg` from CSP).
+  - Fixed financial, inventory, CRM, and workflow bugs across `shift.ts` (tender-allocated cash/card/online refund deductions on `expectedDrawerCash`), `refunds.ts` (`paidRatio` on discounted delivery & `Rs 0` comped orders + refund tender selector in `RefundModal.tsx`), `sales.ts`/`customers.ts` (`restoreInventory` unrefunded-only restore + CRM spend/points clawback and reversal), `onlineOrders.ts`/`held.ts`/`App.tsx` (delivery charge/discount preservation, held online-order link, full `resetOrder()` on logout), `staff.ts` (duplicate monthly payroll guard), `Sidebar.tsx` (KDS count & Cashier/Manager opening cash access when unset), `ExpensesModal.tsx` (Monday week + `isApproved`), and `SuppliersModal.tsx`/`StaffModal.tsx` (inline delete confirmations).
+  - Added 11 new regression tests across `auth.test.ts`, `backup.test.ts`, `refunds.test.ts`, `shift.test.ts`, `payroll.test.ts`, `onlineOrders.test.ts`, and `salesIntegrity.test.ts`.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **18 passed (18)** test files, **125 passed (125)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `772.75 kB` minified / `226.16 kB` gzip, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 91 files).
+- `cd hungrybirds-pos-modern && npm test` → **19 passed (19)** test files, **136 passed (136)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `780.55 kB` minified / `228.35 kB` gzip, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 92 files).
 - Repo root `npm test` → **4 passed (4)** test files, **60 passed (60)** tests; `npm run lint` → **EXIT 0** (`0 errors`, `3` ignored-file warnings).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities** (prior check).
-- `npm test` (root) → **4 passed (4)** test files, **60 passed (60)** tests.
-- `npm run lint` (root) → **EXIT 0** (`0 errors`, `3` pre-existing warnings).
 - **Live Browser QA:** Prior Slice 8 pass (`1366×768` & `390×844`) had **0** console errors; post-Slice 11 multi-width check (`375px` / `768px` / `1280px`) is pending Chrome remote debugging.
 
 ## 3. Known Gaps & Deferred Items
@@ -79,7 +82,7 @@
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 125 Vitest unit & regression tests
+npm test          # Run 136 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173
@@ -92,4 +95,4 @@ npm run lint      # Run ESLint on legacy root files
 
 ## 5. Next Steps / Blockers
 - **Blockers:** Chrome remote debugging (`DevToolsActivePort`) was unavailable for fresh `375px` / `768px` / `1280px` visual verification.
-- **Next:** Run live multi-width browser QA (`375px` / `768px` / `1280px`) once Chrome remote debugging is active, push to `zainabtanveer001-cyber/hungrybirdspos` when requested, or run `/ship` (Phase 6 Release).
+- **Next:** Publish updated `firestore.rules` to the Firebase Console (`firebase deploy --only firestore:rules`), push to `zainabtanveer001-cyber/hungrybirdspos` when requested, or run `/ship` (Phase 6 Release).

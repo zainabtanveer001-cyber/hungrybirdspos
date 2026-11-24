@@ -101,3 +101,22 @@
   - `cd hungrybirds-pos-modern && npm audit` reports **0 vulnerabilities** across 85 packages.
   - Root `package.json` (used only for legacy root unit tests and ESLint on legacy `app.js`/`db.js`/`sw.js`) depends on deprecated `eslint@8.57.1` / `glob@7.2.3`.
 - **Fix & Verification:** Fixed root `vitest.config.js` (`environment: 'node'`), `package.json`, and `.eslintrc.js` so all 60 legacy tests and ESLint run cleanly on Node 22.14. **Status: FIXED & VERIFIED.**
+
+---
+
+## 3. Follow-Up Security & Code Audit (2026-11-24, post-Slices 9–26)
+
+Following Slices 9–26, a second full-codebase vulnerability and correctness audit identified 7 security findings (`SEC-01`..`SEC-07`). High and Medium findings (`SEC-01`..`SEC-06`) have been remediated and verified in code; Low architectural finding `SEC-07` (extension of `AUD-005`) remains documented.
+
+| ID | Severity | Area | Status | Notes |
+|----|----------|------|--------|-------|
+| `SEC-01` | High | `/onlineOrders` Firestore IDOR (`allow get`) & unvalidated creates (`firestore.rules:47-67`) | **Fixed (Publish pending)** | Restricted `get` to `isStaff()` or owning `customerUid`; enforced `status == 'PENDING'`, non-empty `items`, and `total >= 0` on customer `create`. Publish `firestore.rules` to Firebase Console. |
+| `SEC-02` | High | `/coupons` coupon reset & global promo disable (`firestore.rules:100-137`) | **Fixed (Publish pending)** | Enforced one-way personal loyalty coupon redemption (`used: false -> true`) and monotonic `usedCount == prev + 1` on global promos (`active` cannot be modified by customers). |
+| `SEC-03` | High | Coarse `isStaff()` Firestore privileges, synced `ownerPinHash`, unverified `sessionStorage` role (`firestore.rules`, `src/lib/auth.ts`, `src/App.tsx`) | **Fixed & Verified** | Split Firestore helpers (`isAdmin`, `isManagerOrOwner`, `isCashierOrAbove`, `isStaff`) with `active != false`; locked `setting_ownerPinHash` writes and `/auditLogs` deletes to `isAdmin()`; added `verifyStoredSession()` on boot (`tests/auth.test.ts`). |
+| `SEC-04` | Medium | Plaintext secrets in `collectBackup()` & unvalidated `importBackup()` (`src/lib/backup.ts`) | **Fixed & Verified** | Redacted `ownerPinHash`, `sync.*`, and `passwordHash` from exports; added `PROTECTED_SETTING_KEYS` filtering & row sanitization (`sanitizeTableRows`) on import (`tests/backup.test.ts`). |
+| `SEC-05` | Medium | Rejected login persisted `hb.syncToken` & non-atomic staff creation (`src/lib/auth.ts`, `src/lib/staffAccounts.ts`) | **Fixed & Verified** | Deferred `rememberToken()` until role & active checks pass (calling `forgetToken()` on failure); rolled back `accounts:delete` on Firestore provisioning failure (`tests/auth.test.ts`). |
+| `SEC-06` | Medium | DOM XSS in `export-data.html` & over-broad CSP `script-src` (`export-data.html`, `vercel.json`, `netlify.toml`) | **Fixed & Verified** | Replaced `listEl.innerHTML` with `document.createElement('li')` + `textContent`; dropped `'unsafe-eval'`, `cdnjs.cloudflare.com`, and `unpkg.com` from `script-src`. |
+| `SEC-07` | Low | Unsalted SHA-256 offline password hashes (`src/lib/auth.ts`, `src/lib/backup.ts`) | **Documented (`AUD-005`)** | Offline fallback design constraint; online logins always defer to Firebase Authentication. |
+
+### Deployment Note
+- **Firestore Rules Publish Required:** `SEC-01`, `SEC-02`, and the server-side rules for `SEC-03` are committed in `firestore.rules` and take effect on live Firebase once deployed via `firebase deploy --only firestore:rules` or pasted in the Firebase Console.
