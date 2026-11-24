@@ -3,6 +3,7 @@ import { Download, Pencil, Printer, RotateCcw, Search, Share2, Trash2 } from 'lu
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { logAudit } from '../lib/audit';
+import { reverseCustomerSale } from '../lib/customers';
 import { restoreInventory } from '../lib/sales';
 import { deleteSale } from '../lib/sync';
 import { formatAmount } from '../lib/format';
@@ -87,11 +88,12 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify, h
 
   async function voidSales(ids: number[]) {
     const voided: Sale[] = [];
-    await db.transaction('rw', db.sales, db.inventory, db.recipes, db.deliveries, async () => {
+    await db.transaction('rw', db.sales, db.inventory, db.recipes, db.deliveries, db.customers, async () => {
       for (const id of ids) {
         const sale = await db.sales.get(id);
         if (!sale) continue;
         if (returnStock) await restoreInventory(sale.items);
+        await reverseCustomerSale(sale);
         await db.sales.delete(id);
         await db.deliveries.where('saleId').equals(id).delete();
         voided.push(sale);

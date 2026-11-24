@@ -1,6 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
-import { upsertCustomer } from './customers';
+import { reverseCustomerSale, upsertCustomer } from './customers';
 import { collectModifierIngredientUsage } from './modifiers';
 import { deleteSale, pushSale, pushStock } from './sync';
 import type { CartItem, OrderType, PaymentDetail, Sale, CustomerInfo } from './db/types';
@@ -147,9 +147,11 @@ export async function recordSale(input: SaleInput): Promise<number> {
   return saleId;
 }
 
-/** Returns recipe- and modifier-linked stock for items being voided or re-opened into the cart. */
+/** Returns remaining unrefunded recipe- and modifier-linked stock for voided or re-opened items. */
 export async function restoreInventory(items: CartItem[]): Promise<void> {
   for (const cartItem of items) {
+    const unrefundedQty = Math.max(0, (Number(cartItem.qty) || 0) - (Number(cartItem.refundedQty) || 0));
+    if (unrefundedQty <= 0) continue;
     const recipes = await db.recipes
       .where('menuItemId')
       .equals(cartItem.menuItemId || cartItem.id)
@@ -158,11 +160,11 @@ export async function restoreInventory(items: CartItem[]): Promise<void> {
       const ingredient = await db.inventory.get(recipe.inventoryId);
       if (!ingredient) continue;
       await db.inventory.update(recipe.inventoryId, {
-        stock: (Number(ingredient.stock) || 0) + recipe.qtyRequired * cartItem.qty,
+        stock: (Number(ingredient.stock) || 0) + recipe.qtyRequired * unrefundedQty,
       });
     }
   }
-  for (const [inventoryId, modQty] of collectModifierIngredientUsage(items, false)) {
+  for (const [inventoryId, modQty] of collectModifierIngredientUsage(items, true)) {
     const ingredient = await db.inventory.get(inventoryId);
     if (!ingredient) continue;
     await db.inventory.update(inventoryId, {
@@ -171,10 +173,11 @@ export async function restoreInventory(items: CartItem[]): Promise<void> {
   }
 }
 
-/** Pulls a completed sale back into the counter cart: restocks it, deletes it, audits it. */
+/** Pulls a completed sale back into the counter cart: restocks remaining qty, reverses CRM, deletes it, audits it. */
 export async function reopenSale(sale: Sale, user: string) {
-  await db.transaction('rw', db.sales, db.inventory, db.recipes, db.deliveries, async () => {
+  await db.transaction('rw', db.sales, db.inventory, db.recipes, db.deliveries, db.customers, async () => {
     await restoreInventory(sale.items);
+    await reverseCustomerSale(sale);
     await db.sales.delete(sale.id!);
     await db.deliveries.where('saleId').equals(sale.id!).delete();
   });

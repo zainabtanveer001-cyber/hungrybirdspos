@@ -52,6 +52,66 @@ function roundTwo(value: number): number {
   return Math.round(clean * 100) / 100;
 }
 
+/**
+ * Breaks a sale's refunded amount down by tender method so shift cash drawer and card/online
+ * totals stay accurate even for split-tender bills or legacy refunds without a `method` field.
+ */
+export function allocateSaleRefundsByMethod(sale: Sale): {
+  cashRefunded: number;
+  cardRefunded: number;
+  onlineRefunded: number;
+} {
+  let cashRefunded = 0;
+  let cardRefunded = 0;
+  let onlineRefunded = 0;
+
+  for (const record of sale.refunds || []) {
+    const amt = Math.max(0, Number(record.amount) || 0);
+    if (amt <= 0) continue;
+    if (record.method === 'Cash') cashRefunded = roundTwo(cashRefunded + amt);
+    else if (record.method === 'Card') cardRefunded = roundTwo(cardRefunded + amt);
+    else if (record.method === 'Online') onlineRefunded = roundTwo(onlineRefunded + amt);
+  }
+
+  const totalRefunded = Math.max(0, Number(sale.refundedAmount) || 0);
+  const explicitTotal = roundTwo(cashRefunded + cardRefunded + onlineRefunded);
+  const unattributed = roundTwo(Math.max(0, totalRefunded - explicitTotal));
+  if (unattributed <= 0) {
+    return { cashRefunded, cardRefunded, onlineRefunded };
+  }
+
+  let cashPaid = 0;
+  let cardPaid = 0;
+  let onlinePaid = 0;
+  for (const payment of sale.payments || []) {
+    const amt = Math.max(0, Number(payment.amount) || 0);
+    if (payment.method === 'Card') cardPaid += amt;
+    else if (payment.method === 'Online') onlinePaid += amt;
+    else cashPaid += amt;
+  }
+
+  const paidSum = cashPaid + cardPaid + onlinePaid;
+  if (paidSum <= 0) {
+    return { cashRefunded: roundTwo(cashRefunded + unattributed), cardRefunded, onlineRefunded };
+  }
+
+  const cShare = roundTwo((unattributed * cashPaid) / paidSum);
+  const cardShare = roundTwo((unattributed * cardPaid) / paidSum);
+  const onlineShare = roundTwo((unattributed * onlinePaid) / paidSum);
+  const remainder = roundTwo(unattributed - (cShare + cardShare + onlineShare));
+
+  cashRefunded = roundTwo(cashRefunded + cShare);
+  cardRefunded = roundTwo(cardRefunded + cardShare);
+  onlineRefunded = roundTwo(onlineRefunded + onlineShare);
+  if (remainder !== 0) {
+    if (cardPaid >= cashPaid && cardPaid >= onlinePaid) cardRefunded = roundTwo(cardRefunded + remainder);
+    else if (onlinePaid >= cashPaid && onlinePaid >= cardPaid) onlineRefunded = roundTwo(onlineRefunded + remainder);
+    else cashRefunded = roundTwo(cashRefunded + remainder);
+  }
+
+  return { cashRefunded, cardRefunded, onlineRefunded };
+}
+
 /** Sums PKR note counts across denominations plus optional loose coins. */
 export function computeDenominationTotal(
   counts: Record<string, number>,
@@ -381,18 +441,32 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     }, 0),
   );
   const changeGiven = sum((s) => Number(s.totalChange) || 0);
-  const cardCollected = sum((sale) =>
+  const rawCardCollected = sum((sale) =>
     (sale.payments || []).reduce((total, payment) => {
       if (payment.method !== 'Card') return total;
       return total + (Number(payment.amount) || 0);
     }, 0),
   );
-  const onlineCollected = sum((sale) =>
+  const rawOnlineCollected = sum((sale) =>
     (sale.payments || []).reduce((total, payment) => {
       if (payment.method !== 'Online') return total;
       return total + (Number(payment.amount) || 0);
     }, 0),
   );
+
+  let cashRefunded = 0;
+  let cardRefunded = 0;
+  let onlineRefunded = 0;
+  for (const sale of shiftSales) {
+    const allocated = allocateSaleRefundsByMethod(sale);
+    cashRefunded = roundTwo(cashRefunded + allocated.cashRefunded);
+    cardRefunded = roundTwo(cardRefunded + allocated.cardRefunded);
+    onlineRefunded = roundTwo(onlineRefunded + allocated.onlineRefunded);
+  }
+  const netCash = roundTwo(cashCollected - changeGiven - cashRefunded);
+  const cardCollected = roundTwo(Math.max(0, rawCardCollected - cardRefunded));
+  const onlineCollected = roundTwo(Math.max(0, rawOnlineCollected - onlineRefunded));
+  const expectedDrawerCash = roundTwo(openingCash + netCash);
 
   const staffDiscounts = new Map<string, number>();
   let totalDiscounts = 0;
@@ -427,10 +501,10 @@ export async function buildShiftReport(): Promise<ShiftReport> {
     categorySales: computeCategoryBreakdown(shiftSales, menu, categories),
     cashCollected,
     changeGiven,
-    netCash: cashCollected - changeGiven,
+    netCash,
     cardCollected,
     onlineCollected,
-    expectedDrawerCash: openingCash + cashCollected - changeGiven,
+    expectedDrawerCash,
     discountsByStaff: [...staffDiscounts].map(([user, amount]) => ({ user, amount })),
     totalDiscounts,
     discountedOrderCount,

@@ -6,6 +6,7 @@ import { logAudit } from '../lib/audit';
 import { formatAmount } from '../lib/format';
 import { downloadCsv, datedFilename } from '../lib/export';
 import { normalizeQuantity } from '../lib/inventory';
+import { isApproved } from '../lib/suppliers';
 import { Modal } from './Modal';
 import type { Expense, ExpenseStatus, UserRole } from '../lib/db/types';
 
@@ -32,7 +33,10 @@ const BLANK: Draft = { description: '', amount: '', category: CATEGORIES[0], pay
 function rangeStart(filter: string): number {
   const now = new Date();
   if (filter === 'today') return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  if (filter === 'week') return new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).getTime();
+  if (filter === 'week') {
+    const mondayOffset = (now.getDay() + 6) % 7;
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset).getTime();
+  }
   if (filter === 'month') return new Date(now.getFullYear(), now.getMonth(), 1).getTime();
   return 0;
 }
@@ -58,7 +62,7 @@ export function ExpensesModal({ role, username, onClose, notify }: {
 
   const totals = useMemo(
     () => ({
-      approved: visible.filter((e) => e.status === 'APPROVED').reduce((s, e) => s + (Number(e.amount) || 0), 0),
+      approved: visible.filter((e) => isApproved(e)).reduce((s, e) => s + (Number(e.amount) || 0), 0),
       pending: visible.filter((e) => e.status === 'PENDING').reduce((s, e) => s + (Number(e.amount) || 0), 0),
     }),
     [visible],

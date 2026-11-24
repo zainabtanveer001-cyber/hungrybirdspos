@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isActive, nextStatus } from '../src/lib/onlineOrders';
+import { deriveOnlineOrderCharges, isActive, nextStatus } from '../src/lib/onlineOrders';
 import type { OnlineOrder, OnlineOrderStatus } from '../src/lib/db/types';
 
 function order(status: OnlineOrderStatus, orderType: OnlineOrder['orderType']): OnlineOrder {
@@ -32,5 +32,32 @@ describe('online order lifecycle', () => {
     expect(isActive(order('OUT_FOR_DELIVERY', 'DELIVERY'))).toBe(true);
     expect(isActive(order('COMPLETED', 'DELIVERY'))).toBe(false);
     expect(isActive(order('REJECTED', 'DELIVERY'))).toBe(false);
+  });
+
+  it('preserves delivery fee and discount when loading an online order into POS charges', () => {
+    const items = [{ id: 'm1', menuItemId: 'm1', name: 'Zinger', price: 500, qty: 2 }];
+    const deliveryWithDiscount: OnlineOrder = {
+      ...order('PENDING', 'DELIVERY'),
+      items,
+      discountPercent: 10,
+      deliveryCharge: 150,
+      total: 1050,
+    };
+    expect(deriveOnlineOrderCharges(items, deliveryWithDiscount)).toMatchObject({
+      orderType: 'DELIVERY',
+      discountPercent: 10,
+      deliveryCharge: 150,
+    });
+
+    const implicitDeliveryFee: OnlineOrder = {
+      ...order('PENDING', 'DELIVERY'),
+      items,
+      total: 1120,
+    };
+    expect(deriveOnlineOrderCharges(items, implicitDeliveryFee)).toMatchObject({
+      orderType: 'DELIVERY',
+      discountPercent: 0,
+      deliveryCharge: 120,
+    });
   });
 });

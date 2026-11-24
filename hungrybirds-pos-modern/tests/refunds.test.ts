@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeRefund, refundableTotal, remainingQty } from '../src/lib/refunds';
+import { computeRefund, primaryRefundMethod, refundableTotal, remainingQty } from '../src/lib/refunds';
 import type { CartItem, Sale } from '../src/lib/db/types';
 
 function line(name: string, price: number, qty: number, refundedQty = 0): CartItem {
@@ -61,5 +61,33 @@ describe('refunds', () => {
       { index: 0, qty: 2 },
     ]);
     expect(result.amount).toBe(1300);
+  });
+
+  it('prorates discounted delivery orders accurately even when delivery fee lifts total >= gross', () => {
+    const discountedDelivery: Sale = {
+      ...sale([line('Burger', 500, 2)]),
+      orderType: 'DELIVERY',
+      subtotal: 1000,
+      discountPercent: 10,
+      discountAmount: 100,
+      deliveryCharge: 150,
+      total: 1050,
+      payments: [{ method: 'Online', amount: 1050 }],
+    };
+    expect(computeRefund(discountedDelivery, [{ index: 0, qty: 1 }]).amount).toBe(450);
+    expect(refundableTotal(discountedDelivery)).toBe(900);
+    expect(primaryRefundMethod(discountedDelivery)).toBe('Online');
+  });
+
+  it('refunds Rs 0 on 100%-discounted or loyalty-comped orders with total 0', () => {
+    const comped: Sale = {
+      ...sale([line('Burger', 500, 2)]),
+      subtotal: 1000,
+      discountPercent: 100,
+      discountAmount: 1000,
+      total: 0,
+    };
+    expect(computeRefund(comped, [{ index: 0, qty: 1 }]).amount).toBe(0);
+    expect(refundableTotal(comped)).toBe(0);
   });
 });

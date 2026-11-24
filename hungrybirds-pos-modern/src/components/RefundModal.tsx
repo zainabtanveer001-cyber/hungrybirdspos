@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { formatAmount } from '../lib/format';
-import { computeRefund, recordRefund, remainingQty } from '../lib/refunds';
+import { computeRefund, primaryRefundMethod, recordRefund, remainingQty } from '../lib/refunds';
 import type { RefundLine } from '../lib/refunds';
 import { Modal } from './Modal';
-import type { Sale } from '../lib/db/types';
+import type { PaymentMethod, Sale } from '../lib/db/types';
 
 export function RefundModal({ sale, username, notify, onClose, onDone }: {
   sale: Sale;
@@ -14,6 +14,7 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
   onDone: () => void;
 }) {
   const [qty, setQty] = useState<Record<number, string>>({});
+  const [method, setMethod] = useState<PaymentMethod>(() => primaryRefundMethod(sale));
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -26,7 +27,7 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
   async function submit() {
     setBusy(true);
     try {
-      const result = await recordRefund(sale.id!, lines, reason, username);
+      const result = await recordRefund(sale.id!, lines, reason, username, method);
       notify(
         `${result.status === 'FULL' ? 'Full' : 'Partial'} refund of ${formatAmount(result.amount)} on order #${sale.id}.`,
       );
@@ -114,6 +115,28 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
             );
           })}
         </ul>
+
+        <div className="space-y-1.5">
+          <span className="block text-xs font-medium text-[#273238]">Refund via</span>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Refund payment method">
+            {(['Cash', 'Card', 'Online'] as PaymentMethod[]).map((option) => (
+              <button
+                key={option}
+                type="button"
+                disabled={busy}
+                onClick={() => setMethod(option)}
+                aria-pressed={method === option}
+                className={`h-9 rounded-[8px] text-xs font-semibold border transition ${
+                  method === option
+                    ? 'bg-[#2941e0] text-white border-[#2941e0]'
+                    : 'bg-white text-[#273238] border-[#788991] hover:bg-[#eff6ff]'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label className="block">
           <span className="block text-xs font-medium text-[#273238] mb-1">

@@ -98,6 +98,9 @@ export function cloudOrderToLocal(cloudId: string, data: Record<string, any>): O
     total: Number(data.total) || 0,
     status: (data.status || 'PENDING') as OnlineOrderStatus,
   };
+  if (Number(data.deliveryCharge) > 0) order.deliveryCharge = Number(data.deliveryCharge);
+  if (Number(data.discountPercent) > 0) order.discountPercent = Number(data.discountPercent);
+  if (Number(data.discountAmount) > 0) order.discountAmount = Number(data.discountAmount);
   for (const [local, cloud] of Object.values(CLOUD_TIMESTAMP)) {
     const iso = toIso(data[cloud]);
     if (iso) (order as any)[local] = iso;

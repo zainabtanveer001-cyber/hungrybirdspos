@@ -8,6 +8,7 @@ export async function holdOrder(
   charges: CartCharges,
   customer: CustomerInfo | undefined,
   serverUser: string,
+  onlineRef?: { onlineOrderId?: number; onlineOrderCloudId?: string | null },
 ): Promise<number> {
   const totals = calculateCartTotals(items, charges);
   return (await db.heldOrders.add({
@@ -29,6 +30,8 @@ export async function holdOrder(
     customer,
     serverUser,
     timestamp: new Date().toISOString(),
+    ...(onlineRef?.onlineOrderId !== undefined ? { onlineOrderId: onlineRef.onlineOrderId } : {}),
+    ...(onlineRef?.onlineOrderCloudId !== undefined ? { onlineOrderCloudId: onlineRef.onlineOrderCloudId } : {}),
   })) as number;
 }
 
@@ -37,6 +40,8 @@ export async function readHeldOrder(id: number): Promise<{
   items: CartItem[];
   charges: CartCharges;
   customer: CustomerInfo | undefined;
+  onlineOrderId?: number;
+  onlineOrderCloudId?: string | null;
 } | null> {
   const order = await db.heldOrders.get(id);
   if (!order) return null;
@@ -44,6 +49,8 @@ export async function readHeldOrder(id: number): Promise<{
   return {
     items: order.items,
     customer: order.customer,
+    onlineOrderId: order.onlineOrderId,
+    onlineOrderCloudId: order.onlineOrderCloudId,
     charges: {
       orderType: order.orderType || 'DINE_IN',
       tableNumber: order.tableNumber,

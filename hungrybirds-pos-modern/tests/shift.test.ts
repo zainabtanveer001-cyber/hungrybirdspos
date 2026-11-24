@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/lib/db';
 import {
+  allocateSaleRefundsByMethod,
   buildShiftReport,
   closeShift,
   CLOSED_SHIFT_REPORTS_KEY,
@@ -110,5 +111,83 @@ describe('blind cash drawer & payment-mode shift helpers', () => {
     const savedList = await getClosedShiftReports();
     expect(savedList).toHaveLength(1);
     expect(savedList[0].closedBy).toBe('cashier1');
+  });
+
+  it('subtracts cash, card, and online refunds from expectedDrawerCash and tender totals', async () => {
+    const settingsMap = new Map<string, any>([
+      ['shiftStartTime', { key: 'shiftStartTime', value: '2026-11-21T08:00:00.000Z' }],
+      ['shiftOpeningCash', { key: 'shiftOpeningCash', value: '2000' }],
+    ]);
+
+    const mockSales = [
+      {
+        id: 1,
+        timestamp: '2026-11-21T10:00:00.000Z',
+        orderType: 'DINE_IN',
+        serverUser: 'cashier1',
+        items: [],
+        subtotal: 1500,
+        discountPercent: 0,
+        discountAmount: 0,
+        deliveryCharge: 0,
+        packingCharge: 0,
+        taxPercent: 0,
+        taxAmount: 0,
+        otherCharge: 0,
+        total: 1500,
+        payments: [{ method: 'Cash', amount: 1500, cashGiven: 2000, change: 500 }],
+        totalReceived: 2000,
+        totalChange: 500,
+        refundedAmount: 650,
+        refundStatus: 'PARTIAL',
+        refunds: [{ timestamp: '2026-11-21T10:15:00.000Z', by: 'manager1', reason: 'Wrong item', amount: 650, method: 'Cash', items: [] }],
+      },
+      {
+        id: 2,
+        timestamp: '2026-11-21T11:00:00.000Z',
+        orderType: 'TAKEAWAY',
+        serverUser: 'cashier1',
+        items: [],
+        subtotal: 1000,
+        discountPercent: 0,
+        discountAmount: 0,
+        deliveryCharge: 0,
+        packingCharge: 0,
+        taxPercent: 0,
+        taxAmount: 0,
+        otherCharge: 0,
+        total: 1000,
+        payments: [{ method: 'Card', amount: 600 }, { method: 'Online', amount: 400 }],
+        totalReceived: 1000,
+        totalChange: 0,
+        refundedAmount: 500,
+        refundStatus: 'PARTIAL',
+        // Legacy refund without `method` falls back proportionally across Card (60%) / Online (40%).
+        refunds: [{ timestamp: '2026-11-21T11:10:00.000Z', by: 'owner', reason: 'Cancelled half', amount: 500, items: [] }],
+      },
+    ];
+
+    vi.spyOn(db.settings, 'get').mockImplementation(async (k: string) => settingsMap.get(k));
+    vi.spyOn(db.sales, 'toArray').mockResolvedValue(mockSales as any);
+    vi.spyOn(db.inventory, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.recipes, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.expenses, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.menu, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.categories, 'toArray').mockResolvedValue([]);
+
+    expect(allocateSaleRefundsByMethod(mockSales[1] as any)).toEqual({
+      cashRefunded: 0,
+      cardRefunded: 300,
+      onlineRefunded: 200,
+    });
+
+    const report = await buildShiftReport();
+    // Net cash = (2000 cashGiven - 500 changeGiven) - 650 cashRefunded = 850
+    expect(report.netCash).toBe(850);
+    // Expected drawer = 2000 opening + 850 net cash = 2850 (no false 650 shortage)
+    expect(report.expectedDrawerCash).toBe(2850);
+    expect(report.cardCollected).toBe(300);
+    expect(report.onlineCollected).toBe(200);
+    expect(report.totalSales).toBe(1350);
   });
 });

@@ -9,7 +9,13 @@ import type { CartItem, CustomerInfo } from '../lib/db/types';
 
 export function HeldOrdersModal({ onClose, onRestore }: {
   onClose: () => void;
-  onRestore: (order: { items: CartItem[]; charges: CartCharges; customer?: CustomerInfo }) => void;
+  onRestore: (order: {
+    items: CartItem[];
+    charges: CartCharges;
+    customer?: CustomerInfo;
+    onlineOrderId?: number;
+    onlineOrderCloudId?: string | null;
+  }) => void;
 }) {
   const orders = useLive(() => db.heldOrders.orderBy('id').reverse().toArray(), []) ?? [];
   const [confirming, setConfirming] = useState<number | null>(null);

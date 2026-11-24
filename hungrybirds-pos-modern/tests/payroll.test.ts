@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { payrollRows } from '../src/lib/staff';
+import { describe, it, expect, vi } from 'vitest';
+import { db } from '../src/lib/db';
+import { paySalary, payrollRows } from '../src/lib/staff';
 import type { AdvancePayment, SalaryPayment, StaffMember } from '../src/lib/db/types';
 
 const member = (id: number, salary: number, status: 'ACTIVE' | 'INACTIVE' = 'ACTIVE'): StaffMember => ({
@@ -44,5 +45,29 @@ describe('payrollRows', () => {
       '2026-10',
     );
     expect(row).toMatchObject({ advances: 5_000, net: 40_000 });
+  });
+
+  it('prevents paying the same employee twice in the same month', async () => {
+    const payments: SalaryPayment[] = [];
+    vi.spyOn(db, 'transaction').mockImplementation((async (...args: any[]) => {
+      const fn = args[args.length - 1];
+      return fn();
+    }) as any);
+    vi.spyOn(db.advancePayments, 'toArray').mockResolvedValue([]);
+    vi.spyOn(db.salaryPayments, 'add').mockImplementation(async (row: any) => {
+      payments.push(row);
+      return payments.length;
+    });
+    vi.spyOn(db.salaryPayments, 'where').mockImplementation((({ staffId }: any) => ({
+      and: (predicate: (p: SalaryPayment) => boolean) => ({
+        first: async () => payments.find((p) => p.staffId === staffId && predicate(p)),
+      }),
+    })) as any);
+    vi.spyOn(db.auditLogs, 'add').mockResolvedValue(1);
+
+    const row = payrollRows([member(1, 50_000)], [], payments, '2026-10')[0];
+    await paySalary(row, '2026-10', 'owner');
+    await expect(paySalary(row, '2026-10', 'owner')).rejects.toThrow(/already been paid/);
+    vi.restoreAllMocks();
   });
 });

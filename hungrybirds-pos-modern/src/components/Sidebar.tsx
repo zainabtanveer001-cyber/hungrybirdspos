@@ -49,6 +49,16 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const heldCount = useLive(() => db.heldOrders.count(), []) ?? 0;
+  const kdsCount = useLive(async () => {
+    const cutoff = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
+    const [held, recent] = await Promise.all([
+      db.heldOrders.toArray(),
+      db.sales.where('timestamp').above(cutoff).toArray(),
+    ]);
+    const activeHeld = held.filter((h) => (h.kitchenStatus || 'PREPARING') !== 'SERVED').length;
+    const activeSales = recent.filter((s) => !s.refundStatus && (s.kitchenStatus || 'PREPARING') !== 'SERVED').length;
+    return activeHeld + activeSales;
+  }, []) ?? 0;
   const pendingDeliveries = useLive(() => db.deliveries.where('status').notEqual('COMPLETED').count(), []) ?? 0;
   const pendingOnline = useLive(() => db.onlineOrders.where('status').equals('PENDING').count(), []) ?? 0;
 
@@ -57,7 +67,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
       title: 'Orders',
       items: [
         { label: 'Counter & menu', icon: LayoutGrid },
-        { label: 'Kitchen display (KDS)', icon: ChefHat, badge: heldCount, onClick: onOpenKds },
+        { label: 'Kitchen display (KDS)', icon: ChefHat, badge: kdsCount, onClick: onOpenKds },
         { label: 'Online orders', icon: Globe, badge: pendingOnline, onClick: onOpenOnlineOrders },
         { label: 'Held orders', icon: Archive, badge: heldCount, onClick: onOpenHeldOrders },
         { label: 'Deliveries', icon: Bike, badge: pendingDeliveries, onClick: onOpenDeliveries },
@@ -78,7 +88,7 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
         { label: 'Suppliers', icon: Truck, roles: ['OWNER', 'MANAGER'], onClick: onOpenSuppliers },
         { label: 'Expenses', icon: Receipt, roles: ['OWNER', 'MANAGER'], onClick: onOpenExpenses },
         { label: 'Staff management', icon: UserCog, roles: ['OWNER', 'MANAGER'], onClick: onOpenStaff },
-        { label: 'Opening cash', icon: Wallet, roles: ['OWNER'], onClick: onOpenOpeningCash },
+        { label: 'Opening cash', icon: Wallet, roles: ['OWNER', 'MANAGER', 'CASHIER'], onClick: onOpenOpeningCash },
         { label: 'Blind cash close', icon: EyeOff, roles: ['CASHIER', 'MANAGER', 'OWNER'], onClick: onOpenBlindClose },
         { label: 'Shift summary', icon: Clock, roles: ['OWNER', 'MANAGER'], onClick: onOpenShiftSummary },
         { label: 'Printer settings', icon: Printer, onClick: onOpenPrinter },

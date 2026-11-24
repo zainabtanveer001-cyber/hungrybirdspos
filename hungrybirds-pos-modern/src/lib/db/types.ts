@@ -30,6 +30,7 @@ export interface RefundRecord {
   by: string;
   reason: string;
   amount: number;
+  method?: PaymentMethod;
   items: CartItem[];
 }
 
@@ -78,6 +79,8 @@ export interface HeldOrder {
   total: number;
   customer?: CustomerInfo;
   note?: string;
+  onlineOrderId?: number;
+  onlineOrderCloudId?: string | null;
 }
 
 export interface CustomerInfo {
@@ -168,6 +171,9 @@ export interface OnlineOrder {
   customer: CustomerInfo;
   orderType: OrderType;
   items: CartItem[];
+  deliveryCharge?: number;
+  discountPercent?: number;
+  discountAmount?: number;
   total: number;
   status: OnlineOrderStatus;
   note?: string;

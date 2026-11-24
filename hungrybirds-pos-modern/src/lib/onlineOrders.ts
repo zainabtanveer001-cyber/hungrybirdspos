@@ -1,6 +1,8 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { roundAmount } from './format';
 import { pushOrder } from './sync';
+import type { CartCharges } from './cart';
 import type { CartItem, OnlineOrder, OnlineOrderStatus } from './db/types';
 
 /** Lifecycle for delivery orders; takeaway/dine-in stop at COMPLETED. */
@@ -87,4 +89,48 @@ export async function resolveOrderToCart(order: OnlineOrder): Promise<CartItem[]
     });
   }
   return resolved;
+}
+
+/**
+ * Reconstructs CartCharges (orderType, discountPercent, deliveryCharge) from an accepted
+ * website order so loaded POS totals match the customer's quoted order total.
+ */
+export function deriveOnlineOrderCharges(items: CartItem[], order: OnlineOrder): CartCharges {
+  const itemsSubtotal = (items || []).reduce(
+    (sum, line) => sum + (Number(line.price) || 0) * (Number(line.qty) || 0),
+    0,
+  );
+  const orderTotal = Number(order.total) || 0;
+
+  let discountPercent = 0;
+  if (Number(order.discountPercent) > 0) {
+    discountPercent = Math.min(100, Number(order.discountPercent));
+  } else if (Number(order.discountAmount) > 0 && itemsSubtotal > 0) {
+    discountPercent = Math.min(100, roundAmount((Number(order.discountAmount) / itemsSubtotal) * 100));
+  }
+
+  const discountedItems = itemsSubtotal * (1 - discountPercent / 100);
+  let deliveryCharge = 0;
+  if (order.orderType === 'DELIVERY') {
+    if (Number(order.deliveryCharge) > 0) {
+      deliveryCharge = Number(order.deliveryCharge);
+    } else if (orderTotal > discountedItems) {
+      deliveryCharge = roundAmount(orderTotal - discountedItems);
+    }
+  }
+
+  if (discountPercent === 0 && itemsSubtotal > 0 && orderTotal > 0 && orderTotal < itemsSubtotal) {
+    discountPercent = roundAmount(((itemsSubtotal - orderTotal) / itemsSubtotal) * 100);
+  }
+
+  return {
+    orderType: order.orderType || 'DELIVERY',
+    tableNumber: undefined,
+    discountPercent,
+    deliveryCharge,
+    packingCharge: 0,
+    taxPercent: 0,
+    otherCharge: 0,
+    loyaltyPoints: 0,
+  };
 }

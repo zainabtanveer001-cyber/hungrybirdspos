@@ -20,6 +20,7 @@ export function SuppliersModal({ onClose, notify }: {
   const allStockIn = useLive(() => db.stockIn.toArray(), []) ?? [];
   const [selected, setSelected] = useState<Supplier | null>(null);
   const [editing, setEditing] = useState<Supplier | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   return (
     <Modal
@@ -79,18 +80,37 @@ export function SuppliersModal({ onClose, notify }: {
                       >
                         Edit
                       </button>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (!window.confirm('Delete this supplier? Existing expenses keep their record.')) return;
-                          await db.suppliers.delete(supplier.id);
-                          notify(`${supplier.name} deleted.`);
-                        }}
-                        aria-label={`Delete ${supplier.name}`}
-                        className="bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100"
-                      >
-                        <Trash2 className="w-3 h-3" aria-hidden />
-                      </button>
+                      {confirmDeleteId === supplier.id ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await db.suppliers.delete(supplier.id);
+                              setConfirmDeleteId(null);
+                              notify(`${supplier.name} deleted.`);
+                            }}
+                            className="text-xs font-bold bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmDeleteId(supplier.id)}
+                          aria-label={`Delete ${supplier.name}`}
+                          className="bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100"
+                        >
+                          <Trash2 className="w-3 h-3" aria-hidden />
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

@@ -117,12 +117,24 @@ export function payrollRows(
 
 export async function paySalary(row: PayrollRow, period: string, user: string): Promise<void> {
   const { year, month } = checkPeriod(period);
-  const owed = pendingAdvances(await db.advancePayments.toArray(), row.member.id!, period);
-  const advanceTotal = owed.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
-  const base = Number(row.member.monthlySalary) || 0;
-  const net = base - advanceTotal;
+  let base = Number(row.member.monthlySalary) || 0;
+  let advanceTotal = 0;
+  let net = base;
 
   await db.transaction('rw', db.salaryPayments, db.advancePayments, async () => {
+    const existing = await db.salaryPayments
+      .where({ staffId: row.member.id! })
+      .and((p) => p.year === year && p.month === month)
+      .first();
+    if (existing) {
+      throw new Error(`${row.member.name} has already been paid for ${period}.`);
+    }
+
+    const owed = pendingAdvances(await db.advancePayments.toArray(), row.member.id!, period);
+    advanceTotal = owed.reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+    base = Number(row.member.monthlySalary) || 0;
+    net = base - advanceTotal;
+
     await db.salaryPayments.add({
       staffId: row.member.id!,
       year,

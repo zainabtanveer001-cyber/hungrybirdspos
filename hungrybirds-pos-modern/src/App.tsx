@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { BellRing, ChefHat, CloudOff, Globe, LogOut, Menu, RefreshCw } from 'lucide-react';
 import { db } from './lib/db';
 import { useLive } from './lib/useLive';
-import { initializeApp, readSession, signOut } from './lib/auth';
+import { initializeApp, readSession, signOut, verifyStoredSession } from './lib/auth';
 import { getSyncStatus, startSync, stopSync, subscribeToSync, syncNow } from './lib/sync';
 import { addToCart, calculateCartTotals, countCartByMenuId, decrementByMenuId, replaceCartLineModifiers, setQty } from './lib/cart';
 import type { CartCharges } from './lib/cart';
 import { getModifierLibrary, resolveDishModifierGroups } from './lib/modifiers';
 import { getCustomer } from './lib/customers';
 import { holdOrder } from './lib/held';
-import { setOrderStatus } from './lib/onlineOrders';
+import { deriveOnlineOrderCharges, setOrderStatus } from './lib/onlineOrders';
 import { formatAmount } from './lib/format';
 import { MIN_DELIVERY_ORDER, recordSale, reopenSale, verifyStock } from './lib/sales';
 import { printReceipt } from './lib/receipt';
@@ -110,8 +110,25 @@ function App() {
     if (!session) return;
     let active = true;
     initializeApp()
-      .catch((err) => console.error('App init failed:', err))
-      .finally(() => {
+      .then(() => verifyStoredSession())
+      .then((verified) => {
+        if (!active) return;
+        if (!verified) {
+          setSession(null);
+          setCart([]);
+          setCharges(EMPTY_CHARGES);
+          setCustomer({});
+          setLoyaltyBalance(0);
+          setActiveOnlineOrder(null);
+          return;
+        }
+        if (verified.role !== session.role || verified.username !== session.username) {
+          setSession({ username: verified.username, role: verified.role });
+        }
+        startSync();
+      })
+      .catch((err) => {
+        console.error('App init failed:', err);
         if (active) startSync();
       });
     return () => {
@@ -215,10 +232,13 @@ function App() {
 
   const hold = useCallback(async () => {
     if (!cart.length) return;
-    const id = await holdOrder(cart, charges, customer.phone ? customer : undefined, session?.username || 'Staff');
+    const onlineRef = activeOnlineOrder
+      ? { onlineOrderId: activeOnlineOrder.id, onlineOrderCloudId: activeOnlineOrder.cloudId ?? null }
+      : undefined;
+    const id = await holdOrder(cart, charges, customer.phone ? customer : undefined, session?.username || 'Staff', onlineRef);
     resetOrder();
     notify(`Held order #${id}${charges.tableNumber ? ` (${charges.tableNumber})` : ''}.`);
-  }, [cart, charges, customer, notify, resetOrder, session?.username]);
+  }, [activeOnlineOrder, cart, charges, customer, notify, resetOrder, session?.username]);
 
   const startCheckout = useCallback(async () => {
     if (!cart.length) return;
@@ -319,7 +339,7 @@ function App() {
         deliveryInfo: charges.orderType === 'DELIVERY' ? customer : undefined,
         onlineOrderId: activeOnlineOrder?.cloudId ?? null,
       });
-      closeOnlineOrder(saleId);
+      await closeOnlineOrder(saleId).catch((err) => console.warn('Failed to update online order status:', err));
       const sale: Sale = {
         id: saleId,
         timestamp: new Date().toISOString(),
@@ -461,7 +481,7 @@ function App() {
             onClick={() => {
               signOut();
               setSession(null);
-              setCart([]);
+              resetOrder();
             }}
             aria-label="Logout"
             className="bg-white hover:bg-red-50 text-[#000000] hover:text-red-700 border border-[#788991] px-2.5 sm:px-4 h-9 rounded-[8px] text-xs font-medium transition flex items-center gap-1 sm:gap-1.5 shrink-0"
@@ -480,7 +500,7 @@ function App() {
           onSignOut={() => {
             signOut();
             setSession(null);
-            setCart([]);
+            resetOrder();
           }}
           onOpenKds={() => setKdsOpen(true)}
           onOpenHeldOrders={() => setHeldOpen(true)}
@@ -681,11 +701,18 @@ function App() {
       {heldOpen && (
         <HeldOrdersModal
           onClose={() => setHeldOpen(false)}
-          onRestore={({ items, charges: restored, customer: restoredCustomer }) => {
+          onRestore={async ({ items, charges: restored, customer: restoredCustomer, onlineOrderId, onlineOrderCloudId }) => {
             setCart(items);
             setCharges(restored);
             setCustomer(restoredCustomer ?? {});
             setLoyaltyBalance(0);
+            let linkedOrder: OnlineOrder | undefined;
+            if (onlineOrderId !== undefined) {
+              linkedOrder = await db.onlineOrders.get(onlineOrderId);
+            } else if (onlineOrderCloudId) {
+              linkedOrder = await db.onlineOrders.where('cloudId').equals(onlineOrderCloudId).first();
+            }
+            setActiveOnlineOrder(linkedOrder ?? null);
             setHeldOpen(false);
             notify('Held order restored to cart.');
           }}
@@ -718,6 +745,7 @@ function App() {
       {openingCashOpen && (
         <OpeningCashModal
           username={session.username}
+          role={session.role}
           onClose={() => setOpeningCashOpen(false)}
           notify={notify}
         />
@@ -761,7 +789,7 @@ function App() {
           onClose={() => setOnlineOrdersOpen(false)}
           onAccept={(items, order) => {
             setCart(items);
-            setCharges({ ...EMPTY_CHARGES, orderType: order.orderType });
+            setCharges(deriveOnlineOrderCharges(items, order));
             setCustomer(order.customer || {});
             setLoyaltyBalance(0);
             setActiveOnlineOrder(order);
@@ -817,7 +845,14 @@ function App() {
           onClose={() => setSalesOpen(false)}
           onReopen={async (sale: Sale) => {
             await reopenSale(sale, session.username);
-            setCart(sale.items);
+            const remainingItems = (sale.items || [])
+              .map((line) => ({
+                ...line,
+                qty: Math.max(0, (Number(line.qty) || 0) - (Number(line.refundedQty) || 0)),
+                refundedQty: undefined,
+              }))
+              .filter((line) => line.qty > 0);
+            setCart(remainingItems);
             setCharges({
               orderType: sale.orderType || 'DINE_IN',
               tableNumber: sale.tableNumber,

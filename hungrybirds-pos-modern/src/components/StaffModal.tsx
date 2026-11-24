@@ -64,6 +64,7 @@ export function StaffModal({ username, onClose, notify }: {
 function Employees({ username, notify }: { username: string; notify: (m: string) => void }) {
   const staff = useLive(() => db.staff.toArray(), []) ?? [];
   const [draft, setDraft] = useState<StaffMember>(BLANK);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const sorted = [...staff].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -166,18 +167,37 @@ function Employees({ username, notify }: { username: string; notify: (m: string)
               </div>
               <div className="flex gap-1.5 shrink-0">
                 <button type="button" onClick={() => setDraft(member)} className={GHOST}>Edit</button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!window.confirm('Delete this staff member? Their attendance, leave and payroll history will be kept.')) return;
-                    await deleteStaff(member, username);
-                    notify(`${member.name} deleted.`);
-                  }}
-                  aria-label={`Delete ${member.name}`}
-                  className="bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100"
-                >
-                  <Trash2 className="w-3 h-3" aria-hidden />
-                </button>
+                {confirmDeleteId === member.id ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await deleteStaff(member, username);
+                        setConfirmDeleteId(null);
+                        notify(`${member.name} deleted.`);
+                      }}
+                      className="text-[10px] font-bold bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeleteId(null)}
+                      className={GHOST}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(member.id ?? null)}
+                    aria-label={`Delete ${member.name}`}
+                    className="bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100"
+                  >
+                    <Trash2 className="w-3 h-3" aria-hidden />
+                  </button>
+                )}
               </div>
             </article>
           ))}
