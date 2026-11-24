@@ -442,7 +442,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     for (const line of wrapWords(thanks, cols)) encoder.text(line);
     encoder.text('Please visit us again!');
     if (profile.phone) {
-      encoder.text(`Order & Support: ${profile.phone}`);
+      for (const line of wrapWords(`For Delivery Contact: ${profile.phone}`, cols)) encoder.text(line);
     }
   }
 
@@ -801,7 +801,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
         <div class="rule"></div>
         <p class="thanks">${escapeHtml(settings.footerText?.trim() || defaultThankYou(sale.orderType))}</p>
         <p class="sub-thanks">Please visit us again!</p>
-        ${profile.phone ? `<p class="support">Order &amp; Support: ${escapeHtml(profile.phone)}</p>` : ''}
+        ${profile.phone ? `<p class="support">For Delivery Contact: ${escapeHtml(profile.phone)}</p>` : ''}
       </footer>`
     : '';
 

@@ -268,6 +268,8 @@ describe('receipt', () => {
     expect(decoded).toContain('Zeeshan Shafiq');
     expect(decoded).toContain('Jazzcash/Easypaisa');
     expect(decoded).toContain('Scan to leave a review');
+    expect(decoded).toContain('For Delivery Contact: 0325-7867774');
+    expect(decoded).not.toContain('Order & Support');
 
     // Pure-text ESC/POS receipt must not contain UTF-8 NBSP (\u00A0),
     // and every line must remain bold (ESC E 1 on, ESC E 0 never emitted)
@@ -624,5 +626,7 @@ describe('receipt', () => {
     });
     expect(fullHtml).toContain('* { box-sizing: border-box; font-weight: 700; }');
     expect(fullHtml).toContain('font-weight: 700;');
+    expect(fullHtml).toContain('For Delivery Contact: 0325-7867774');
+    expect(fullHtml).not.toContain('Order &amp; Support');
   });
 });

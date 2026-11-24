@@ -966,7 +966,7 @@ function LiveReceiptPreview({
             <div className="text-center border-t border-dashed border-black pt-1.5">
               <p className="font-bold">{settings.footerText?.trim() || 'Thank you for dining with us!'}</p>
               <p className="text-[10px]">Please visit us again!</p>
-              {profile.phone && <p className="text-[10px] mt-0.5">Order &amp; Support: {profile.phone}</p>}
+              {profile.phone && <p className="text-[10px] mt-0.5">For Delivery Contact: {profile.phone}</p>}
             </div>
           </div>
         )}
