@@ -802,31 +802,30 @@ export async function printTestReceipt(headerText = 'Hungry Birds Restaurant'): 
   const light = '-'.repeat(cols);
   const encoder = new EscPosEncoder();
   encoder.initialize();
+  encoder.bold(true);
   encoder.align('center');
   if (settings.showLogo !== false) {
     const logo = buildCenteredLogoRaster(settings.paperWidth);
     encoder.rasterImage(logo.width, logo.height, logo.bytes);
+    encoder.bold(true);
     encoder.text('');
   }
-  encoder.bold(true);
   encoder.setSize(0, 1);
   encoder.text(headerText);
   encoder.setSize(0, 0);
   encoder.text(light);
   encoder.text('PRINTER TEST SLIP');
-  encoder.bold(false);
   encoder.text(heavy);
   encoder.text(`Mode: ${(settings.connectionType || 'bluetooth').toUpperCase()}  |  Paper: ${settings.paperWidth}`);
   encoder.text(new Date().toLocaleString());
-  encoder.bold(true);
   encoder.text('Status: CONNECTED & READY');
-  encoder.bold(false);
   encoder.text(light);
   if (settings.qrUrl?.trim()) {
     const qr = buildQrRaster(settings.qrUrl, settings.paperWidth);
     if (qr) {
       encoder.text('');
       encoder.rasterImage(qr.width, qr.height, qr.bytes);
+      encoder.bold(true);
       encoder.text('');
       encoder.text(settings.qrLabel?.trim() || 'Scan to verify QR');
       encoder.text(light);

@@ -810,7 +810,7 @@ function LiveReceiptPreview({
     <section className="p-3.5 rounded-2xl border border-dashed border-[#788991] bg-[#f8fafd]">
       <SectionTitle>Live Thermal Receipt Preview · {settings.paperWidth}</SectionTitle>
       <div
-        className={`mx-auto mt-2 bg-white border border-[#d4d4d8] rounded-xl p-3.5 shadow-sm ${receiptFontClass(settings.receiptFontSize)} font-mono text-[#000000]`}
+        className={`mx-auto mt-2 bg-white border border-[#d4d4d8] rounded-xl p-3.5 shadow-sm ${receiptFontClass(settings.receiptFontSize)} font-mono font-bold text-[#000000]`}
         style={{ width: settings.paperWidth === '58mm' ? 236 : 316 }}
       >
         {settings.printKitchenTicket && (
@@ -819,12 +819,12 @@ function LiveReceiptPreview({
               KITCHEN ORDER (KOT)
             </div>
             <div className="text-center font-bold text-[11px] mt-1">{sampleBadge}</div>
-            <div className="text-center text-[10px] text-[#526066]">
+            <div className="text-center text-[10px]">
               Bill #HBR-42 · Server: {username}
             </div>
             <div className="border-t-2 border-black my-1.5" />
             <div className="font-bold text-xs">2x Crispy Zinger Burger</div>
-            <div className="text-[10px] pl-3 text-[#273238]">+ Extra Cheese, Extra Jalapenos</div>
+            <div className="text-[10px] pl-3">+ Extra Cheese, Extra Jalapenos</div>
             <div className="border-t-2 border-black my-1.5" />
             <div className="my-3 border-t border-dashed border-[#788991]" />
           </>
@@ -842,8 +842,8 @@ function LiveReceiptPreview({
         )}
 
         <div className="text-center font-black text-sm tracking-tight">{profile.name}</div>
-        {profile.tagline && <div className="text-center text-[10px] italic text-[#273238]">{profile.tagline}</div>}
-        <div className="text-center text-[10px] text-[#273238] leading-tight mt-0.5">
+        {profile.tagline && <div className="text-center text-[10px] italic">{profile.tagline}</div>}
+        <div className="text-center text-[10px] leading-tight mt-0.5">
           {profile.addressLine1 && <div>{profile.addressLine1}</div>}
           {profile.addressLine2 && <div>{profile.addressLine2}</div>}
           {profile.phone && <div className="font-bold mt-0.5">Tel: {profile.phone}</div>}
@@ -852,7 +852,7 @@ function LiveReceiptPreview({
         <div className="border-y border-black text-black text-center font-black py-1 px-2 mt-2 text-[11px] tracking-wider">
           {sampleBadge}
         </div>
-        <div className="text-center text-[10px] text-[#526066] mt-0.5">*** Customer Copy ***</div>
+        <div className="text-center text-[10px] mt-0.5">*** Customer Copy ***</div>
 
         <div className="border-t-2 border-black my-1.5" />
 
@@ -885,7 +885,7 @@ function LiveReceiptPreview({
         <div className="space-y-1">
           {sampleLines.map(([label, value]) => (
             <div key={label} className="flex justify-between gap-2 text-[11px]">
-              <span className="font-semibold break-words">{label}</span>
+              <span className="font-bold break-words">{label}</span>
               <span className="tabular-nums font-bold shrink-0">{settings.printItemPrices ? value : '1x'}</span>
             </div>
           ))}
@@ -959,7 +959,7 @@ function LiveReceiptPreview({
                     ),
                   )}
                 </svg>
-                <p className="text-[9px] text-[#273238] mt-1">{profile.qrLabel}</p>
+                <p className="text-[9px] mt-1">{profile.qrLabel}</p>
               </div>
             )}
 

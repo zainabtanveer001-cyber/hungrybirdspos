@@ -269,13 +269,21 @@ describe('receipt', () => {
     expect(decoded).toContain('Jazzcash/Easypaisa');
     expect(decoded).toContain('Scan to leave a review');
 
-    // Pure-text ESC/POS receipt must not contain UTF-8 NBSP (\u00A0)
-    const textOnlyBytes = generateEscPosReceipt(richSale, {
+    // Pure-text ESC/POS receipt must not contain UTF-8 NBSP (\u00A0),
+    // and every line must remain bold (ESC E 1 on, ESC E 0 never emitted)
+    const textOnlyCustomerBytes = generateEscPosReceipt(richSale, {
       ...settings,
       showLogo: false,
+      printKitchenTicket: false,
       qrUrl: '',
     });
-    expect(new TextDecoder().decode(textOnlyBytes)).not.toContain('\u00A0');
+    const textOnlyKotBytes = generateEscPosReceipt(richSale, {
+      ...settings,
+      showLogo: false,
+      printKitchenTicket: true,
+      qrUrl: '',
+    });
+    expect(new TextDecoder().decode(textOnlyKotBytes)).not.toContain('\u00A0');
 
     // Verify inverted black background command (GS B 1 -> 0x1d 0x42 0x01) is removed,
     // including when KOT is enabled, and QR is emitted as universal GS v 0 raster (not GS ( k)
@@ -291,6 +299,10 @@ describe('receipt', () => {
       }
       return false;
     };
+    expect(hasSeq(textOnlyCustomerBytes, [0x1b, 0x45, 0x01])).toBe(true);
+    expect(hasSeq(textOnlyCustomerBytes, [0x1b, 0x45, 0x00])).toBe(false);
+    expect(hasSeq(textOnlyKotBytes, [0x1b, 0x45, 0x01])).toBe(true);
+    expect(hasSeq(textOnlyKotBytes, [0x1b, 0x45, 0x00])).toBe(false);
     expect(hasSeq(bytes, [0x1d, 0x42, 0x01])).toBe(false);
     expect(hasSeq(withKotBytes, [0x1d, 0x42, 0x01])).toBe(false);
     expect(hasSeq(bytes, [0x1d, 0x76, 0x30])).toBe(true);
@@ -602,6 +614,15 @@ describe('receipt', () => {
     expect(html).toContain('SYSTEM PRINTER');
     expect(html).toContain('<img src="data:image/png;base64,');
     expect(html).toContain('<svg ');
+    expect(html).toContain('font-weight: 700;');
     expect(html).not.toContain('background: #000');
+
+    const fullHtml = receiptDocument(sale, {
+      ...settings,
+      connectionType: 'browser',
+      qrUrl: 'https://maps.app.goo.gl/abc123',
+    });
+    expect(fullHtml).toContain('* { box-sizing: border-box; font-weight: 700; }');
+    expect(fullHtml).toContain('font-weight: 700;');
   });
 });

@@ -166,6 +166,7 @@ function defaultThankYou(orderType: Sale['orderType']): string {
 export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Uint8Array {
   const encoder = new EscPosEncoder();
   encoder.initialize();
+  encoder.bold(true);
 
   const profile = resolveReceiptProfile(settings);
   const cols = settings.paperWidth === '80mm' ? 47 : 31;
@@ -177,25 +178,21 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   if (settings.printKitchenTicket) {
     encoder.align('center');
     encoder.text(heavyRule);
-    encoder.bold(true);
     encoder.setSize(0, 1);
     encoder.text('KITCHEN ORDER (KOT)');
     encoder.setSize(0, 0);
     encoder.text(orderBadge);
-    encoder.bold(false);
     encoder.text(`Bill #HBR-${sale.id ?? ''}  |  ${formatBillTimestamp(sale.timestamp)}`);
     encoder.text(`By: ${sale.serverUser || 'Staff'}`);
     encoder.text(heavyRule);
     encoder.align('left');
     for (const item of sale.items || []) {
       const { baseName, modifiers, note } = splitItemDisplay(item);
-      encoder.bold(true);
       encoder.setSize(0, 1);
       for (const wrapped of wrapWords(`${item.qty}x ${baseName}`, cols)) {
         encoder.text(wrapped);
       }
       encoder.setSize(0, 0);
-      encoder.bold(false);
       if (modifiers.length) {
         for (const modLine of wrapWords(`+ ${modifiers.join(', ')}`, cols - 3)) {
           encoder.text(`   ${modLine}`);
@@ -210,6 +207,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     encoder.text(heavyRule);
     encoder.feed(4);
     encoder.cut();
+    encoder.bold(true);
   }
 
   // 1. Centered Rooster Stamp Logo
@@ -218,19 +216,18 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     if (logo) {
       encoder.align('center');
       encoder.rasterImage(logo.width, logo.height, logo.bytes);
+      encoder.bold(true);
       encoder.text('');
     }
   }
 
   // 2. Bold Brand Header + Tagline + Contact
   encoder.align('center');
-  encoder.bold(true);
   encoder.setSize(0, 1);
   for (const nameLine of wrapWords(profile.name, cols)) {
     encoder.text(nameLine);
   }
   encoder.setSize(0, 0);
-  encoder.bold(false);
 
   if (profile.tagline) {
     encoder.text(profile.tagline);
@@ -242,17 +239,13 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     for (const line of wrapWords(profile.addressLine2, cols)) encoder.text(line);
   }
   if (profile.phone) {
-    encoder.bold(true);
     encoder.text(`Tel: ${profile.phone}`);
-    encoder.bold(false);
   }
 
   encoder.text('');
   // 3. Framed White-Background Order-Type Section + Copy Label
   encoder.text(lightRule);
-  encoder.bold(true);
   encoder.text(orderBadge);
-  encoder.bold(false);
   encoder.text('*** Customer Copy ***');
 
   // 4. Order Metadata Block
@@ -261,9 +254,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   if (settings.printOrderDetails) {
     const billNo = `Bill #HBR-${sale.id ?? ''}`;
     const dateStr = formatBillTimestamp(sale.timestamp);
-    encoder.bold(true);
     encoder.text(formatTwoCol(billNo, dateStr, cols));
-    encoder.bold(false);
 
     const cashierLeft = `Cashier: ${sale.serverUser || 'Staff'}`;
     const rightMeta =
@@ -279,9 +270,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     ? sale.deliveryInfo
     : sale.customer;
   if (settings.printDeliveryDetails && cust && (cust.name || cust.address || cust.phone)) {
-    encoder.bold(true);
     encoder.text(sale.orderType === 'DELIVERY' ? 'DELIVERY DETAILS' : 'CUSTOMER DETAILS');
-    encoder.bold(false);
     if (cust.name) {
       for (const [idx, l] of wrapWords(cust.name, cols - 10).entries()) {
         encoder.text(`${idx === 0 ? 'Customer: ' : '          '}${l}`);
@@ -304,7 +293,6 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   const qtyW = settings.paperWidth === '80mm' ? 5 : 4;
   const amtW = settings.paperWidth === '80mm' ? 12 : 8;
 
-  encoder.bold(true);
   if (settings.printItemPrices) {
     encoder.text(
       'Item'.padEnd(itemW, ' ') +
@@ -315,7 +303,6 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   } else {
     encoder.text(formatTwoCol('Item', 'Qty', cols));
   }
-  encoder.bold(false);
   encoder.text(lightRule);
 
   let totalUnits = 0;
@@ -358,7 +345,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
 
   encoder.text(heavyRule);
 
-  // 7. Financial Breakdown & Inverted Highlighted Grand Total
+  // 7. Financial Breakdown & Grand Total
   if (settings.printTotals) {
     const moneyRow = (label: string, amount: number, sign = '') => {
       const val = `${sign}Rs ${formatDecimal(amount)}`;
@@ -393,16 +380,12 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
 
     const totalLeft = 'TOTAL AMOUNT';
     const totalRight = `Rs ${formatDecimal(sale.total)}`;
-    encoder.bold(true);
     encoder.setSize(0, 1);
     encoder.text(formatTwoCol(totalLeft, totalRight, cols));
     encoder.setSize(0, 0);
-    encoder.bold(false);
 
     if (sale.refundedAmount) {
-      encoder.bold(true);
       moneyRow(`Refunded (${sale.refundStatus || 'PARTIAL'})`, sale.refundedAmount, '-');
-      encoder.bold(false);
     }
 
     encoder.text(lightRule);
@@ -413,24 +396,18 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
 
   // 8. Payment Receipt Block
   if (settings.printPayments && sale.payments?.length) {
-    encoder.bold(true);
     encoder.text('PAYMENT DETAILS');
-    encoder.bold(false);
     for (const payment of sale.payments) {
       encoder.text(formatTwoCol(`Paid (${payment.method})`, `Rs ${formatDecimal(payment.amount)}`, cols));
       if (payment.method === 'Cash' && payment.cashGiven != null) {
         encoder.text(formatTwoCol('Cash Received', `Rs ${formatDecimal(payment.cashGiven)}`, cols));
       }
       if (Number(payment.change) > 0) {
-        encoder.bold(true);
         encoder.text(formatTwoCol('Change Returned', `Rs ${formatDecimal(Number(payment.change))}`, cols));
-        encoder.bold(false);
       }
     }
     encoder.align('center');
-    encoder.bold(true);
     encoder.text(sale.refundStatus === 'FULL' ? '*** REFUNDED ***' : '*** PAID ***');
-    encoder.bold(false);
     encoder.align('left');
     encoder.text(lightRule);
   }
@@ -439,9 +416,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   if (settings.printFooter) {
     if (profile.accountTitle || profile.accountMethod || profile.accountNumber) {
       encoder.align('center');
-      encoder.bold(true);
       encoder.text('ONLINE PAYMENT');
-      encoder.bold(false);
       encoder.align('left');
       if (profile.accountMethod) encoder.text(formatTwoCol('Method:', profile.accountMethod, cols));
       if (profile.accountTitle) encoder.text(formatTwoCol('Title:', profile.accountTitle, cols));
@@ -455,6 +430,7 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
         encoder.align('center');
         encoder.text('');
         encoder.rasterImage(qr.width, qr.height, qr.bytes);
+        encoder.bold(true);
         encoder.text('');
         encoder.text(profile.qrLabel);
         encoder.text(lightRule);
@@ -462,10 +438,8 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     }
 
     encoder.align('center');
-    encoder.bold(true);
     const thanks = settings.footerText?.trim() || defaultThankYou(sale.orderType);
     for (const line of wrapWords(thanks, cols)) encoder.text(line);
-    encoder.bold(false);
     encoder.text('Please visit us again!');
     if (profile.phone) {
       encoder.text(`Order & Support: ${profile.phone}`);
@@ -511,9 +485,9 @@ export function buildTestReceiptDocument(settings: PrinterSettings): string {
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>Printer Test Slip</title><style>
   @page { size: ${settings.paperWidth} auto; margin: 2mm; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; font-weight: 700; }
   html, body { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0; color: #000; background: #fff; }
-  body { font: ${FONT_PT[settings.receiptFontSize] ?? '10.5pt'}/1.35 "Courier New", Courier, monospace; }
+  body { font: 700 ${FONT_PT[settings.receiptFontSize] ?? '10.5pt'}/1.35 "Courier New", Courier, monospace; font-weight: 700; }
   main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 1mm 1.5mm 4mm; text-align: center; }
   .stamp-wrap { width: 100%; display: flex; justify-content: center; margin: 0 auto 1.5mm; }
   .stamp-wrap img.receipt-logo { display: block; margin: 0 auto; width: ${settings.paperWidth === '58mm' ? '15mm' : '18mm'}; max-width: 100%; height: auto; }
@@ -833,9 +807,9 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>Receipt #${escapeHtml(sale.id)}</title><style>
   @page { size: ${settings.paperWidth} auto; margin: 2mm; }
-  * { box-sizing: border-box; }
+  * { box-sizing: border-box; font-weight: 700; }
   html, body { width: 100%; max-width: ${width}; margin: 0 auto; padding: 0; color: #000; background: #fff; }
-  body { font: ${FONT_PT[settings.receiptFontSize] ?? '10.5pt'}/1.35 "Courier New", Courier, monospace; }
+  body { font: 700 ${FONT_PT[settings.receiptFontSize] ?? '10.5pt'}/1.35 "Courier New", Courier, monospace; font-weight: 700; }
   main { width: 100%; max-width: ${width}; margin: 0 auto; padding: 1mm 1.5mm 4mm; }
   header { width: 100%; text-align: center; padding-bottom: 1.5mm; }
   .stamp-wrap { width: 100%; display: flex; justify-content: center; margin: 0 auto 1.5mm; }
