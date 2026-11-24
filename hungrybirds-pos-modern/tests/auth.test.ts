@@ -271,4 +271,36 @@ describe('auth & login resilience during Firestore 429 quota exhaustion (BUG-015
       'Username not found or account is not configured.',
     );
   });
+
+  it('never leaves hb.syncToken in localStorage when a non-staff customer login is rejected', async () => {
+    const cloud = createAuthAndFirestoreMock();
+    vi.stubGlobal('fetch', cloud.fetchMock);
+    const auth = await import('../src/lib/auth');
+
+    await expect(auth.signIn('customer@example.com', 'secret-customer-pass')).rejects.toThrow(
+      /does not have POS access/,
+    );
+    expect(local.getItem('hb.syncToken')).toBeNull();
+  });
+
+  it('verifies sessionStorage role against local user record and signs out locally disabled users', async () => {
+    const cloud = createAuthAndFirestoreMock();
+    vi.stubGlobal('fetch', cloud.fetchMock);
+    const auth = await import('../src/lib/auth');
+
+    await auth.signIn('cashier1', 'secret-cashier-pass');
+    // Simulate manual sessionStorage role elevation in devtools.
+    session.setItem(auth.SESSION_KEY, JSON.stringify({ id: 1, username: 'cashier1', role: 'OWNER' }));
+
+    const verified = await auth.verifyStoredSession();
+    expect(verified?.role).toBe('CASHIER');
+    expect(auth.readSession()?.role).toBe('CASHIER');
+
+    // Disable locally and re-verify -> should force signOut.
+    const stored = [...state.users.values()].find((u) => u.username === 'cashier1');
+    stored.active = false;
+    expect(await auth.verifyStoredSession()).toBeNull();
+    expect(session.getItem(auth.SESSION_KEY)).toBeNull();
+    expect(local.getItem('hb.syncToken')).toBeNull();
+  });
 });

@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { parseBackup, translateLegacyPassword, BACKUP_FORMAT } from '../src/lib/backup';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { db } from '../src/lib/db';
+import {
+  BACKUP_FORMAT,
+  PROTECTED_SETTING_KEYS,
+  collectBackup,
+  parseBackup,
+  sanitizeTableRows,
+  translateLegacyPassword,
+} from '../src/lib/backup';
 
 const backup = (tables: unknown, extra: Record<string, unknown> = {}) =>
   JSON.stringify({ format: BACKUP_FORMAT, version: 1, tables, ...extra });
@@ -51,5 +59,55 @@ describe('translateLegacyPassword', () => {
 
   it('handles a missing password', async () => {
     expect((await translateLegacyPassword(undefined)).note).toBe('no password on file');
+  });
+});
+
+describe('backup sanitization & secret redaction (SEC-04)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('strips protected setting keys and malformed rows during import sanitization', () => {
+    const cleanedSettings = sanitizeTableRows('settings', [
+      { key: 'ownerPinHash', value: 'forged-hash' },
+      { key: 'sync.outbox', value: '{}' },
+      { key: 'receiptSettings', value: '{"header":"Hungry Birds"}' },
+      { key: '', value: 'ignored' },
+    ]);
+    expect(cleanedSettings).toEqual([{ key: 'receiptSettings', value: '{"header":"Hungry Birds"}' }]);
+    expect(PROTECTED_SETTING_KEYS.has('ownerPinHash')).toBe(true);
+
+    const cleanedMenu = sanitizeTableRows('menu', [
+      { id: '', name: 'Bad row', price: 100 },
+      { id: 'm1', name: 'Burger', price: -50 },
+      { id: 'm2', name: 'Fries', price: 'not-a-number' },
+    ]);
+    expect(cleanedMenu).toEqual([
+      { id: 'm1', name: 'Burger', price: 0 },
+      { id: 'm2', name: 'Fries', price: 0 },
+    ]);
+  });
+
+  it('redacts ownerPinHash, sync state, and user passwordHash from collectBackup exports', async () => {
+    vi.spyOn(db, 'tables', 'get').mockReturnValue([
+      {
+        name: 'settings',
+        toArray: async () => [
+          { key: 'ownerPinHash', value: 'secret-pin-hash' },
+          { key: 'sync.versions', value: '{}' },
+          { key: 'lowStockThreshold', value: '5' },
+        ],
+      },
+      {
+        name: 'users',
+        toArray: async () => [
+          { id: 1, username: 'owner', role: 'OWNER', active: true, passwordHash: 'deadbeef' },
+        ],
+      },
+    ] as any);
+
+    const exported = JSON.parse(await collectBackup());
+    expect(exported.tables.settings).toEqual([{ key: 'lowStockThreshold', value: '5' }]);
+    expect(exported.tables.users).toEqual([{ id: 1, username: 'owner', role: 'OWNER', active: true }]);
   });
 });

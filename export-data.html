@@ -80,7 +80,13 @@
         if (!db) throw new Error("No database found in this browser.");
 
         const names = Array.from(db.objectStoreNames);
-        listEl.innerHTML = names.map(name => `<li>${name}</li>`).join("");
+        listEl.replaceChildren(
+          ...names.map(name => {
+            const li = document.createElement("li");
+            li.textContent = name;
+            return li;
+          })
+        );
         if (names.length === 0) {
           say("This browser has no Hungry Birds database. Open the original POS here first, then run this again.", "warn");
           return;

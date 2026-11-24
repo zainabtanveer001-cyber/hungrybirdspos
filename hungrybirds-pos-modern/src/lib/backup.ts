@@ -8,6 +8,50 @@ export const BACKUP_VERSION = 1;
 
 const ROLES: UserRole[] = ['OWNER', 'MANAGER', 'CASHIER', 'WAITER'];
 
+export const PROTECTED_SETTING_KEYS = new Set([
+  'ownerPinHash',
+  'sync.snapshot',
+  'sync.outbox',
+  'sync.versions',
+  'sync.watermarks',
+  'sync.deviceId',
+  'sync.localVoids',
+]);
+
+const STRING_KEY_TABLES = new Set(['categories', 'menu', 'inventory', 'suppliers', 'customers', 'waiters']);
+
+function finiteNonNegative(value: unknown, fallback = 0): number {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : fallback;
+}
+
+/** Filters protected settings and malformed rows before writing an imported backup to IndexedDB. */
+export function sanitizeTableRows(tableName: string, rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  if (tableName === 'settings') {
+    return rows.filter(
+      (row) => typeof row.key === 'string' && row.key.trim().length > 0 && !PROTECTED_SETTING_KEYS.has(row.key),
+    );
+  }
+  const clean: Record<string, unknown>[] = [];
+  for (const row of rows) {
+    if (STRING_KEY_TABLES.has(tableName)) {
+      if (typeof row.id !== 'string' || !row.id.trim()) continue;
+    }
+    if (tableName === 'menu') {
+      clean.push({ ...row, price: finiteNonNegative(row.price) });
+    } else if (tableName === 'inventory') {
+      clean.push({ ...row, stock: finiteNonNegative(row.stock), cost: finiteNonNegative(row.cost) });
+    } else if (tableName === 'sales') {
+      clean.push({ ...row, total: finiteNonNegative(row.total) });
+    } else if (tableName === 'expenses') {
+      clean.push({ ...row, amount: finiteNonNegative(row.amount) });
+    } else {
+      clean.push(row);
+    }
+  }
+  return clean;
+}
+
 interface LegacyStaff {
   username?: unknown;
   role?: unknown;
@@ -111,10 +155,10 @@ export async function importBackup(text: string, actor: string): Promise<ImportS
   const tables = [...names, 'users'].map((name) => db.table(name));
   await db.transaction('rw', tables, async () => {
     for (const name of names) {
-      const rows = parsed.tables[name];
-      if (!rows.length) continue;
-      await db.table(name).bulkPut(rows);
-      counts[name] = rows.length;
+      const sanitized = sanitizeTableRows(name, parsed.tables[name]);
+      if (!sanitized.length) continue;
+      await db.table(name).bulkPut(sanitized);
+      counts[name] = sanitized.length;
     }
     for (const user of usersToWrite) {
       const existing = await db.users.where('username').equals(user.username).first();
@@ -141,10 +185,19 @@ export async function importBackup(text: string, actor: string): Promise<ImportS
   return { counts, skipped, staff };
 }
 
-/** Full dump of this app's own database, for safekeeping before a risky change. */
+/** Full dump of this app's own database, omitting sensitive auth/PIN/sync secrets. */
 export async function collectBackup(): Promise<string> {
   const tables: Record<string, unknown[]> = {};
-  for (const table of db.tables) tables[table.name] = await table.toArray();
+  for (const table of db.tables) {
+    const rows = await table.toArray();
+    if (table.name === 'settings') {
+      tables[table.name] = rows.filter((row: any) => !PROTECTED_SETTING_KEYS.has(String(row?.key ?? '')));
+    } else if (table.name === 'users') {
+      tables[table.name] = rows.map(({ passwordHash: _pw, ...rest }: any) => rest);
+    } else {
+      tables[table.name] = rows;
+    }
+  }
   return JSON.stringify(
     { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), source: 'modern', tables },
     null,

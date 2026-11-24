@@ -47,8 +47,8 @@ async function directoryGet(username: string): Promise<Record<string, unknown> |
   return (await res.json()).fields ?? {};
 }
 
-/** Creates the Firebase Auth account; returns its uid. Fails loudly on duplicates. */
-async function createAuthUser(email: string, password: string): Promise<string> {
+/** Creates the Firebase Auth account; returns its uid + idToken for rollback if profile write fails. */
+async function createAuthUser(email: string, password: string): Promise<{ uid: string; idToken: string }> {
   const { key } = await firestoreBase();
   const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${key}`, {
     method: 'POST',
@@ -62,7 +62,20 @@ async function createAuthUser(email: string, password: string): Promise<string> 
     if (error?.message?.startsWith('WEAK_PASSWORD')) throw new Error('Password must be at least 6 characters.');
     throw new Error('Account creation failed. Check your connection and try again.');
   }
-  return (await res.json()).localId as string;
+  const data = await res.json();
+  return { uid: data.localId as string, idToken: (data.idToken as string) || '' };
+}
+
+/** Deletes a newly created Firebase Auth user so failed provisioning never orphans a username. */
+async function deleteAuthUser(idToken: string): Promise<void> {
+  if (!idToken) return;
+  const { key } = await firestoreBase();
+  await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${key}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    signal: AbortSignal.timeout(8000),
+  });
 }
 
 export async function listStaffAccounts(): Promise<StaffAccount[]> {
@@ -102,26 +115,31 @@ export async function createStaffAccount(input: {
   const existing = await directoryGet(username);
   if (existing && Object.keys(existing).length > 0) throw new Error('That username is already in use.');
 
-  const uid = await createAuthUser(authEmail(username), input.password);
+  const { uid, idToken } = await createAuthUser(authEmail(username), input.password);
   const email = authEmail(username);
 
   const { base } = await firestoreBase();
-  const profile = await restWrite('PATCH', `${base}/users/${uid}`, {
-    fields: {
-      username: { stringValue: username },
-      usernameLower: { stringValue: username },
-      displayName: { stringValue: input.displayName.trim() },
-      role: { stringValue: input.role },
-      active: { booleanValue: true },
-      authEmail: { stringValue: email },
-    },
-  });
-  if (!profile) throw new Error('Account created but the profile write was rejected. Publish the latest Firestore rules.');
+  try {
+    const profile = await restWrite('PATCH', `${base}/users/${uid}`, {
+      fields: {
+        username: { stringValue: username },
+        usernameLower: { stringValue: username },
+        displayName: { stringValue: input.displayName.trim() },
+        role: { stringValue: input.role },
+        active: { booleanValue: true },
+        authEmail: { stringValue: email },
+      },
+    });
+    if (!profile) throw new Error('Account created but the profile write was rejected. Publish the latest Firestore rules.');
 
-  const directory = await restWrite('PATCH', `${base}/usernameDirectory/${encodeURIComponent(username)}`, {
-    fields: { authEmail: { stringValue: email }, active: { booleanValue: true } },
-  });
-  if (!directory) throw new Error('Profile saved but the username directory write was rejected. Publish the latest Firestore rules.');
+    const directory = await restWrite('PATCH', `${base}/usernameDirectory/${encodeURIComponent(username)}`, {
+      fields: { authEmail: { stringValue: email }, active: { booleanValue: true } },
+    });
+    if (!directory) throw new Error('Profile saved but the username directory write was rejected. Publish the latest Firestore rules.');
+  } catch (err) {
+    await deleteAuthUser(idToken).catch(() => {});
+    throw err;
+  }
 }
 
 export async function setStaffActive(account: StaffAccount, active: boolean): Promise<void> {

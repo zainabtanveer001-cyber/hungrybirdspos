@@ -233,8 +233,6 @@ async function cloudSignIn(input: string, password: string): Promise<User> {
   }
 
   const { uid, idToken, refreshToken, expiresIn } = authResult;
-  rememberToken(idToken, refreshToken, Number(expiresIn));
-
   const passwordHash = await sha256(password);
   let profile: FirestoreDoc = null;
   if (!firestoreQuotaHit) {
@@ -247,16 +245,25 @@ async function cloudSignIn(input: string, password: string): Promise<User> {
   }
 
   if (firestoreQuotaHit) {
-    return resolveQuotaFallbackUser(uid, email, input, passwordHash);
+    const user = await resolveQuotaFallbackUser(uid, email, input, passwordHash);
+    rememberToken(idToken, refreshToken, Number(expiresIn));
+    return user;
   }
 
   const resolvedProfile = profile ?? {};
-  if (resolvedProfile.active === false) throw new Error('This account is disabled. Contact the Owner.');
+  if (resolvedProfile.active === false) {
+    forgetToken();
+    throw new Error('This account is disabled. Contact the Owner.');
+  }
 
   // Customer accounts sign in to the same Firebase project but have no staff role.
-  if (!ROLES.includes(resolvedProfile.role as UserRole)) throw new Error('This account does not have POS access.');
+  if (!ROLES.includes(resolvedProfile.role as UserRole)) {
+    forgetToken();
+    throw new Error('This account does not have POS access.');
+  }
 
   const username = (resolvedProfile.username as string) ?? input.split('@')[0];
+  rememberToken(idToken, refreshToken, Number(expiresIn));
   return upsertVerifiedUser(
     { username, role: resolvedProfile.role as UserRole, active: true },
     { authEmail: email, cloudUid: uid, passwordHash },
@@ -300,8 +307,29 @@ export function readSession(): { id?: number; username: string; role: UserRole }
   const raw = sessionStorage.getItem(SESSION_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.username !== 'string' || !ROLES.includes(parsed.role)) return null;
+    return parsed;
   } catch {
     return null;
   }
+}
+
+/** Re-validates the stored session against local verified user records on startup. */
+export async function verifyStoredSession(): Promise<{ id?: number; username: string; role: UserRole } | null> {
+  const current = readSession();
+  if (!current) return null;
+  const localUser = await findLocalUser(normalizeUsername(current.username));
+  if (localUser) {
+    if (localUser.active === false) {
+      signOut();
+      return null;
+    }
+    if (localUser.role !== current.role) {
+      const corrected = { id: localUser.id, username: localUser.username, role: localUser.role };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(corrected));
+      return corrected;
+    }
+  }
+  return current;
 }
