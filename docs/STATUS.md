@@ -1,8 +1,8 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 5 Complete (Security & Quality Audit + Bug Remediation across `SEC-01`..`SEC-06` and `BUG-017`..`BUG-020`)
+- **Current Phase:** Phase 3 Complete — Slice 27 (Weight-based per-kg menu pricing implemented & verified)
 - **Active Branch:** `main`
-- **Last Updated:** 2026-11-24
+- **Last Updated:** 2026-11-26
 
 ## 1. What Was Done
 - **Cloned & Installed:** Cloned `zainabtanveer001-cyber/hungrybirdspos` into `C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos` and installed dependencies for both root and `hungrybirds-pos-modern/` (`0` npm audit vulnerabilities in `hungrybirds-pos-modern`).
@@ -64,11 +64,15 @@
   - Hardened `auth.ts`, `staffAccounts.ts`, `backup.ts`, `export-data.html`, `vercel.json`, and `netlify.toml` (deferred `rememberToken()` until verified, added `verifyStoredSession()` on boot, Auth rollback on failed staff creation, backup secret redaction + import row sanitization, DOM-safe `export-data.html`, and stripped `'unsafe-eval'`/`cdnjs`/`unpkg` from CSP).
   - Fixed financial, inventory, CRM, and workflow bugs across `shift.ts` (tender-allocated cash/card/online refund deductions on `expectedDrawerCash`), `refunds.ts` (`paidRatio` on discounted delivery & `Rs 0` comped orders + refund tender selector in `RefundModal.tsx`), `sales.ts`/`customers.ts` (`restoreInventory` unrefunded-only restore + CRM spend/points clawback and reversal), `onlineOrders.ts`/`held.ts`/`App.tsx` (delivery charge/discount preservation, held online-order link, full `resetOrder()` on logout), `staff.ts` (duplicate monthly payroll guard), `Sidebar.tsx` (KDS count & Cashier/Manager opening cash access when unset), `ExpensesModal.tsx` (Monday week + `isApproved`), and `SuppliersModal.tsx`/`StaffModal.tsx` (inline delete confirmations).
   - Added 11 new regression tests across `auth.test.ts`, `backup.test.ts`, `refunds.test.ts`, `shift.test.ts`, `payroll.test.ts`, `onlineOrders.test.ts`, and `salesIntegrity.test.ts`.
+- **Feature Slice 27 — Weight-Based (Per kg) Menu Item Pricing:**
+  - Added `soldByWeight` menu configuration (`db/types.ts`, `menu.ts`, `AdminSettingsModal.tsx`), `Per kg` badges and `+ Weigh` triggers (`MenuGrid.tsx`), `WeightModal.tsx` (`kg`/`g` toggle, comma/dot decimal parsing, `0.5`/`1`/`1.5`/`2 kg` quick presets, locked per-kg rate, whole-rupee line rounding), flat per-fish extras preservation (`cart.ts`, `ModifierModal.tsx`), and tappable weight chips (`CartPanel.tsx`, `App.tsx`).
+  - Scaled recipe stock checks/deductions/restorations, refunds, and live shift COGS by sold `weightKg` (`sales.ts`, `refunds.ts`, `shift.ts`), and formatted `weight × rate/kg` cleanly across 80mm/58mm ESC/POS, HTML print, KOT (`2.4kg Grilled Fish`), KDS cards, Held Orders, and Sales History (`receipt.ts`, `KitchenDisplayModal.tsx`, `HeldOrdersModal.tsx`, `RefundModal.tsx`, `SalesHistoryModal.tsx`).
+  - Added 6 regression tests across `cart.test.ts`, `salesIntegrity.test.ts`, `shift.test.ts`, and `receipt.test.ts`.
 
 ## 2. Verification Results
-- `cd hungrybirds-pos-modern && npm test` → **19 passed (19)** test files, **136 passed (136)** tests.
-- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, `780.55 kB` minified / `228.35 kB` gzip, no `.map` file exposed).
-- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 92 files).
+- `cd hungrybirds-pos-modern && npm test` → **19 passed (19)** test files, **142 passed (142)** tests.
+- `cd hungrybirds-pos-modern && npm run build` → **EXIT 0** (`tsc -b && vite build`, no `.map` file exposed).
+- `cd hungrybirds-pos-modern && npm run lint` → **EXIT 0** (`0 errors`, `17` pre-existing warnings on 93 files).
 - Repo root `npm test` → **4 passed (4)** test files, **60 passed (60)** tests; `npm run lint` → **EXIT 0** (`0 errors`, `3` ignored-file warnings).
 - `cd hungrybirds-pos-modern && npm audit` → **0 vulnerabilities** (prior check).
 - **Live Browser QA:** Prior Slice 8 pass (`1366×768` & `390×844`) had **0** console errors; post-Slice 11 multi-width check (`375px` / `768px` / `1280px`) is pending Chrome remote debugging.
@@ -82,7 +86,7 @@
 ```powershell
 # Production app (hungrybirds-pos-modern)
 cd C:\Users\Admin\.gemini\antigravity\scratch\hungrybirdspos\hungrybirds-pos-modern
-npm test          # Run 136 Vitest unit & regression tests
+npm test          # Run 142 Vitest unit & regression tests
 npm run lint      # Run Oxlint
 npm run build     # Type-check (tsc -b) and build production bundle to dist/
 npm run dev       # Start local Vite dev server on http://localhost:5173

@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## [2026-11-26] Weight-Based (Per kg) Menu Item Pricing (Slice 27)
+- **Menu Setup (`src/lib/db/types.ts`, `src/lib/menu.ts`, `src/components/AdminSettingsModal.tsx`):** Added `MenuItem.soldByWeight` toggle so weighted dishes (e.g. Grilled Fish at `Rs 1,800/kg`) store per-kg rates and configure ingredient deductions per 1 kg sold.
+- **Weight Picker & Cart UX (`src/components/WeightModal.tsx`, `src/components/MenuGrid.tsx`, `src/components/CartPanel.tsx`, `src/components/ModifierModal.tsx`, `src/lib/cart.ts`, `src/App.tsx`):** Added decimal- and comma-aware `kg`/`g` weight picker modal with presets (`0.5`, `1`, `1.5`, `2 kg`), locked per-kg rate, whole-rupee line rounding (`computeWeightedPrice`), flat per-fish extras preservation, separate line identity per weighed portion (`2.4 kg` vs `1.8 kg`), and tappable cart weight badge to re-weigh items.
+- **Inventory, Shift COGS & Refunds (`src/lib/sales.ts`, `src/lib/shift.ts`, `src/lib/refunds.ts`, `src/components/RefundModal.tsx`):** Scaled recipe stock verification, deductions, restorations, and live shift COGS by sold `weightKg` (`recipeMultiplierForLine`) while keeping modifiers flat per fish.
+- **Receipts, KOT & KDS (`src/lib/receipt.ts`, `src/components/KitchenDisplayModal.tsx`, `src/components/HeldOrdersModal.tsx`, `src/components/SalesHistoryModal.tsx`):** Formatted weight × per-kg rate cleanly across 80mm/58mm ESC/POS, HTML print receipts, KOT (`2.4kg Grilled Fish`), KDS cards, Held Orders, and Sales History while keeping `Total Qty` unit count accurate.
+
 ## [2026-11-24] Security Hardening & Financial/Workflow Bug Fixes
 
 ### Security (`SEC-01`..`SEC-06`)
