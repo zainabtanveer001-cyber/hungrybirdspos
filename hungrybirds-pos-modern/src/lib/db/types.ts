@@ -98,6 +98,10 @@ export interface CartItem {
   /** Snapshot of the item's category at time of order so historical category reports survive menu edits. */
   categoryId?: string;
   categoryName?: string;
+  /** Weight in kg when sold by weight (e.g. 2.4 for Grilled Fish); `price` stores the computed line total. */
+  weightKg?: number;
+  /** Snapshot of the per-kg selling rate at order time (e.g. 1800). */
+  unitRate?: number;
   /** Written by partial refunds; never reduces `qty` so the original bill stays legible. */
   refundedQty?: number;
   modifiers?: ModifierSelection[];
@@ -203,6 +207,8 @@ export interface MenuItem {
   imageUrl?: string;
   description?: string;
   available?: boolean;
+  /** When true, `price` represents selling rate per kg and cashier enters item weight at POS. */
+  soldByWeight?: boolean;
   isAddon?: boolean;
   modifierGroups?: ModifierGroup[];
   createdAt?: string;

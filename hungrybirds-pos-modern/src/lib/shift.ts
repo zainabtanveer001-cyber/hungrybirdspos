@@ -1,5 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { recipeMultiplierForLine } from './cart';
 import { computeCategoryBreakdown } from './categoryAnalytics';
 import type { CategorySalesRow } from './categoryAnalytics';
 import { clearShiftStockDeltas, getShiftStockDeltas } from './inventory';
@@ -215,14 +216,14 @@ export function computeSaleLiveCost(
 ): number {
   let cost = 0;
   for (const line of sale.items || []) {
-    const effectiveQty = Math.max(0, (Number(line.qty) || 0) - (Number(line.refundedQty) || 0));
-    if (effectiveQty <= 0) continue;
+    const recipeMult = recipeMultiplierForLine(line, true);
+    if (recipeMult <= 0) continue;
     const itemId = line.menuItemId || line.id;
     for (const recipe of recipes) {
       if (recipe.menuItemId !== itemId) continue;
       const item = inventoryById.get(recipe.inventoryId);
       const unitCost = Number(item?.cost) || 0;
-      cost += (Number(recipe.qtyRequired) || 0) * effectiveQty * unitCost;
+      cost += (Number(recipe.qtyRequired) || 0) * recipeMult * unitCost;
     }
   }
   for (const [inventoryId, modQty] of collectModifierIngredientUsage(sale.items || [], true)) {
@@ -267,12 +268,12 @@ export function computeShiftUsage(
 
   for (const sale of shiftSales) {
     for (const line of sale.items || []) {
-      const effectiveQty = Math.max(0, (Number(line.qty) || 0) - (Number(line.refundedQty) || 0));
-      if (effectiveQty <= 0) continue;
+      const recipeMult = recipeMultiplierForLine(line, true);
+      if (recipeMult <= 0) continue;
       const itemId = line.menuItemId || line.id;
       for (const recipe of recipes.filter((r) => r.menuItemId === itemId)) {
         const row = ensureRow(recipe.inventoryId);
-        const qty = (Number(recipe.qtyRequired) || 0) * effectiveQty;
+        const qty = (Number(recipe.qtyRequired) || 0) * recipeMult;
         row.recipeQty += qty;
         row.qtyConsumed += qty;
         const addedCost = qty * row.costPerUnit;

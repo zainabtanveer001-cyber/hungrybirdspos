@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ChefHat, Clock, Flame, Printer } from 'lucide-react';
 import { db } from '../lib/db';
+import { formatWeightShort } from '../lib/cart';
 import { useLive } from '../lib/useLive';
 import { EscPosEncoder } from '../lib/escpos';
 import { printRaw } from '../lib/printer';
@@ -101,7 +102,8 @@ export function KitchenDisplayModal({ onClose, notify }: {
       for (const item of ticket.items) {
         const mods = (item.modifiers || []).map((m) => m.name).join(', ');
         const name = mods && !item.name.includes(`(${mods})`) ? `${item.name} (${mods})` : item.name;
-        encoder.text(`${item.qty}x ${name}${item.note ? ` - ${item.note}` : ''}`);
+        const lead = item.weightKg ? formatWeightShort(item.weightKg) : `${item.qty}x`;
+        encoder.text(`${lead} ${name}${item.note ? ` - ${item.note}` : ''}`);
       }
       encoder.text('--------------------------------');
       encoder.feed(4);
@@ -214,7 +216,7 @@ export function KitchenDisplayModal({ onClose, notify }: {
                       {ticket.items.map((item, idx) => (
                         <li key={`${item.id}-${idx}`} className="flex items-start gap-2 font-medium text-[#000000]">
                           <span className="inline-flex items-center justify-center min-w-7 px-1.5 py-0.5 rounded-[6px] bg-[#000524] text-white text-xs font-bold tabular-nums shrink-0">
-                            {item.qty}×
+                            {item.weightKg ? formatWeightShort(item.weightKg) : `${item.qty}×`}
                           </span>
                           <div className="min-w-0">
                             <div>{item.name}</div>

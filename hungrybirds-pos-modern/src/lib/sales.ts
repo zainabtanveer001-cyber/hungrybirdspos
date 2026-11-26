@@ -1,5 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { recipeMultiplierForLine } from './cart';
 import { reverseCustomerSale, upsertCustomer } from './customers';
 import { collectModifierIngredientUsage } from './modifiers';
 import { deleteSale, pushSale, pushStock } from './sync';
@@ -11,9 +12,10 @@ export async function verifyStock(items: CartItem[]): Promise<string | null> {
   const requiredByInventory = new Map<string, number>();
 
   for (const cartItem of items) {
+    const mult = recipeMultiplierForLine(cartItem, false);
     const recipes = await db.recipes.where('menuItemId').equals(cartItem.menuItemId || cartItem.id).toArray();
     for (const recipe of recipes) {
-      const qty = (Number(recipe.qtyRequired) || 0) * (Number(cartItem.qty) || 0);
+      const qty = (Number(recipe.qtyRequired) || 0) * mult;
       if (qty > 0) {
         requiredByInventory.set(recipe.inventoryId, (requiredByInventory.get(recipe.inventoryId) || 0) + qty);
       }
@@ -98,6 +100,7 @@ export async function recordSale(input: SaleInput): Promise<number> {
     saleId = (await db.sales.add(sale)) as number;
 
     for (const cartItem of sale.items) {
+      const mult = recipeMultiplierForLine(cartItem, false);
       const recipes = await db.recipes
         .where('menuItemId')
         .equals(cartItem.menuItemId || cartItem.id)
@@ -105,9 +108,11 @@ export async function recordSale(input: SaleInput): Promise<number> {
       for (const recipe of recipes) {
         const ingredient = await db.inventory.get(recipe.inventoryId);
         if (!ingredient) continue;
-        await db.inventory.update(recipe.inventoryId, {
-          stock: Math.max(0, (Number(ingredient.stock) || 0) - recipe.qtyRequired * cartItem.qty),
-        });
+        const nextStock = Math.max(
+          0,
+          Math.round(((Number(ingredient.stock) || 0) - recipe.qtyRequired * mult) * 1000) / 1000,
+        );
+        await db.inventory.update(recipe.inventoryId, { stock: nextStock });
         touchedStock.add(recipe.inventoryId);
       }
     }
@@ -150,8 +155,8 @@ export async function recordSale(input: SaleInput): Promise<number> {
 /** Returns remaining unrefunded recipe- and modifier-linked stock for voided or re-opened items. */
 export async function restoreInventory(items: CartItem[]): Promise<void> {
   for (const cartItem of items) {
-    const unrefundedQty = Math.max(0, (Number(cartItem.qty) || 0) - (Number(cartItem.refundedQty) || 0));
-    if (unrefundedQty <= 0) continue;
+    const mult = recipeMultiplierForLine(cartItem, true);
+    if (mult <= 0) continue;
     const recipes = await db.recipes
       .where('menuItemId')
       .equals(cartItem.menuItemId || cartItem.id)
@@ -159,9 +164,8 @@ export async function restoreInventory(items: CartItem[]): Promise<void> {
     for (const recipe of recipes) {
       const ingredient = await db.inventory.get(recipe.inventoryId);
       if (!ingredient) continue;
-      await db.inventory.update(recipe.inventoryId, {
-        stock: (Number(ingredient.stock) || 0) + recipe.qtyRequired * unrefundedQty,
-      });
+      const nextStock = Math.round(((Number(ingredient.stock) || 0) + recipe.qtyRequired * mult) * 1000) / 1000;
+      await db.inventory.update(recipe.inventoryId, { stock: nextStock });
     }
   }
   for (const [inventoryId, modQty] of collectModifierIngredientUsage(items, true)) {

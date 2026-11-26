@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { addToCart, calculateCartTotals, cartItemCount, countCartByMenuId, decrementByMenuId, setQty } from '../src/lib/cart';
-import type { CartItem } from '../src/lib/db/types';
+import {
+  addToCart,
+  calculateCartTotals,
+  cartItemCount,
+  composeModifiedItem,
+  composeWeightedItem,
+  computeWeightedPrice,
+  countCartByMenuId,
+  decrementByMenuId,
+  formatWeightKg,
+  formatWeightShort,
+  parseWeightInput,
+  recipeMultiplierForLine,
+  replaceCartLineModifiers,
+  setQty,
+  updateCartLineWeight,
+} from '../src/lib/cart';
+import type { CartItem, MenuItem } from '../src/lib/db/types';
 
 const item = (id: string, price: number, qty = 1): CartItem => ({
   id, menuItemId: id, name: id, price, qty,
@@ -92,5 +108,61 @@ describe('cart mutations', () => {
       { id: 'm1::Spice:Mild', menuItemId: 'm1', name: 'Burger (Mild)', price: 650, qty: 1 },
       { id: 'm2', menuItemId: 'm2', name: 'Fries', price: 250, qty: 1 },
     ]);
+  });
+});
+
+describe('weight-based menu item helpers (per kg)', () => {
+  const fish: MenuItem = {
+    id: 'fish_1',
+    categoryId: 'cat_bbq',
+    name: 'Grilled Fish',
+    price: 1800,
+    soldByWeight: true,
+  };
+
+  it('normalizes comma and dot decimals in kg/g and formats weight labels cleanly', () => {
+    expect(parseWeightInput('2,4', 'kg')).toBe(2.4);
+    expect(parseWeightInput('2400', 'g')).toBe(2.4);
+    expect(parseWeightInput('0', 'kg')).toBe(0);
+    expect(parseWeightInput('-1.5', 'kg')).toBe(0);
+    expect(parseWeightInput('abc', 'g')).toBe(0);
+    expect(formatWeightKg(2.4)).toBe('2.4 kg');
+    expect(formatWeightShort(2.4)).toBe('2.4kg');
+    expect(formatWeightKg(1)).toBe('1 kg');
+  });
+
+  it('rounds weighted line totals to nearest whole rupee and adds flat modifiers per fish', () => {
+    expect(computeWeightedPrice(2.4, 1800)).toBe(4320);
+    expect(computeWeightedPrice(1.35, 1850)).toBe(2498); // 2497.5 -> 2498
+    expect(computeWeightedPrice(2.4, 1800, 100)).toBe(4420); // flat Rs 100 sauce
+  });
+
+  it('keeps multiple weighed portions distinct, updates weight in place, and scales recipe multipliers', () => {
+    const fishA = composeWeightedItem(fish, 2.4);
+    const fishB = composeWeightedItem(fish, 1.8);
+    expect(fishA.id).not.toBe(fishB.id);
+    expect(fishA).toMatchObject({ qty: 1, weightKg: 2.4, unitRate: 1800, price: 4320 });
+    expect(fishB).toMatchObject({ qty: 1, weightKg: 1.8, unitRate: 1800, price: 3240 });
+
+    const cart = [fishA, fishB];
+    expect(countCartByMenuId(cart)).toEqual({ fish_1: 2 });
+
+    // Adding a flat Rs 100 modifier on fishA keeps fishB untouched and updates in place.
+    const modifiedFishA = composeModifiedItem(
+      fish,
+      [{ group: 'Extras', name: 'Garlic Sauce', price: 100 }],
+      'Extra crispy',
+      { weightKg: 2.4, unitRate: 1800, lineId: fishA.id },
+    );
+    const withMod = replaceCartLineModifiers(cart, fishA.id, modifiedFishA);
+    expect(withMod).toHaveLength(2);
+    expect(withMod[0]).toMatchObject({ id: fishA.id, price: 4420, note: 'Extra crispy', weightKg: 2.4 });
+    expect(withMod[1]).toMatchObject({ id: fishB.id, price: 3240, weightKg: 1.8 });
+
+    // Editing fishA weight to 2.0 kg recalculates base price (3600) + preserved flat modifier (100).
+    const reweighed = updateCartLineWeight(withMod, fishA.id, 2.0);
+    expect(reweighed[0]).toMatchObject({ weightKg: 2, unitRate: 1800, price: 3700 });
+    expect(recipeMultiplierForLine(reweighed[0])).toBe(2);
+    expect(recipeMultiplierForLine({ ...reweighed[0], refundedQty: 1 }, true)).toBe(0);
   });
 });

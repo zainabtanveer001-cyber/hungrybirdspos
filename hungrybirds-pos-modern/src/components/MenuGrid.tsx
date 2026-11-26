@@ -147,14 +147,18 @@ export function MenuGrid({
                               : 'border-[#e0edff]'
                         }`}
                       >
-                        {justAdded && (
+                        {justAdded ? (
                           <span
                             role="status"
                             className="pointer-events-none absolute top-2 left-2 z-10 inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-700 text-white text-[11px] font-bold shadow-sm"
                           >
                             <Check className="w-3 h-3" aria-hidden /> Added
                           </span>
-                        )}
+                        ) : item.soldByWeight ? (
+                          <span className="pointer-events-none absolute top-2 left-2 z-10 inline-flex items-center px-2 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-900 text-[10px] font-bold shadow-sm">
+                            Per kg
+                          </span>
+                        ) : null}
                         {inCartQty > 0 && (
                           <span
                             aria-label={`${inCartQty} in cart`}
@@ -169,7 +173,13 @@ export function MenuGrid({
                         <button
                           type="button"
                           onClick={() => onPick(item)}
-                          title={hasModifiers ? `Customize & add ${item.name}` : `Add ${item.name} to the order`}
+                          title={
+                            item.soldByWeight
+                              ? `Weigh & add ${item.name}`
+                              : hasModifiers
+                                ? `Customize & add ${item.name}`
+                                : `Add ${item.name} to the order`
+                          }
                           className="w-full text-left flex-1 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2941e0]"
                         >
                           {item.imageUrl ? (
@@ -195,7 +205,7 @@ export function MenuGrid({
                           {inCartQty > 0 ? (
                             <>
                               <p className="text-[#2941e0] font-semibold text-sm tabular-nums">
-                                {formatAmount(item.price)}
+                                {formatAmount(item.price)}{item.soldByWeight ? '/kg' : ''}
                               </p>
                               <div
                                 role="group"
@@ -217,9 +227,11 @@ export function MenuGrid({
                                   type="button"
                                   onClick={() => onPick(item)}
                                   aria-label={
-                                    hasModifiers
-                                      ? `Customize and add another ${item.name}`
-                                      : `Increase ${item.name}`
+                                    item.soldByWeight
+                                      ? `Weigh and add another ${item.name}`
+                                      : hasModifiers
+                                        ? `Customize and add another ${item.name}`
+                                        : `Increase ${item.name}`
                                   }
                                   className="w-9 h-9 rounded-[8px] bg-emerald-700 hover:bg-emerald-800 text-white flex items-center justify-center transition-colors shrink-0"
                                 >
@@ -230,15 +242,15 @@ export function MenuGrid({
                           ) : (
                             <div className="flex items-center justify-between gap-2">
                               <p className="text-[#2941e0] font-semibold text-sm tabular-nums">
-                                {formatAmount(item.price)}
+                                {formatAmount(item.price)}{item.soldByWeight ? '/kg' : ''}
                               </p>
                               <button
                                 type="button"
                                 onClick={() => onPick(item)}
-                                aria-label={`Add ${item.name} to cart`}
+                                aria-label={item.soldByWeight ? `Weigh and add ${item.name}` : `Add ${item.name} to cart`}
                                 className="inline-flex items-center gap-0.5 px-2.5 min-h-8 rounded-[8px] text-xs font-semibold bg-[#eff6ff] hover:bg-[#2941e0] text-[#2941e0] hover:text-white transition-colors"
                               >
-                                <Plus className="w-3.5 h-3.5" aria-hidden /> Add
+                                <Plus className="w-3.5 h-3.5" aria-hidden /> {item.soldByWeight ? 'Weigh' : 'Add'}
                               </button>
                             </div>
                           )}

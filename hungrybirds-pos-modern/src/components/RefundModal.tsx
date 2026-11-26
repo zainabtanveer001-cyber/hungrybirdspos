@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { formatAmount } from '../lib/format';
+import { formatWeightKg } from '../lib/cart';
 import { computeRefund, primaryRefundMethod, recordRefund, remainingQty } from '../lib/refunds';
 import type { RefundLine } from '../lib/refunds';
 import { Modal } from './Modal';
@@ -95,7 +96,9 @@ export function RefundModal({ sale, username, notify, onClose, onDone }: {
                     {line.name}
                   </p>
                   <p className="text-xs text-[#526066] tabular-nums">
-                    {formatAmount(preview.units[index])} each
+                    {line.weightKg && line.unitRate
+                      ? `${formatWeightKg(line.weightKg)} × ${formatAmount(line.unitRate)}/kg · ${formatAmount(preview.units[index])}`
+                      : `${formatAmount(preview.units[index])} each`}
                     {preview.units[index] !== line.price && ' after discount'} ·{' '}
                     {left === 0 ? 'fully refunded' : `${left} of ${line.qty} refundable`}
                   </p>

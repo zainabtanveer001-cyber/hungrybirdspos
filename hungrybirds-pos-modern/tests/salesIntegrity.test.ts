@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { db } from '../src/lib/db';
 import { adjustCustomerForRefund, reverseCustomerSale } from '../src/lib/customers';
-import { restoreInventory } from '../src/lib/sales';
+import { restoreInventory, verifyStock } from '../src/lib/sales';
 import type { CartItem, Customer, Sale } from '../src/lib/db/types';
 
 describe('inventory restoration & customer CRM reversal integrity', () => {
@@ -100,5 +100,47 @@ describe('inventory restoration & customer CRM reversal integrity', () => {
     expect(stored.totalOrders).toBe(0);
     expect(stored.totalSpent).toBe(0);
     expect(stored.loyaltyPoints).toBe(10);
+  });
+
+  it('scales recipe stock verification and restoration by weightKg while keeping modifier stock flat per fish', async () => {
+    const stock = new Map<string, number>([
+      ['raw_fish', 5],
+      ['sauce_cup', 3],
+    ]);
+    const recipes = [{ id: 1, menuItemId: 'fish_1', inventoryId: 'raw_fish', qtyRequired: 1 }];
+
+    vi.spyOn(db.recipes, 'where').mockImplementation((() => ({
+      equals: (menuId: string) => ({
+        toArray: async () => recipes.filter((r) => r.menuItemId === menuId),
+      }),
+    })) as any);
+    vi.spyOn(db.inventory, 'get').mockImplementation(async (id: string) =>
+      stock.has(id) ? ({ id, name: id, stock: stock.get(id)!, unit: 'kg', cost: 1000 } as any) : undefined,
+    );
+    vi.spyOn(db.inventory, 'update').mockImplementation(async (id: string, patch: any) => {
+      stock.set(id, patch.stock);
+      return 1;
+    });
+
+    const fishLine: CartItem = {
+      id: 'fish_1::wt:2.4:1',
+      menuItemId: 'fish_1',
+      name: 'Grilled Fish (Garlic Sauce)',
+      price: 4420,
+      qty: 1,
+      weightKg: 2.4,
+      unitRate: 1800,
+      modifiers: [{ group: 'Extras', name: 'Garlic Sauce', price: 100, inventoryId: 'sauce_cup', qtyRequired: 1 }],
+    };
+
+    // 2.4 kg needed <= 5 kg available -> passes
+    expect(await verifyStock([fishLine])).toBeNull();
+    // 6.0 kg needed > 5 kg available -> blocked
+    expect(await verifyStock([{ ...fishLine, weightKg: 6 }])).toContain('raw_fish');
+
+    // Void/reopen restores 2.4 kg raw_fish and 1 flat sauce_cup.
+    await restoreInventory([fishLine]);
+    expect(stock.get('raw_fish')).toBe(7.4);
+    expect(stock.get('sauce_cup')).toBe(4);
   });
 });

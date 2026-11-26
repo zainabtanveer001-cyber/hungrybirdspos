@@ -629,4 +629,54 @@ describe('receipt', () => {
     expect(fullHtml).toContain('For Delivery Contact: 0325-7867774');
     expect(fullHtml).not.toContain('Order &amp; Support');
   });
+
+  it('formats weighted items clearly across 80mm/58mm ESC/POS, KOT, HTML receipt, and WhatsApp text', () => {
+    const weightedSale: Sale = {
+      ...sale,
+      items: [
+        {
+          id: 'fish_1::wt:2.4:1',
+          menuItemId: 'fish_1',
+          name: 'Grilled Fish',
+          price: 4320,
+          qty: 1,
+          weightKg: 2.4,
+          unitRate: 1800,
+        },
+        { id: 'm1', menuItemId: 'm1', name: 'Zinger Burger', price: 650, qty: 1 },
+      ],
+      subtotal: 4970,
+      discountPercent: 0,
+      discountAmount: 0,
+      deliveryCharge: 0,
+      total: 4970,
+    };
+
+    const esc80 = new TextDecoder('latin1').decode(
+      generateEscPosReceipt(weightedSale, { ...settings, showLogo: false, qrUrl: '' }),
+    );
+    expect(esc80).toContain('2.4kg Grilled Fish');
+    expect(esc80).toContain('2.4 kg x Rs 1,800.00/kg');
+    expect(esc80).toContain('4,320.00');
+    expect(esc80).toContain('Total Qty: 2');
+
+    const esc58 = new TextDecoder('latin1').decode(
+      generateEscPosReceipt(weightedSale, { ...settings, paperWidth: '58mm', showLogo: false, qrUrl: '' }),
+    );
+    expect(esc58).toContain('2.4kg Grilled Fish');
+    expect(esc58).toContain('2.4 kg x Rs 1,800.00/kg');
+    expect(esc58).toContain('4,320.00');
+
+    const html = receiptDocument(weightedSale, { ...settings, showLogo: false, qrUrl: '' });
+    expect(html).toMatch(/2\.4 kg &times; Rs[\s\u00a0]1,800\/kg/);
+    expect(html).toContain('>1,800.00<');
+    expect(html).toContain('>2.4kg<');
+    expect(html).toContain('>4,320.00<');
+    expect(html).toContain('Total Qty: 2');
+
+    const plainLines = receiptLines(weightedSale, settings);
+    expect(
+      plainLines.some((l) => /2\.4 kg x Rs[\s\u00a0]1,800\/kg/.test(l) && /Rs[\s\u00a0]4,320/.test(l)),
+    ).toBe(true);
+  });
 });

@@ -7,6 +7,8 @@ import {
   CLOSED_SHIFT_REPORTS_KEY,
   computeDenominationTotal,
   computeDrawerVariance,
+  computeSaleLiveCost,
+  computeShiftUsage,
   getClosedShiftReports,
 } from '../src/lib/shift';
 
@@ -189,5 +191,45 @@ describe('blind cash drawer & payment-mode shift helpers', () => {
     expect(report.cardCollected).toBe(300);
     expect(report.onlineCollected).toBe(200);
     expect(report.totalSales).toBe(1350);
+  });
+
+  it('scales recipe COGS and live shift usage by sold weightKg for weighted menu items', () => {
+    const inv = [{ id: 'raw_fish', name: 'Raw Fish', stock: 10, unit: 'kg', cost: 900 }];
+    const recipes = [{ id: 1, menuItemId: 'fish_1', inventoryId: 'raw_fish', qtyRequired: 1 }];
+    const weightedSale = {
+      id: 99,
+      timestamp: '2026-11-26T12:00:00.000Z',
+      orderType: 'DINE_IN' as const,
+      serverUser: 'cashier',
+      items: [
+        {
+          id: 'fish_1::wt:2.4:1',
+          menuItemId: 'fish_1',
+          name: 'Grilled Fish',
+          price: 4320,
+          qty: 1,
+          weightKg: 2.4,
+          unitRate: 1800,
+        },
+      ],
+      subtotal: 4320,
+      discountPercent: 0,
+      discountAmount: 0,
+      deliveryCharge: 0,
+      packingCharge: 0,
+      taxPercent: 0,
+      taxAmount: 0,
+      otherCharge: 0,
+      total: 4320,
+      payments: [{ method: 'Cash' as const, amount: 4320 }],
+      totalReceived: 4320,
+      totalChange: 0,
+    };
+
+    const invMap = new Map(inv.map((i) => [i.id, i]));
+    expect(computeSaleLiveCost(weightedSale, recipes, invMap)).toBeCloseTo(2160);
+    const usage = computeShiftUsage([weightedSale], recipes, inv);
+    expect(usage.consumedCost).toBeCloseTo(2160);
+    expect(usage.ingredients[0].qtyConsumed).toBeCloseTo(2.4);
   });
 });

@@ -113,6 +113,7 @@ export interface MenuItemDraft {
   imageUrl?: string;
   description?: string;
   available?: boolean;
+  soldByWeight?: boolean;
   modifierGroups?: ModifierGroup[];
 }
 
@@ -159,6 +160,7 @@ export async function saveMenuItem(
     };
     if (draft.description !== undefined) merged.description = draft.description.trim();
     merged.available = draft.available ?? existing?.available ?? true;
+    merged.soldByWeight = draft.soldByWeight ? true : undefined;
 
     await db.menu.put(merged);
     await db.recipes.where('menuItemId').equals(id).delete();
@@ -170,7 +172,7 @@ export async function saveMenuItem(
   await pushMenu(id);
   await logAudit(
     existingId ? 'MENU_ITEM_UPDATED' : 'MENU_ITEM_ADDED',
-    `${existingId ? 'Updated' : 'Added'} "${name}" at ${price} with ${cleanRecipes.length} recipe line(s)`,
+    `${existingId ? 'Updated' : 'Added'} "${name}" at ${price}${draft.soldByWeight ? '/kg' : ''} with ${cleanRecipes.length} recipe line(s)`,
     user,
   );
   return id;

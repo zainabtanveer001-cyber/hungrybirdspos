@@ -26,9 +26,10 @@ interface Draft {
   price: string;
   categoryId: string;
   imageUrl: string;
+  soldByWeight: boolean;
 }
 
-const BLANK: Draft = { name: '', price: '', categoryId: '', imageUrl: '' };
+const BLANK: Draft = { name: '', price: '', categoryId: '', imageUrl: '', soldByWeight: false };
 
 export function AdminSettingsModal({ username, notify, onClose }: {
   username: string;
@@ -100,6 +101,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
       price: String(item.price ?? ''),
       categoryId: item.categoryId || categories[0]?.id || '',
       imageUrl: item.imageUrl || '',
+      soldByWeight: Boolean(item.soldByWeight),
     });
     setRecipeRows((recipesByItem.get(item.id) || []).map((r) => ({ inventoryId: r.inventoryId, qtyRequired: String(r.qtyRequired) })));
     setDishModifierGroups(item.modifierGroups ? item.modifierGroups.map((g) => ({ ...g, options: [...(g.options || [])] })) : []);
@@ -285,7 +287,7 @@ export function AdminSettingsModal({ username, notify, onClose }: {
               step="0.01"
               value={draft.price}
               onChange={(e) => setDraft({ ...draft, price: e.target.value })}
-              placeholder="Price (Rs)"
+              placeholder={draft.soldByWeight ? 'Rate per kg (Rs)' : 'Price (Rs)'}
               aria-label="Dish price"
               className={`${INPUT} font-bold text-purple-800`}
             />
@@ -301,6 +303,21 @@ export function AdminSettingsModal({ username, notify, onClose }: {
               ))}
             </select>
           </div>
+
+          <label className="flex items-start gap-2.5 p-2.5 rounded-xl border border-purple-200 bg-purple-50/40 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={draft.soldByWeight}
+              onChange={(e) => setDraft({ ...draft, soldByWeight: e.target.checked })}
+              className="mt-0.5 rounded accent-purple-600 w-4 h-4 shrink-0"
+            />
+            <span className="text-xs leading-snug">
+              <strong className="text-gray-800">Sold by weight (per kg)</strong>
+              <span className="block text-[11px] text-gray-500">
+                Cashier enters weight in kg or g (e.g. Grilled Fish 2.4 kg × Rs 1,800/kg = Rs 4,320).
+              </span>
+            </span>
+          </label>
 
           <div className="flex flex-col sm:flex-row gap-2">
             <button
@@ -363,7 +380,9 @@ export function AdminSettingsModal({ username, notify, onClose }: {
 
           <div className="border-t border-gray-100 pt-2 space-y-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-700">Ingredient deductions</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-gray-700">
+                {draft.soldByWeight ? 'Ingredient deductions (per 1 kg sold)' : 'Ingredient deductions'}
+              </span>
               <button
                 type="button"
                 onClick={() => setRecipeRows((rows) => [...rows, { inventoryId: '', qtyRequired: '' }])}
@@ -427,9 +446,16 @@ export function AdminSettingsModal({ username, notify, onClose }: {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-gray-800 truncate">{item.name}</p>
+                      <p className="text-xs font-bold text-gray-800 truncate flex items-center gap-1.5">
+                        <span className="truncate">{item.name}</span>
+                        {item.soldByWeight && (
+                          <span className="text-[9px] font-bold uppercase bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-full shrink-0">
+                            Per kg
+                          </span>
+                        )}
+                      </p>
                       <p className="text-[10px] text-gray-500">
-                        {formatAmount(item.price)}
+                        {formatAmount(item.price)}{item.soldByWeight ? '/kg' : ''}
                         {' · '}
                         {categoryName.get(item.categoryId) || 'Uncategorized'}
                         {' · '}

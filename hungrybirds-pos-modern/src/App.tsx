@@ -4,7 +4,18 @@ import { db } from './lib/db';
 import { useLive } from './lib/useLive';
 import { initializeApp, readSession, signOut, verifyStoredSession } from './lib/auth';
 import { getSyncStatus, startSync, stopSync, subscribeToSync, syncNow } from './lib/sync';
-import { addToCart, calculateCartTotals, countCartByMenuId, decrementByMenuId, replaceCartLineModifiers, setQty } from './lib/cart';
+import {
+  addToCart,
+  calculateCartTotals,
+  composeWeightedItem,
+  countCartByMenuId,
+  decrementByMenuId,
+  formatWeightKg,
+  formatWeightShort,
+  replaceCartLineModifiers,
+  setQty,
+  updateCartLineWeight,
+} from './lib/cart';
 import type { CartCharges } from './lib/cart';
 import { getModifierLibrary, resolveDishModifierGroups } from './lib/modifiers';
 import { getCustomer } from './lib/customers';
@@ -20,6 +31,7 @@ import { MenuGrid } from './components/MenuGrid';
 import { CartPanel } from './components/CartPanel';
 import { PaymentModal } from './components/PaymentModal';
 import { ModifierModal } from './components/ModifierModal';
+import { WeightModal } from './components/WeightModal';
 import { HeldOrdersModal } from './components/HeldOrdersModal';
 import { DeliveriesModal } from './components/DeliveriesModal';
 import { CustomersModal } from './components/CustomersModal';
@@ -46,8 +58,12 @@ import type { CartItem, CustomerInfo, MenuItem, ModifierGroup, OnlineOrder, Paym
 type Session = { username: string; role: UserRole };
 
 type ModifierSession =
-  | { mode: 'add'; item: MenuItem; groups: ModifierGroup[] }
-  | { mode: 'edit'; item: MenuItem; groups: ModifierGroup[]; line: CartItem };
+  | { mode: 'add'; item: MenuItem; groups: ModifierGroup[]; weightContext?: { weightKg: number; unitRate: number; lineId?: string } }
+  | { mode: 'edit'; item: MenuItem; groups: ModifierGroup[]; line: CartItem; weightContext?: { weightKg: number; unitRate: number; lineId?: string } };
+
+type WeightSession =
+  | { mode: 'add'; item: MenuItem }
+  | { mode: 'edit'; item: MenuItem; line: CartItem; modifierSum: number };
 
 const EMPTY_CHARGES: CartCharges = {
   orderType: 'DINE_IN',
@@ -67,6 +83,7 @@ function App() {
   const [customer, setCustomer] = useState<CustomerInfo>({});
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [modifying, setModifying] = useState<ModifierSession | null>(null);
+  const [weighing, setWeighing] = useState<WeightSession | null>(null);
   const modifierLibrary = useLive(() => getModifierLibrary(), []) ?? [];
   const menuItems = useLive(() => db.menu.toArray(), []) ?? [];
   const [paying, setPaying] = useState(false);
@@ -174,12 +191,20 @@ function App() {
         setLastAddedMenuId(null);
         setLastAddedLineId(null);
       }, 950);
-      notify(`Added ${cartItem.name} to cart (×${nextQty})`);
+      notify(
+        cartItem.weightKg
+          ? `Added ${formatWeightShort(cartItem.weightKg)} ${cartItem.name} to cart`
+          : `Added ${cartItem.name} to cart (×${nextQty})`,
+      );
     },
     [cart, notify],
   );
 
   function pickItem(item: MenuItem) {
+    if (item.soldByWeight) {
+      setWeighing({ mode: 'add', item });
+      return;
+    }
     const groups = resolveDishModifierGroups(item, modifierLibrary, 'pick');
     if (groups.length > 0) {
       setModifying({ mode: 'add', item, groups });
@@ -196,6 +221,22 @@ function App() {
     addCartItem(line);
   }
 
+  function editCartLineWeight(line: CartItem) {
+    const canonicalId = line.menuItemId || line.id;
+    const found = menuItems.find((m) => m.id === canonicalId);
+    const modSum = (line.modifiers ?? []).reduce((sum, m) => sum + (Number(m.price) || 0), 0);
+    const baseName = line.modifiers?.length
+      ? line.name.replace(/\s*\([^)]*\)$/, '').trim() || line.name
+      : line.name;
+    const unitRate = line.unitRate ?? found?.price ?? Math.max(0, (Number(line.price) || 0) - modSum);
+    const baseItem: MenuItem = {
+      ...(found ?? { id: canonicalId, categoryId: line.categoryId || '', name: baseName, price: unitRate }),
+      price: unitRate,
+      soldByWeight: true,
+    };
+    setWeighing({ mode: 'edit', item: baseItem, line, modifierSum: modSum });
+  }
+
   function editCartLineModifiers(line: CartItem) {
     const canonicalId = line.menuItemId || line.id;
     const found = menuItems.find((m) => m.id === canonicalId);
@@ -210,7 +251,15 @@ function App() {
       price: Math.max(0, (Number(line.price) || 0) - modSum),
     };
     const groups = resolveDishModifierGroups(baseItem, modifierLibrary, 'edit');
-    setModifying({ mode: 'edit', item: baseItem, groups, line });
+    const weightContext =
+      line.weightKg && line.weightKg > 0
+        ? {
+            weightKg: line.weightKg,
+            unitRate: line.unitRate ?? found?.price ?? Math.max(0, (Number(line.price) || 0) - modSum),
+            lineId: line.id,
+          }
+        : undefined;
+    setModifying({ mode: 'edit', item: baseItem, groups, line, weightContext });
   }
 
   const resetOrder = useCallback(() => {
@@ -639,6 +688,7 @@ function App() {
               onQtyChange={(id, qty) => setCart((c) => setQty(c, id, qty))}
               onRemove={(id) => setCart((c) => c.filter((i) => i.id !== id))}
               onEditModifiers={editCartLineModifiers}
+              onEditWeight={editCartLineWeight}
               onClear={clearCart}
               onHold={hold}
               onCheckout={() => void startCheckout()}
@@ -813,7 +863,9 @@ function App() {
               ? {
                   title: `${charges.orderType.replace('_', ' ')} · ${charges.tableNumber ? `Table ${charges.tableNumber}` : 'Walk-in'}`,
                   lines: cart.map((line): [string, string] => [
-                    `${line.qty} × ${line.name}`,
+                    line.weightKg
+                      ? `${formatWeightShort(line.weightKg)} ${line.name} (${formatAmount(line.unitRate ?? line.price)}/kg)`
+                      : `${line.qty} × ${line.name}`,
                     formatAmount(line.price * line.qty),
                   ]),
                   total: totals.grandTotal,
@@ -870,6 +922,40 @@ function App() {
         />
       )}
 
+      {weighing && (
+        <WeightModal
+          item={weighing.item}
+          mode={weighing.mode}
+          initialWeightKg={weighing.mode === 'edit' ? weighing.line.weightKg : undefined}
+          modifierSum={weighing.mode === 'edit' ? weighing.modifierSum : 0}
+          onCancel={() => setWeighing(null)}
+          onConfirm={(weightKg) => {
+            if (weighing.mode === 'edit') {
+              const targetId = weighing.line.id;
+              setCart((current) => updateCartLineWeight(current, targetId, weightKg));
+              setLastAddedMenuId(weighing.item.id);
+              setLastAddedLineId(targetId);
+              if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
+              addedTimerRef.current = setTimeout(() => {
+                setLastAddedMenuId(null);
+                setLastAddedLineId(null);
+              }, 950);
+              setWeighing(null);
+              notify(`Updated ${weighing.item.name} weight to ${formatWeightKg(weightKg)}.`);
+              return;
+            }
+            const item = weighing.item;
+            setWeighing(null);
+            const groups = resolveDishModifierGroups(item, modifierLibrary, 'pick');
+            if (groups.length > 0) {
+              setModifying({ mode: 'add', item, groups, weightContext: { weightKg, unitRate: item.price } });
+              return;
+            }
+            addCartItem(composeWeightedItem(item, weightKg));
+          }}
+        />
+      )}
+
       {modifying && (
         <ModifierModal
           item={modifying.item}
@@ -878,6 +964,7 @@ function App() {
           initialSelections={modifying.mode === 'edit' ? modifying.line.modifiers : undefined}
           initialNote={modifying.mode === 'edit' ? modifying.line.note : undefined}
           currentQty={modifying.mode === 'edit' ? modifying.line.qty : 1}
+          weightContext={modifying.weightContext}
           notify={notify}
           onCancel={() => setModifying(null)}
           onConfirm={(cartItem, splitOne) => {
@@ -887,7 +974,7 @@ function App() {
               setCart((current) =>
                 replaceCartLineModifiers(current, modifying.line.id, cartItem, splitOne),
               );
-              setLastAddedLineId(cartItem.id);
+              setLastAddedLineId(modifying.line.weightKg ? modifying.line.id : cartItem.id);
               if (addedTimerRef.current) clearTimeout(addedTimerRef.current);
               addedTimerRef.current = setTimeout(() => {
                 setLastAddedLineId(null);

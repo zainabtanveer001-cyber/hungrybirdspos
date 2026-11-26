@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { readHeldOrder } from '../lib/held';
+import { formatWeightShort } from '../lib/cart';
 import { formatAmount } from '../lib/format';
 import { Modal } from './Modal';
 import type { CartCharges } from '../lib/cart';
@@ -57,7 +58,7 @@ export function HeldOrdersModal({ onClose, onRestore }: {
               </div>
 
               <div className="text-xs text-[#273238] bg-white p-2.5 rounded-[10px] border border-[#e0edff]">
-                {order.items.map((i) => `${i.name} ×${i.qty}`).join(', ')}
+                {order.items.map((i) => (i.weightKg ? `${formatWeightShort(i.weightKg)} ${i.name}` : `${i.name} ×${i.qty}`)).join(', ')}
               </div>
 
               <div className="flex flex-wrap items-center justify-end gap-2 pt-1">

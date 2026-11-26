@@ -1,5 +1,6 @@
 import { db } from './db';
 import { logAudit } from './audit';
+import { recipeMultiplierForLine } from './cart';
 import { adjustCustomerForRefund } from './customers';
 import { roundAmount } from './format';
 import { collectModifierIngredientUsage } from './modifiers';
@@ -178,12 +179,12 @@ export async function recordRefund(
     await db.sales.update(saleId, patch);
 
     for (const line of refundedItems) {
+      const mult = recipeMultiplierForLine(line, false);
       for (const recipe of await db.recipes.where('menuItemId').equals(line.menuItemId || line.id).toArray()) {
         const ingredient = await db.inventory.get(recipe.inventoryId);
         if (!ingredient) continue;
-        await db.inventory.update(recipe.inventoryId, {
-          stock: (Number(ingredient.stock) || 0) + recipe.qtyRequired * line.qty,
-        });
+        const nextStock = Math.round(((Number(ingredient.stock) || 0) + recipe.qtyRequired * mult) * 1000) / 1000;
+        await db.inventory.update(recipe.inventoryId, { stock: nextStock });
       }
     }
     for (const [inventoryId, modQty] of collectModifierIngredientUsage(refundedItems, false)) {

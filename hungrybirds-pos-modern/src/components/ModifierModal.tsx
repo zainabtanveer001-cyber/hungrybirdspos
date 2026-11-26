@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
-import { composeModifiedItem } from '../lib/cart';
+import { composeModifiedItem, formatWeightKg } from '../lib/cart';
 import { formatAmount } from '../lib/format';
 import type { CartItem, MenuItem, ModifierGroup, ModifierSelection } from '../lib/db/types';
 
@@ -29,6 +29,7 @@ export function ModifierModal({
   initialSelections = [],
   initialNote = '',
   currentQty = 1,
+  weightContext,
   onCancel,
   onConfirm,
   notify,
@@ -39,6 +40,7 @@ export function ModifierModal({
   initialSelections?: ModifierSelection[];
   initialNote?: string;
   currentQty?: number;
+  weightContext?: { weightKg: number; unitRate: number; lineId?: string };
   onCancel: () => void;
   onConfirm: (cartItem: CartItem, splitOne: boolean) => void;
   notify: (message: string) => void;
@@ -79,8 +81,8 @@ export function ModifierModal({
     }),
   );
 
-  const composed = composeModifiedItem(item, selections, note);
-  const showSplitToggle = mode === 'edit' && currentQty > 1;
+  const composed = composeModifiedItem(item, selections, note, weightContext);
+  const showSplitToggle = mode === 'edit' && currentQty > 1 && !weightContext;
 
   function confirm() {
     const missing = groups.find((g) => g.required && !(picked[g.id] ?? []).length);
@@ -117,6 +119,11 @@ export function ModifierModal({
       }
     >
       <div className="space-y-4">
+        {weightContext && (
+          <div className="p-2.5 rounded-xl bg-[#eff6ff] border border-[#e0edff] text-xs font-medium text-[#273238] tabular-nums">
+            {formatWeightKg(weightContext.weightKg)} × {formatAmount(weightContext.unitRate)}/kg · Paid extras add flat per portion
+          </div>
+        )}
         {showSplitToggle && (
           <div className="p-3 rounded-xl bg-[#eff6ff] border border-[#e0edff] space-y-2">
             <p className="text-xs font-semibold text-[#273238]">

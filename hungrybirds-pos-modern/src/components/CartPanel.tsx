@@ -1,8 +1,8 @@
 import { useId, useState } from 'react';
-import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed, Check, SlidersHorizontal } from 'lucide-react';
+import { Minus, Plus, Trash2, Pause, Printer, UtensilsCrossed, Check, SlidersHorizontal, Scale } from 'lucide-react';
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
-import { calculateCartTotals, cartItemCount } from '../lib/cart';
+import { calculateCartTotals, cartItemCount, formatWeightKg, formatWeightShort } from '../lib/cart';
 import type { CartCharges } from '../lib/cart';
 import { formatAmount } from '../lib/format';
 import { CustomerPanel } from './CustomerPanel';
@@ -18,7 +18,7 @@ const TABLES = ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9', 'T10', 'T1
 
 export function CartPanel({
   items, role, charges, customer, loyaltyBalance, lastAddedLineId = null, onChange, onCustomerChange,
-  onQtyChange, onRemove, onEditModifiers, onClear, onCheckout, onHold, notify,
+  onQtyChange, onRemove, onEditModifiers, onEditWeight, onClear, onCheckout, onHold, notify,
 }: {
   items: CartItem[];
   role: UserRole;
@@ -31,6 +31,7 @@ export function CartPanel({
   onQtyChange: (id: string, qty: number) => void;
   onRemove: (id: string) => void;
   onEditModifiers?: (line: CartItem) => void;
+  onEditWeight?: (line: CartItem) => void;
   onClear: () => void;
   onCheckout: () => void;
   onHold: () => void;
@@ -205,6 +206,7 @@ export function CartPanel({
           ) : (
             items.map((item) => {
               const justAdded = lastAddedLineId === item.id;
+              const isWeighted = Boolean(item.weightKg && item.weightKg > 0);
               return (
                 <div
                   key={item.id}
@@ -220,7 +222,11 @@ export function CartPanel({
                       <div className="text-[11px] italic text-[#526066] mt-0.5 truncate">Note: {item.note}</div>
                     )}
                     <div className="text-xs text-[#526066] flex flex-wrap items-center gap-1.5 mt-1 tabular-nums">
-                      <span>{formatAmount(item.price)}</span>
+                      <span>
+                        {isWeighted
+                          ? `${formatWeightKg(item.weightKg!)} × ${formatAmount(item.unitRate ?? item.price)}/kg`
+                          : formatAmount(item.price)}
+                      </span>
                       {justAdded && (
                         <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded-full">
                           <Check className="w-3 h-3" aria-hidden /> Added
@@ -240,25 +246,38 @@ export function CartPanel({
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <div className="flex items-center gap-1">
+                    {isWeighted ? (
                       <button
                         type="button"
-                        onClick={() => onQtyChange(item.id, item.qty - 1)}
-                        className="w-9 h-9 rounded-[8px] bg-red-600 text-white hover:bg-red-700 flex items-center justify-center transition-colors"
-                        aria-label={`Decrease ${item.name}`}
+                        onClick={() => onEditWeight?.(item)}
+                        aria-label={`Edit weight for ${item.name}`}
+                        title="Tap to change weight"
+                        className="h-9 px-2.5 rounded-[8px] border border-[#2941e0] bg-[#eff6ff] hover:bg-[#e0edff] text-[#2941e0] text-xs font-bold flex items-center gap-1 transition-colors tabular-nums"
                       >
-                        <Minus className="w-4 h-4" aria-hidden />
+                        <Scale className="w-3.5 h-3.5 shrink-0" aria-hidden />
+                        {formatWeightShort(item.weightKg!)}
                       </button>
-                      <span className="font-semibold min-w-6 text-center text-sm tabular-nums text-[#000000]">{item.qty}</span>
-                      <button
-                        type="button"
-                        onClick={() => onQtyChange(item.id, item.qty + 1)}
-                        className="w-9 h-9 rounded-[8px] bg-emerald-700 text-white hover:bg-emerald-800 flex items-center justify-center transition-colors"
-                        aria-label={`Increase ${item.name}`}
-                      >
-                        <Plus className="w-4 h-4" aria-hidden />
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onQtyChange(item.id, item.qty - 1)}
+                          className="w-9 h-9 rounded-[8px] bg-red-600 text-white hover:bg-red-700 flex items-center justify-center transition-colors"
+                          aria-label={`Decrease ${item.name}`}
+                        >
+                          <Minus className="w-4 h-4" aria-hidden />
+                        </button>
+                        <span className="font-semibold min-w-6 text-center text-sm tabular-nums text-[#000000]">{item.qty}</span>
+                        <button
+                          type="button"
+                          onClick={() => onQtyChange(item.id, item.qty + 1)}
+                          className="w-9 h-9 rounded-[8px] bg-emerald-700 text-white hover:bg-emerald-800 flex items-center justify-center transition-colors"
+                          aria-label={`Increase ${item.name}`}
+                        >
+                          <Plus className="w-4 h-4" aria-hidden />
+                        </button>
+                      </div>
+                    )}
                     <div className="font-semibold text-xs sm:text-sm min-w-14 sm:min-w-16 text-right text-[#000000] tabular-nums">
                       {formatAmount(item.price * item.qty)}
                     </div>

@@ -3,6 +3,7 @@ import { Download, Pencil, Printer, RotateCcw, Search, Share2, Trash2 } from 'lu
 import { db } from '../lib/db';
 import { useLive } from '../lib/useLive';
 import { logAudit } from '../lib/audit';
+import { formatWeightShort } from '../lib/cart';
 import { reverseCustomerSale } from '../lib/customers';
 import { restoreInventory } from '../lib/sales';
 import { deleteSale } from '../lib/sync';
@@ -346,7 +347,7 @@ export function SalesHistoryModal({ role, username, onClose, onReopen, notify, h
                             By: {sale.serverUser || 'Staff'} · {new Date(sale.timestamp).toLocaleString()}
                           </p>
                           <p className="text-xs text-[#526066] truncate mt-0.5">
-                            {sale.items.map((i) => `${i.name} ×${i.qty}`).join(', ')}
+                            {sale.items.map((i) => (i.weightKg ? `${formatWeightShort(i.weightKg)} ${i.name}` : `${i.name} ×${i.qty}`)).join(', ')}
                           </p>
                           {shares.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1.5">

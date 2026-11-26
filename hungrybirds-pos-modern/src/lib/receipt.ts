@@ -1,4 +1,5 @@
 import { formatAmount } from './format';
+import { formatWeightKg, formatWeightShort } from './cart';
 import { DEFAULT_PRINTER_SETTINGS, getPrinterSettings, printRaw } from './printer';
 import type { PrinterSettings } from './printer';
 import type { CartItem, Sale } from './db/types';
@@ -188,8 +189,9 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
     encoder.align('left');
     for (const item of sale.items || []) {
       const { baseName, modifiers, note } = splitItemDisplay(item);
+      const lead = item.weightKg ? formatWeightShort(item.weightKg) : `${item.qty}x`;
       encoder.setSize(0, 1);
-      for (const wrapped of wrapWords(`${item.qty}x ${baseName}`, cols)) {
+      for (const wrapped of wrapWords(`${lead} ${baseName}`, cols)) {
         encoder.text(wrapped);
       }
       encoder.setSize(0, 0);
@@ -309,24 +311,53 @@ export function generateEscPosReceipt(sale: Sale, settings: PrinterSettings): Ui
   for (const item of sale.items || []) {
     totalUnits += Number(item.qty) || 0;
     const { baseName, modifiers, note } = splitItemDisplay(item);
-    const wrappedName = wrapWords(baseName, settings.printItemPrices ? itemW - 1 : cols - 6);
-    const rateStr = formatDecimal(item.price);
-    const qtyStr = String(item.qty);
+    const isWeighted = Boolean(item.weightKg && item.unitRate);
+    const weightShort = isWeighted ? formatWeightShort(item.weightKg!) : '';
+    const rateStr = formatDecimal(isWeighted ? item.unitRate! : item.price);
+    const qtyStr = isWeighted ? weightShort : String(item.qty);
     const amtStr = formatDecimal(item.price * item.qty);
+    const wrappedName = wrapWords(
+      baseName,
+      settings.printItemPrices
+        ? settings.paperWidth === '80mm' || !isWeighted
+          ? itemW - 1
+          : cols - amtStr.length - 1
+        : cols - (isWeighted ? Math.max(6, weightShort.length + 1) : 6),
+    );
 
     if (settings.printItemPrices) {
-      encoder.text(
-        wrappedName[0].padEnd(itemW, ' ') +
-        rateStr.padStart(rateW, ' ') +
-        qtyStr.padStart(qtyW, ' ') +
-        amtStr.padStart(amtW, ' '),
-      );
+      if (isWeighted && settings.paperWidth === '58mm') {
+        encoder.text(formatTwoCol(wrappedName[0], amtStr, cols));
+      } else if (isWeighted) {
+        const fitCols = qtyStr.length <= qtyW && rateStr.length <= rateW;
+        encoder.text(
+          wrappedName[0].padEnd(itemW, ' ') +
+          (fitCols ? rateStr.padStart(rateW, ' ') : ''.padStart(rateW, ' ')) +
+          (fitCols ? qtyStr.padStart(qtyW, ' ') : `${item.qty}x`.padStart(qtyW, ' ')) +
+          amtStr.padStart(amtW, ' '),
+        );
+      } else {
+        encoder.text(
+          wrappedName[0].padEnd(itemW, ' ') +
+          rateStr.padStart(rateW, ' ') +
+          qtyStr.padStart(qtyW, ' ') +
+          amtStr.padStart(amtW, ' '),
+        );
+      }
     } else {
-      encoder.text(formatTwoCol(wrappedName[0], `${qtyStr}x`, cols));
+      encoder.text(formatTwoCol(wrappedName[0], isWeighted ? weightShort : `${qtyStr}x`, cols));
     }
 
     for (let i = 1; i < wrappedName.length; i += 1) {
       encoder.text(wrappedName[i]);
+    }
+    if (isWeighted) {
+      for (const wtLine of wrapWords(
+        `${formatWeightKg(item.weightKg!)} x Rs ${formatDecimal(item.unitRate!)}/kg`,
+        cols - 2,
+      )) {
+        encoder.text(`  ${wtLine}`);
+      }
     }
     if (modifiers.length) {
       for (const modLine of wrapWords(`+ ${modifiers.join(', ')}`, cols - 2)) {
@@ -579,7 +610,10 @@ export function receiptLines(sale: Sale, settings: PrinterSettings = DEFAULT_PRI
     );
   }
   for (const item of sale.items || []) {
-    lines.push(`${item.name} x${item.qty}  ${formatAmount(item.price * item.qty)}`);
+    const qtyLabel = item.weightKg && item.unitRate
+      ? `(${formatWeightKg(item.weightKg)} x ${formatAmount(item.unitRate)}/kg)`
+      : `x${item.qty}`;
+    lines.push(`${item.name} ${qtyLabel}  ${formatAmount(item.price * item.qty)}`);
     if (item.note) lines.push(`  Note: ${item.note}`);
     if (item.refundedQty) lines.push(`  (refunded ${item.refundedQty})`);
   }
@@ -656,19 +690,23 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
   const items = (sale.items || [])
     .map((item) => {
       const { baseName, modifiers, note } = splitItemDisplay(item);
+      const isWeighted = Boolean(item.weightKg && item.unitRate);
+      const rateDisplay = formatDecimal(isWeighted ? item.unitRate! : item.price);
+      const qtyDisplay = isWeighted ? formatWeightShort(item.weightKg!) : String(item.qty);
       return `<tr class="item">
         <td class="name">
           <div class="dish-name">${escapeHtml(baseName)}</div>
+          ${isWeighted ? `<div class="mods">${escapeHtml(formatWeightKg(item.weightKg!))} &times; ${escapeHtml(formatAmount(item.unitRate!))}/kg</div>` : ''}
           ${modifiers.length ? `<div class="mods">+ ${escapeHtml(modifiers.join(', '))}</div>` : ''}
           ${note ? `<div class="note">* Note: ${escapeHtml(note)}</div>` : ''}
           ${item.refundedQty ? `<div class="refund-tag">[Refunded: ${escapeHtml(item.refundedQty)}]</div>` : ''}
         </td>
         ${
           settings.printItemPrices
-            ? `<td class="num">${escapeHtml(formatDecimal(item.price))}</td>
-               <td class="num">${escapeHtml(item.qty)}</td>
+            ? `<td class="num">${escapeHtml(rateDisplay)}</td>
+               <td class="num">${escapeHtml(qtyDisplay)}</td>
                <td class="num amt">${escapeHtml(formatDecimal(item.price * item.qty))}</td>`
-            : `<td class="num amt" colspan="3">${escapeHtml(item.qty)}x</td>`
+            : `<td class="num amt" colspan="3">${escapeHtml(isWeighted ? qtyDisplay : `${item.qty}x`)}</td>`
         }
       </tr>`;
     })
@@ -698,7 +736,7 @@ export function receiptDocument(sale: Sale, settings: PrinterSettings): string {
         .map((item) => {
           const { baseName, modifiers, note } = splitItemDisplay(item);
           return `<div class="k-item">
-            <span class="k-qty">${escapeHtml(item.qty)}x</span>
+            <span class="k-qty">${escapeHtml(item.weightKg ? formatWeightShort(item.weightKg) : `${item.qty}x`)}</span>
             <div class="k-body">
               <div class="k-name">${escapeHtml(baseName)}</div>
               ${modifiers.length ? `<div class="k-mod">+ ${escapeHtml(modifiers.join(', '))}</div>` : ''}
