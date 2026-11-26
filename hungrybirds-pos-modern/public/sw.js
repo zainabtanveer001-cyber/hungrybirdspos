@@ -1,5 +1,5 @@
 // Modern POS Service Worker — clears legacy caches and uses network-first so mobile & desktop stay in sync.
-const CACHE_NAME = 'hb-pos-modern-v4.1';
+const CACHE_NAME = 'hb-pos-modern-v4.2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

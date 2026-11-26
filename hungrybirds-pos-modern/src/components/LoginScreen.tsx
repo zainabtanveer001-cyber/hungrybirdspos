@@ -33,7 +33,7 @@ export function LoginScreen({ onSignedIn }: { onSignedIn: (user: User) => void }
     >
       <div className="bg-white rounded-2xl border border-[#c5b9fa] p-6 sm:p-10 w-full max-w-md shadow-[0_24px_60px_rgba(0,5,36,0.55)] my-auto">
         <div className="flex justify-center mb-3">
-          <img src="/logo.svg" alt="" className="w-14 h-14" />
+          <img src="/logo.png" alt="Hungry Birds" className="w-20 h-20 object-contain" />
         </div>
         <div className="flex justify-center mb-2">
           <span className="inline-block rounded-[88px] bg-[#eff6ff] text-[#2941e0] px-4 py-1 text-xs font-semibold">
@@ -158,9 +158,12 @@ function OwnerSetupModal({ onClose, onDone }: {
       }}
     >
       <form onSubmit={submit} className="bg-white rounded-2xl border border-[#c5b9fa] p-6 w-full max-w-sm shadow-2xl space-y-3 my-auto">
-        <h3 id="ownerSetupHeading" className="font-display text-lg font-medium text-[#000000]">
-          Create the owner account
-        </h3>
+        <div className="flex items-center gap-2.5">
+          <img src="/logo.png" alt="" className="w-9 h-9 object-contain shrink-0" />
+          <h3 id="ownerSetupHeading" className="font-display text-lg font-medium text-[#000000]">
+            Create the owner account
+          </h3>
+        </div>
         <p className="text-xs text-[#526066] leading-relaxed">
           One-time setup. Use the admin email listed in your Firestore rules
           (<span className="font-mono text-[#273238]">owner@hungrybirds.com</span>). This only works once, for the project admin.

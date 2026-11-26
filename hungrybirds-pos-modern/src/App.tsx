@@ -459,7 +459,7 @@ function App() {
             )}
           </button>
           <h1 className="font-display text-sm sm:text-xl font-medium tracking-normal flex items-center gap-1.5 sm:gap-2.5 min-w-0">
-            <img src="/logo.svg" alt="" className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
+            <img src="/logo.png" alt="Hungry Birds" className="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0" />
             <span
               className={`text-[#000000] truncate ${
                 pendingOnlineCount > 0 ? 'sr-only sm:not-sr-only' : ''

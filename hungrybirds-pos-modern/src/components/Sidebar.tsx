@@ -203,9 +203,14 @@ export function Sidebar({ role, username, open, onClose, onSignOut, onOpenHeldOr
 
         {!collapsed ? (
           <div className="mx-1 mt-4 rounded-2xl bg-[#000524] p-3 text-xs leading-relaxed text-white">
-            <div className="font-display font-medium text-white">Hungry Birds POS</div>
-            <div className="text-[#c5b9fa]">
-              Signed in as <span className="font-medium text-white">{username}</span> · {role}
+            <div className="flex items-center gap-2.5 mb-1">
+              <img src="/logo.png" alt="" className="w-8 h-8 object-contain shrink-0" />
+              <div className="min-w-0">
+                <div className="font-display font-medium text-white truncate">Hungry Birds POS</div>
+                <div className="text-[#c5b9fa] truncate">
+                  Signed in as <span className="font-medium text-white">{username}</span> · {role}
+                </div>
+              </div>
             </div>
             <button
               type="button"
