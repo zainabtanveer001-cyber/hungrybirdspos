@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## [2026-11-26] Brand Logo & Favicon Update (Slice 28)
+- **Tab Favicon, PWA Icons & Vector Assets (`index.html`, `public/manifest.json`, `public/sw.js`, `public/*.png`, `public/*.svg`):** Replaced the placeholder orange bird SVG with the official full-color Hungry Birds chef-rooster emblem across `favicon-32x32.png`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `logo.png`, `logo.svg`, and `favicon.svg`, and bumped service worker cache to `hb-pos-modern-v4.2`.
+- **POS UI Brand Placements (`src/App.tsx`, `src/components/LoginScreen.tsx`, `src/components/Sidebar.tsx`):** Updated the top header bar (`App.tsx`), sign-in card & Owner setup modal (`LoginScreen.tsx`), and navigation sidebar brand card (`Sidebar.tsx`) to display `/logo.png` cleanly centered with crisp transparent edges.
+
 ## [2026-11-26] Weight-Based (Per kg) Menu Item Pricing (Slice 27)
 - **Menu Setup (`src/lib/db/types.ts`, `src/lib/menu.ts`, `src/components/AdminSettingsModal.tsx`):** Added `MenuItem.soldByWeight` toggle so weighted dishes (e.g. Grilled Fish at `Rs 1,800/kg`) store per-kg rates and configure ingredient deductions per 1 kg sold.
 - **Weight Picker & Cart UX (`src/components/WeightModal.tsx`, `src/components/MenuGrid.tsx`, `src/components/CartPanel.tsx`, `src/components/ModifierModal.tsx`, `src/lib/cart.ts`, `src/App.tsx`):** Added decimal- and comma-aware `kg`/`g` weight picker modal with presets (`0.5`, `1`, `1.5`, `2 kg`), locked per-kg rate, whole-rupee line rounding (`computeWeightedPrice`), flat per-fish extras preservation, separate line identity per weighed portion (`2.4 kg` vs `1.8 kg`), and tappable cart weight badge to re-weigh items.

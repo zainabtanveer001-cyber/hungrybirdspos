@@ -1,6 +1,6 @@
 # Project Status — Hungry Birds POS
 
-- **Current Phase:** Phase 3 Complete — Slice 27 (Weight-based per-kg menu pricing implemented & verified)
+- **Current Phase:** Phase 3 Complete — Slice 28 (Official Hungry Birds chef-rooster logo applied to tab favicon, PWA icons, and all POS UI placements)
 - **Active Branch:** `main`
 - **Last Updated:** 2026-11-26
 
@@ -68,6 +68,9 @@
   - Added `soldByWeight` menu configuration (`db/types.ts`, `menu.ts`, `AdminSettingsModal.tsx`), `Per kg` badges and `+ Weigh` triggers (`MenuGrid.tsx`), `WeightModal.tsx` (`kg`/`g` toggle, comma/dot decimal parsing, `0.5`/`1`/`1.5`/`2 kg` quick presets, locked per-kg rate, whole-rupee line rounding), flat per-fish extras preservation (`cart.ts`, `ModifierModal.tsx`), and tappable weight chips (`CartPanel.tsx`, `App.tsx`).
   - Scaled recipe stock checks/deductions/restorations, refunds, and live shift COGS by sold `weightKg` (`sales.ts`, `refunds.ts`, `shift.ts`), and formatted `weight × rate/kg` cleanly across 80mm/58mm ESC/POS, HTML print, KOT (`2.4kg Grilled Fish`), KDS cards, Held Orders, and Sales History (`receipt.ts`, `KitchenDisplayModal.tsx`, `HeldOrdersModal.tsx`, `RefundModal.tsx`, `SalesHistoryModal.tsx`).
   - Added 6 regression tests across `cart.test.ts`, `salesIntegrity.test.ts`, `shift.test.ts`, and `receipt.test.ts`.
+- **Feature Slice 28 — Official Brand Logo & Tab Favicon Rollout:**
+  - Converted uploaded chef-rooster logo into centered transparent PNGs (`logo.png`, `favicon-32x32.png`, `icon-192.png`, `icon-512.png`, white-backed `apple-touch-icon.png`) and replaced legacy `logo.svg`/`favicon.svg` placeholders; bumped `public/sw.js` cache to `hb-pos-modern-v4.2`.
+  - Updated `index.html`, `public/manifest.json`, `App.tsx` header, `LoginScreen.tsx` (login card + Owner setup modal), and `Sidebar.tsx` brand card to use `/logo.png`.
 
 ## 2. Verification Results
 - `cd hungrybirds-pos-modern && npm test` → **19 passed (19)** test files, **142 passed (142)** tests.
